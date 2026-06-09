@@ -2977,6 +2977,7 @@ async function saveDoc(id){
   else await sb.from('documents').insert({name,url,audience,specific_emails,category:category||null,created_by:D.profile.id});
   closeM();await reload();
 }
+}
 </script>
 </body>
 </html>
