@@ -1658,15 +1658,22 @@ function renderModal(){
     const bal=m.balance||{};
     const cf=bal.annual_carry_forward||0;
     const rid=bal.rider_id||'';
+    const hc=bal?bal.historical_consumed||0:0;
+    const hs=bal?bal.historical_sick||0:0;
     box.innerHTML=`<div class="modal-title"><i class="ti ti-calendar-stats"></i>Edit Leave Balance — ${m.patrollerName}</div>
     <div class="msg msg-err" id="lb-e"></div>
     <div class="info-box" style="background:#FFF0E6;border:1px solid #FFB380;color:#D94D00;font-size:12px;margin-bottom:14px">
       <i class="ti ti-info-circle" style="margin-right:5px"></i>
-      Only set the <b>carry forward</b> from previous year. All other values are auto-calculated from approved requests.
+      <b>Consumed</b> = leaves taken before this app was set up. New approved requests are added on top automatically.
     </div>
     <div class="fg-row">
       <div class="fg"><label>Rider ID</label><input id="lb-rid" value="${rid}" placeholder="e.g. 784315"></div>
-      <div class="fg"><label>Annual leave carry forward (days)</label><input type="number" id="lb-cf" value="${cf}" step="0.001" min="0" placeholder="0"></div>
+      <div class="fg"><label>Annual carry forward (days)</label><input type="number" id="lb-cf" value="${cf}" step="0.001" min="0" placeholder="0"></div>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin:12px 0 8px">Historical consumed (before app)</div>
+    <div class="fg-row">
+      <div class="fg"><label>Annual leave consumed</label><input type="number" id="lb-hc" value="${hc}" step="1" min="0" placeholder="0"></div>
+      <div class="fg"><label>Sick leave consumed</label><input type="number" id="lb-hs" value="${hs}" step="1" min="0" placeholder="0"></div>
     </div>
     <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveLeaveBalance('${m.patrollerId}')"><i class="ti ti-check"></i>Save</button></div>`;return;
   }
@@ -2829,13 +2836,16 @@ async function saveLeaveBalance(patrollerId){
   const e=document.getElementById('lb-e');e.style.display='none';
   const cf=parseFloat(document.getElementById('lb-cf').value)||0;
   const rid=(document.getElementById('lb-rid').value||'').trim();
+  const hc=parseFloat(document.getElementById('lb-hc').value)||0;
+  const hs=parseFloat(document.getElementById('lb-hs').value)||0;
   const existing=D.leaveBalances.find(b=>b.patroller_id===patrollerId);
   const year=getLeaveYear();
+  const payload={annual_carry_forward:cf,rider_id:rid||null,year,historical_consumed:hc,historical_sick:hs,updated_at:new Date().toISOString()};
   if(existing){
-    const{error}=await sb.from('leave_balances').update({annual_carry_forward:cf,rider_id:rid||null,year,updated_at:new Date().toISOString()}).eq('id',existing.id);
+    const{error}=await sb.from('leave_balances').update(payload).eq('id',existing.id);
     if(error){e.textContent=error.message;e.style.display='block';return;}
   } else {
-    const{error}=await sb.from('leave_balances').insert({patroller_id:patrollerId,annual_carry_forward:cf,rider_id:rid||null,year});
+    const{error}=await sb.from('leave_balances').insert({patroller_id:patrollerId,...payload});
     if(error){e.textContent=error.message;e.style.display='block';return;}
   }
   closeM();await reload();
@@ -2950,12 +2960,18 @@ function getLeaveBalance(patrollerId){
     return s + (isNaN(d1)||isNaN(d2) ? 1 : Math.round((d2-d1)/86400000)+1);
   }, 0);
 
-  // Historical consumed = from spreadsheet before app existed
-  const historicalConsumed = rosterEntry ? (rosterEntry.historicalConsumed || 0) : 0;
+  // Historical consumed: DB value takes priority, then roster spreadsheet value
+  const historicalConsumed = (lb && lb.historical_consumed != null)
+    ? lb.historical_consumed
+    : (rosterEntry ? (rosterEntry.historicalConsumed || 0) : 0);
+  const historicalSick = (lb && lb.historical_sick != null)
+    ? lb.historical_sick
+    : 0;
   // App consumed = new approved requests entered in this app
   const appConsumedAnnual  = countDays(approved.filter(t=>t.request_type==='Annual Leave'));
   const consumedAnnual     = historicalConsumed + appConsumedAnnual;
-  const consumedSick       = countDays(approved.filter(t=>t.request_type==='Sick Leave'));
+  const appConsumedSick    = countDays(approved.filter(t=>t.request_type==='Sick Leave'));
+  const consumedSick       = historicalSick + appConsumedSick;
   const consumedSick50     = countDays(approved.filter(t=>t.request_type==='Sick Leave 50%'));
   const consumedUnpaid     = countDays(approved.filter(t=>['Sick Leave Unpaid','Unpaid Leave'].includes(t.request_type)));
   const consumedBereavement= countDays(approved.filter(t=>['Death','Bereavement'].includes(t.request_type)));
@@ -2977,6 +2993,7 @@ function getLeaveBalance(patrollerId){
     bereavEnt, consumedBereavement,
     bereavementRemaining:Math.max(0, bereavEnt - consumedBereavement),
     year,
+    historicalConsumed, historicalSick,
     riderId: (lb&&lb.rider_id) ? lb.rider_id : (rosterEntry ? rosterEntry.riderId : ''),
     lastUpdated: lb ? lb.updated_at : null,
   };
@@ -3017,7 +3034,9 @@ function leaveBalanceCard(p, showFull=true){
         <span>Carry fwd: <strong style="color:#2A0D0F">${b.carryForward}</strong></span>
         <span>Accrued: <strong style="color:#2A0D0F">${b.accrued}</strong></span>
         <span>Total: <strong style="color:#2A0D0F">${b.totalAnnual}</strong></span>
-        <span>Consumed: <strong style="color:#DC2626">${b.consumedAnnual}</strong></span>
+        <span>Consumed: <strong style="color:#DC2626">${b.consumedAnnual}</strong>
+          ${b.historicalConsumed>0?`<span style="font-size:9px;color:#A08070"> (${b.historicalConsumed} pre-app)</span>`:''}
+        </span>
       </div>
     </div>
 
