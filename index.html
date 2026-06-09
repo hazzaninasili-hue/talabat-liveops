@@ -264,36 +264,6 @@ let D={user:null,profile:null,tab:'schedule',view:'week',woff:0,search:'',modal:
 
 const isSuperAdmin=()=>D.user?.email===SUPER_ADMIN;
 
-function toggleDeptDropdown(){
-  if(!isSuperAdmin())return;
-  const dd=document.getElementById('dept-dropdown');
-  if(!dd)return;
-  const isOpen=dd.style.display==='block';
-  if(isOpen){dd.style.display='none';return;}
-  // Build dropdown
-  const depts=D.departments||[];
-  let html='';
-  if(depts.length===0){
-    html=`<div style="padding:12px 14px;font-size:12px;color:rgba(255,255,255,.4)">No departments yet</div>`;
-  } else {
-    depts.forEach(d=>{
-      const isActive=D.currentDept===d.id;
-      html+=`<div onclick="enterDepartment('${d.id}');toggleDeptDropdown()" style="padding:10px 14px;font-size:12.5px;font-weight:${isActive?'700':'500'};color:${isActive?'#FF5900':'rgba(255,255,255,.85)'};cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='transparent'">
-        <div style="width:10px;height:10px;border-radius:50%;background:${d.color||'#FF5900'};flex-shrink:0"></div>
-        ${d.name}${isActive?' ✓':''}
-      </div>`;
-    });
-  }
-  html+=`<div style="border-top:1px solid rgba(255,255,255,.1);padding:8px 14px">
-    <div onclick="exitToDashboard();toggleDeptDropdown()" style="font-size:11.5px;color:rgba(255,255,255,.5);cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 0" onmouseover="this.style.color='#FF5900'" onmouseout="this.style.color='rgba(255,255,255,.5)'">
-      <i class="ti ti-layout-grid" style="font-size:12px"></i> All Departments
-    </div>
-  </div>`;
-  dd.innerHTML=html;
-  dd.style.display='block';
-  // Close on outside click
-  setTimeout(()=>document.addEventListener('click',function h(e){if(!dd.contains(e.target)&&e.target.id!=='wk-chip'){dd.style.display='none';document.removeEventListener('click',h);}},),50);
-}
 function showS(n){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display=n==='login'?'flex':'none';if(np)np.style.display=n==='newpw'?'flex':'none';document.getElementById('app').style.display='none';}
 function showApp(){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display='none';if(np)np.style.display='none';document.getElementById('app').style.display='block';}
 function showErr(id,m){const e=document.getElementById(id);if(e){e.textContent=m;e.style.display='block';}}
@@ -348,6 +318,167 @@ async function loadDepartments(){
   }catch(e){D.departments=[];console.warn('Dept load failed:',e.message);}
 }
 
+
+function renderSuperDash(){
+  showApp();
+  // Update topbar for super admin
+  const u=D.profile;
+  const sc=document.getElementById('wk-chip');
+  if(sc){sc.innerHTML='All Departments <i class="ti ti-chevron-down" style="font-size:9px"></i>';sc.style.cursor='pointer';}
+  document.getElementById('user-chip').innerHTML=`<div class="user-av" style="background:#FF5900;color:#fff">SA</div><div><div class="user-nm">${u.full_name}</div><div class="user-rl">Super Admin</div></div>`;
+  document.getElementById('tabs').innerHTML='';
+
+  const depts=D.departments||[];
+  const totalDepts=depts.length;
+
+  let html=`
+  <style>
+    .dept-card{background:#fff;border:1.5px solid #E8DDD4;border-radius:16px;padding:20px;cursor:pointer;transition:all .18s;box-shadow:0 1px 4px rgba(65,21,23,.06)}
+    .dept-card:hover{box-shadow:0 8px 24px rgba(65,21,23,.14);transform:translateY(-2px);border-color:#FF5900}
+    .dept-stat{text-align:center;padding:10px;background:#F4EDE3;border-radius:10px}
+    .dept-stat-val{font-size:22px;font-weight:700;color:#411517}
+    .dept-stat-lbl{font-size:9px;font-weight:700;color:#A08070;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+  </style>
+  <div style="max-width:1400px;margin:0 auto;padding:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-size:22px;font-weight:700;color:#411517">🏢 Department Overview</div>
+        <div style="font-size:13px;color:#A08070;margin-top:3px">${totalDepts} department${totalDepts!==1?'s':''} · Super Admin Dashboard</div>
+      </div>
+      <button onclick="openM({type:'createdept'})" style="padding:10px 20px;background:#FF5900;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px">
+        <i class="ti ti-building-plus" style="font-size:16px"></i> Create Department
+      </button>
+    </div>`;
+
+  if(depts.length===0){
+    html+=`<div style="text-align:center;padding:80px 20px;background:#fff;border-radius:20px;border:2px dashed #E8DDD4">
+      <i class="ti ti-building" style="font-size:60px;color:#E8DDD4;display:block;margin-bottom:16px"></i>
+      <div style="font-size:18px;font-weight:700;color:#411517;margin-bottom:8px">No departments yet</div>
+      <div style="font-size:13px;color:#A08070;margin-bottom:20px">Create your first department to get started</div>
+      <button onclick="openM({type:'createdept'})" style="padding:10px 24px;background:#FF5900;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">
+        <i class="ti ti-plus"></i> Create Department
+      </button>
+    </div>`;
+  } else {
+    html+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">`;
+    depts.forEach(dept=>{
+      const adminEmail=dept.admin_email||'No admin set';
+      const color=dept.color||'#411517';
+      html+=`<div class="dept-card" onclick="enterDepartment('${dept.id}')">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+          <div style="width:46px;height:46px;border-radius:12px;background:${color};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i class="ti ti-building" style="font-size:22px;color:#fff"></i>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:700;color:#2A0D0F">${dept.name}</div>
+            <div style="font-size:11px;color:#A08070;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${adminEmail}</div>
+          </div>
+          <div style="display:flex;gap:5px">
+            <button onclick="event.stopPropagation();openM({type:'editdept',dept:D.departments.find(d=>d.id==='${dept.id}')})" style="width:30px;height:30px;border-radius:7px;border:1.5px solid #E8DDD4;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#A08070" title="Edit"><i class="ti ti-edit" style="font-size:13px"></i></button>
+            <button onclick="event.stopPropagation();delDept('${dept.id}','${dept.name.replace(/'/g,"\'")}');" style="width:30px;height:30px;border-radius:7px;border:1.5px solid #E8DDD4;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#A08070" title="Delete"><i class="ti ti-trash" style="font-size:13px"></i></button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <div class="dept-stat"><div class="dept-stat-val" style="color:${color}">${dept.user_count||0}</div><div class="dept-stat-lbl">Users</div></div>
+          <div class="dept-stat"><div class="dept-stat-val" style="color:#16A34A">${dept.active_count||0}</div><div class="dept-stat-lbl">Active now</div></div>
+          <div class="dept-stat"><div class="dept-stat-val" style="color:#DC2626">${dept.absent_count||0}</div><div class="dept-stat-lbl">Absent today</div></div>
+        </div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid #F4EDE3;display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:11px;color:#A08070">Created ${new Date(dept.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</span>
+          <span style="font-size:11px;font-weight:600;color:#FF5900">Enter →</span>
+        </div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+  html+=`</div>`;
+  document.getElementById('main').innerHTML=html;
+}
+
+async function enterDepartment(deptId){
+  D.currentDept=deptId;
+  D.superView=false;
+  const dept=D.departments.find(d=>d.id===deptId);
+  // Load profile for this dept context
+  D.tab='schedule';
+  await loadAll();
+  render();
+}
+
+function exitToDashboard(){
+  D.currentDept=null;
+  D.superView=true;
+  D.tasks=[];D.attendance=[];D.shifts=[];D.areas=[];D.patrollers=[];D.schedules=[];D.users=[];D.timeoff=[];
+  loadDepartments().then(()=>renderSuperDash());
+}
+
+function delDept(id,name){
+  openM({type:'confirm',msg:`Delete department <b>${name}</b>? All data will be permanently removed.`,cb:async()=>{
+    await sb.from('departments').delete().eq('id',id);
+    closeM();await loadDepartments();renderSuperDash();
+  }});
+}
+
+function renderDeptModal(m){
+  const box=document.getElementById('modal-box');
+  const isEdit=m.type==='editdept';
+  const dept=isEdit?m.dept:{};
+  const colors=['#411517','#FF5900','#1565C0','#166534','#7C3AED','#D97706','#0D9488','#DC2626'];
+  const colorPicker=colors.map(c=>`<div onclick="document.getElementById('dept-color').value='${c}';document.querySelectorAll('.color-swatch').forEach(s=>s.style.outline='none');this.style.outline='3px solid #FF5900'" class="color-swatch" style="width:28px;height:28px;border-radius:7px;background:${c};cursor:pointer;${(dept.color||'#411517')===c?'outline:3px solid #FF5900':''}"></div>`).join('');
+  box.innerHTML=`<div class="modal-title"><i class="ti ti-building-plus"></i>${isEdit?'Edit Department':'Create Department'}</div>
+  <div class="msg msg-err" id="dept-e"></div>
+  <div class="fg"><label>Department name</label><input id="dept-name" value="${dept.name||''}" placeholder="e.g. NFV Picker, Bahrain Operations"></div>
+  <div class="fg"><label>Admin email (optional)</label><input type="email" id="dept-admin-email" value="${dept.admin_email||''}" placeholder="admin@company.com"></div>
+  <div class="fg"><label>Color</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:5px">${colorPicker}</div><input type="hidden" id="dept-color" value="${dept.color||'#411517'}"></div>
+  <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveDept('${isEdit?dept.id:'null'}')"><i class="ti ti-check"></i>Save</button></div>`;
+  document.getElementById('modal').classList.add('open');
+}
+
+async function saveDept(id){
+  const e=document.getElementById('dept-e');e.style.display='none';
+  const name=(document.getElementById('dept-name').value||'').trim();
+  const adminEmail=(document.getElementById('dept-admin-email').value||'').trim().toLowerCase();
+  const color=document.getElementById('dept-color').value||'#411517';
+  if(!name){e.textContent='Department name required.';e.style.display='block';return;}
+  if(id!=='null'){
+    await sb.from('departments').update({name,admin_email:adminEmail||null,color,updated_at:new Date().toISOString()}).eq('id',id);
+  } else {
+    const{error}=await sb.from('departments').insert({name,admin_email:adminEmail||null,color,created_by:D.profile.id});
+    if(error){e.textContent=error.message;e.style.display='block';return;}
+  }
+  closeM();await loadDepartments();renderSuperDash();
+}
+
+function toggleDeptDropdown(){
+  if(!isSuperAdmin())return;
+  const dd=document.getElementById('dept-dropdown');
+  if(!dd)return;
+  const isOpen=dd.style.display==='block';
+  if(isOpen){dd.style.display='none';return;}
+  // Build dropdown
+  const depts=D.departments||[];
+  let html='';
+  if(depts.length===0){
+    html=`<div style="padding:12px 14px;font-size:12px;color:rgba(255,255,255,.4)">No departments yet</div>`;
+  } else {
+    depts.forEach(d=>{
+      const isActive=D.currentDept===d.id;
+      html+=`<div onclick="enterDepartment('${d.id}');toggleDeptDropdown()" style="padding:10px 14px;font-size:12.5px;font-weight:${isActive?'700':'500'};color:${isActive?'#FF5900':'rgba(255,255,255,.85)'};cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='transparent'">
+        <div style="width:10px;height:10px;border-radius:50%;background:${d.color||'#FF5900'};flex-shrink:0"></div>
+        ${d.name}${isActive?' ✓':''}
+      </div>`;
+    });
+  }
+  html+=`<div style="border-top:1px solid rgba(255,255,255,.1);padding:8px 14px">
+    <div onclick="exitToDashboard();toggleDeptDropdown()" style="font-size:11.5px;color:rgba(255,255,255,.5);cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 0" onmouseover="this.style.color='#FF5900'" onmouseout="this.style.color='rgba(255,255,255,.5)'">
+      <i class="ti ti-layout-grid" style="font-size:12px"></i> All Departments
+    </div>
+  </div>`;
+  dd.innerHTML=html;
+  dd.style.display='block';
+  // Close on outside click
+  setTimeout(()=>document.addEventListener('click',function h(e){if(!dd.contains(e.target)&&e.target.id!=='wk-chip'){dd.style.display='none';document.removeEventListener('click',h);}},),50);
+}
 
 async function afterLogin(user){
   D.user=user;showApp();
@@ -2592,136 +2723,12 @@ async function saveTaskReq(){
 
 // ── DEPARTMENT FUNCTIONS ──
 
-async function enterDepartment(deptId){
-  D.currentDept=deptId;
-  D.superView=false;
-  const dept=D.departments.find(d=>d.id===deptId);
-  // Load profile for this dept context
-  D.tab='schedule';
-  await loadAll();
-  render();
-}
 
-function exitToDashboard(){
-  D.currentDept=null;
-  D.superView=true;
-  D.tasks=[];D.attendance=[];D.shifts=[];D.areas=[];D.patrollers=[];D.schedules=[];D.users=[];D.timeoff=[];
-  loadDepartments().then(()=>renderSuperDash());
-}
 
-function renderSuperDash(){
-  showApp();
-  // Update topbar for super admin
-  const u=D.profile;
-  const sc=document.getElementById('wk-chip');
-  if(sc){sc.innerHTML='All Departments <i class="ti ti-chevron-down" style="font-size:9px"></i>';sc.style.cursor='pointer';}
-  document.getElementById('user-chip').innerHTML=`<div class="user-av" style="background:#FF5900;color:#fff">SA</div><div><div class="user-nm">${u.full_name}</div><div class="user-rl">Super Admin</div></div>`;
-  document.getElementById('tabs').innerHTML='';
 
-  const depts=D.departments||[];
-  const totalDepts=depts.length;
-
-  let html=`
-  <style>
-    .dept-card{background:#fff;border:1.5px solid #E8DDD4;border-radius:16px;padding:20px;cursor:pointer;transition:all .18s;box-shadow:0 1px 4px rgba(65,21,23,.06)}
-    .dept-card:hover{box-shadow:0 8px 24px rgba(65,21,23,.14);transform:translateY(-2px);border-color:#FF5900}
-    .dept-stat{text-align:center;padding:10px;background:#F4EDE3;border-radius:10px}
-    .dept-stat-val{font-size:22px;font-weight:700;color:#411517}
-    .dept-stat-lbl{font-size:9px;font-weight:700;color:#A08070;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
-  </style>
-  <div style="max-width:1400px;margin:0 auto;padding:24px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
-      <div>
-        <div style="font-size:22px;font-weight:700;color:#411517">🏢 Department Overview</div>
-        <div style="font-size:13px;color:#A08070;margin-top:3px">${totalDepts} department${totalDepts!==1?'s':''} · Super Admin Dashboard</div>
-      </div>
-      <button onclick="openM({type:'createdept'})" style="padding:10px 20px;background:#FF5900;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px">
-        <i class="ti ti-building-plus" style="font-size:16px"></i> Create Department
-      </button>
-    </div>`;
-
-  if(depts.length===0){
-    html+=`<div style="text-align:center;padding:80px 20px;background:#fff;border-radius:20px;border:2px dashed #E8DDD4">
-      <i class="ti ti-building" style="font-size:60px;color:#E8DDD4;display:block;margin-bottom:16px"></i>
-      <div style="font-size:18px;font-weight:700;color:#411517;margin-bottom:8px">No departments yet</div>
-      <div style="font-size:13px;color:#A08070;margin-bottom:20px">Create your first department to get started</div>
-      <button onclick="openM({type:'createdept'})" style="padding:10px 24px;background:#FF5900;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">
-        <i class="ti ti-plus"></i> Create Department
-      </button>
-    </div>`;
-  } else {
-    html+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">`;
-    depts.forEach(dept=>{
-      const adminEmail=dept.admin_email||'No admin set';
-      const color=dept.color||'#411517';
-      html+=`<div class="dept-card" onclick="enterDepartment('${dept.id}')">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-          <div style="width:46px;height:46px;border-radius:12px;background:${color};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <i class="ti ti-building" style="font-size:22px;color:#fff"></i>
-          </div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:15px;font-weight:700;color:#2A0D0F">${dept.name}</div>
-            <div style="font-size:11px;color:#A08070;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${adminEmail}</div>
-          </div>
-          <div style="display:flex;gap:5px">
-            <button onclick="event.stopPropagation();openM({type:'editdept',dept:D.departments.find(d=>d.id==='${dept.id}')})" style="width:30px;height:30px;border-radius:7px;border:1.5px solid #E8DDD4;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#A08070" title="Edit"><i class="ti ti-edit" style="font-size:13px"></i></button>
-            <button onclick="event.stopPropagation();delDept('${dept.id}','${dept.name.replace(/'/g,"\'")}');" style="width:30px;height:30px;border-radius:7px;border:1.5px solid #E8DDD4;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#A08070" title="Delete"><i class="ti ti-trash" style="font-size:13px"></i></button>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-          <div class="dept-stat"><div class="dept-stat-val" style="color:${color}">${dept.user_count||0}</div><div class="dept-stat-lbl">Users</div></div>
-          <div class="dept-stat"><div class="dept-stat-val" style="color:#16A34A">${dept.active_count||0}</div><div class="dept-stat-lbl">Active now</div></div>
-          <div class="dept-stat"><div class="dept-stat-val" style="color:#DC2626">${dept.absent_count||0}</div><div class="dept-stat-lbl">Absent today</div></div>
-        </div>
-        <div style="margin-top:12px;padding-top:12px;border-top:1px solid #F4EDE3;display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:11px;color:#A08070">Created ${new Date(dept.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</span>
-          <span style="font-size:11px;font-weight:600;color:#FF5900">Enter →</span>
-        </div>
-      </div>`;
-    });
-    html+=`</div>`;
-  }
-  html+=`</div>`;
-  document.getElementById('main').innerHTML=html;
-}
-
-function delDept(id,name){
-  openM({type:'confirm',msg:`Delete department <b>${name}</b>? All data will be permanently removed.`,cb:async()=>{
-    await sb.from('departments').delete().eq('id',id);
-    closeM();await loadDepartments();renderSuperDash();
-  }});
-}
 
 // ── DEPT CREATE/EDIT MODAL RENDERING ──
-function renderDeptModal(m){
-  const box=document.getElementById('modal-box');
-  const isEdit=m.type==='editdept';
-  const dept=isEdit?m.dept:{};
-  const colors=['#411517','#FF5900','#1565C0','#166534','#7C3AED','#D97706','#0D9488','#DC2626'];
-  const colorPicker=colors.map(c=>`<div onclick="document.getElementById('dept-color').value='${c}';document.querySelectorAll('.color-swatch').forEach(s=>s.style.outline='none');this.style.outline='3px solid #FF5900'" class="color-swatch" style="width:28px;height:28px;border-radius:7px;background:${c};cursor:pointer;${(dept.color||'#411517')===c?'outline:3px solid #FF5900':''}"></div>`).join('');
-  box.innerHTML=`<div class="modal-title"><i class="ti ti-building-plus"></i>${isEdit?'Edit Department':'Create Department'}</div>
-  <div class="msg msg-err" id="dept-e"></div>
-  <div class="fg"><label>Department name</label><input id="dept-name" value="${dept.name||''}" placeholder="e.g. NFV Picker, Bahrain Operations"></div>
-  <div class="fg"><label>Admin email (optional)</label><input type="email" id="dept-admin-email" value="${dept.admin_email||''}" placeholder="admin@company.com"></div>
-  <div class="fg"><label>Color</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:5px">${colorPicker}</div><input type="hidden" id="dept-color" value="${dept.color||'#411517'}"></div>
-  <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveDept('${isEdit?dept.id:'null'}')"><i class="ti ti-check"></i>Save</button></div>`;
-  document.getElementById('modal').classList.add('open');
-}
 
-async function saveDept(id){
-  const e=document.getElementById('dept-e');e.style.display='none';
-  const name=(document.getElementById('dept-name').value||'').trim();
-  const adminEmail=(document.getElementById('dept-admin-email').value||'').trim().toLowerCase();
-  const color=document.getElementById('dept-color').value||'#411517';
-  if(!name){e.textContent='Department name required.';e.style.display='block';return;}
-  if(id!=='null'){
-    await sb.from('departments').update({name,admin_email:adminEmail||null,color,updated_at:new Date().toISOString()}).eq('id',id);
-  } else {
-    const{error}=await sb.from('departments').insert({name,admin_email:adminEmail||null,color,created_by:D.profile.id});
-    if(error){e.textContent=error.message;e.style.display='block';return;}
-  }
-  closeM();await loadDepartments();renderSuperDash();
-}
 
 // Store system role overrides locally
 const SYSTEM_ROLE_OVERRIDES={};
