@@ -346,101 +346,6 @@ async function afterLogin(user){
   try{
     let{data:prof}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);
     if(!prof){
-      const{data:byEmail}=await wt(sb.from('profiles').select('*').eq('email',user.email).maybeSingle(),5000);
-      if(byEmail){
-        await sb.from('profiles').update({id:user.id}).eq('email',user.email);
-        prof={...byEmail,id:user.id};
-      } else {
-        await sb.from('profiles').upsert({id:user.id,email:user.email,full_name:user.user_metadata?.full_name||user.email.split('@')[0],role:user.user_metadata?.role||'patroller',is_active:true},{onConflict:'id'});
-        const{data:p2}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);
-        prof=p2;
-      }
-    }
-    D.profile=prof||{id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};
-  }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};}
-  D.tab=(D.profile.role==='patroller'||D.profile.role==='coordinator')?'myschedule':'schedule';
-  if(isSuperAdmin()){
-    D.superView=true;
-    await loadDepartments();
-    renderSuperDash();
-    return;
-  }
-  await loadAll();
-  render();
-}
-
-async function syncUserProfile(email){
-  try{
-    console.log('Sync: Checking profile for email:', email);
-    
-    // Step 1: Check if profile exists
-    const{data:prof}=await sb.from('profiles').select('id').eq('email',email.toLowerCase()).maybeSingle();
-    console.log('Sync: Profile check result:', prof ? 'Found' : 'Not found');
-    
-    if(prof){
-      console.log('Sync: Profile already exists');
-      return true;
-    }
-    
-    // Step 2: Check if patroller exists with this email
-    console.log('Sync: Looking for patroller with email:', email);
-    const{data:pat}=await sb.from('patrollers').select('id,name,user_type,phone,email').eq('email',email.toLowerCase()).maybeSingle();
-    console.log('Sync: Patroller check result:', pat);
-    
-    if(!pat){
-      console.log('Sync: No patroller found with email:', email);
-      return false;
-    }
-    
-    // Step 3: Create profile from patroller data
-    console.log('Sync: Creating profile from patroller:', pat.name);
-    const role=pat.user_type||'patroller';
-    const{data:newProf,error:createErr}=await sb.from('profiles').insert({
-      email:email.toLowerCase(),
-      full_name:pat.name,
-      role,
-      is_active:true
-    }).select().single();
-    
-    if(createErr){
-      console.error('Sync: Error creating profile:', createErr);
-      return false;
-    }
-    
-    console.log('Sync: Profile created successfully:', newProf?.email);
-    return true;
-    
-  }catch(e){
-    console.error('Sync profile error:',e.message);
-    return false;
-  }
-}
-async function doReset(){
-  
-  const email='';
-  if(!email){showErr('reset-err','Enter your email.');return;}
-  document.getElementById('reset-btn').disabled=true;
-  const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:REDIRECT});
-  document.getElementById('reset-btn').disabled=false;
-  if(error)showErr('reset-err',error.message);else showOk('reset-ok','Reset email sent!');
-}
-async function doSetPw(){
-  clearMsgs('newpw-err','newpw-ok');
-  const p1=document.getElementById('newpw1').value;const p2=document.getElementById('newpw2').value;
-  if(p1.length<8){showErr('newpw-err','Min 8 characters.');return;}
-  if(p1!==p2){showErr('newpw-err','Passwords do not match.');return;}
-  const{error}=await sb.auth.updateUser({password:p1});
-  if(error)showErr('newpw-err',error.message);
-  else{showOk('newpw-ok','Password updated!');setTimeout(()=>{window.location.hash='';showS('login');},1500);}
-}
-async function doLogout(){await sb.auth.signOut();}
-
-async function afterLogin(user){
-  D.user=user;showApp();
-  document.getElementById('main').innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:14px;color:#94A3B8"><div style="width:34px;height:34px;border:3px solid #E2E8F0;border-top-color:#1A6FE8;border-radius:50%;animation:spin .7s linear infinite"></div><div>Loading...</div></div>';
-  try{
-    let{data:prof}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);
-    if(!prof){
       // Try matching by email (handles case where profile predates auth account)
       const{data:byEmail}=await wt(sb.from('profiles').select('*').eq('email',user.email).maybeSingle(),5000);
       if(byEmail){
@@ -521,9 +426,9 @@ async function loadAll(){
     D.locPerms={};(lp||[]).forEach(r=>{D.locPerms[r.patroller_id]=r;});
   }catch(e){D.locPerms={};}
   try{
-    const{data:bd}=await wt(sb.from('device_biometric').select('*').order('last_login',{ascending:false}),5000);
+    const{data:bd}=await wt(sb.from('device_biometric').select('*').order('last_login',{ascending:false}),3000);
     D.biometricDevices=bd||[];
-  }catch(e){D.biometricDevices=[];}
+  }catch(e){D.biometricDevices=[];console.warn('Biometric table not ready');}
   try{
     const{data:att,error:atterr}=await wt(sb.from('attendance').select('*').order('date',{ascending:false}).limit(500),5000);
     if(atterr){console.warn('Attendance table not ready:',atterr.message);D.attendance=[];}
@@ -2689,9 +2594,10 @@ async function saveTaskReq(){
 // ── DEPARTMENT FUNCTIONS ──
 async function loadDepartments(){
   try{
-    const{data}=await wt(sb.from('departments').select('*').order('name'),8000);
-    D.departments=data||[];
-  }catch(e){D.departments=[];console.warn('Dept load:',e);}
+    const{data,error}=await wt(sb.from('departments').select('*').order('name'),5000);
+    if(error){console.warn('Dept load error:',error.message);D.departments=[];}
+    else D.departments=data||[];
+  }catch(e){D.departments=[];console.warn('Dept load failed:',e.message);}
 }
 
 async function enterDepartment(deptId){
