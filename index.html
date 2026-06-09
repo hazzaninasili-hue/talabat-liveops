@@ -297,7 +297,7 @@ function getCurrentSaturday(){
 const BASE_DATE=getCurrentSaturday();
 const LEAVE_TYPES=['Annual Leave','Sick Leave','Sick Leave 50%','Sick Leave Unpaid','Unpaid Leave','Death'];
 
-let D={user:null,profile:null,customRoles:[],tab:'schedule',view:'week',woff:0,search:'',modal:null,ne:false,hweek:null,
+let D={user:null,profile:null,customRoles:[],leaveBalances:[],tab:'schedule',view:'week',woff:0,search:'',modal:null,ne:false,hweek:null,
   shifts:[],areas:[],zones:[],patrollers:[],schedules:[],users:[],
   notesAll:{id:null,content:''},notesPat:{id:null,content:''},notesCoo:{id:null,content:''},
   docs:[],history:[],timeoff:[],attendance:[],attDate:null,opsSub:'areas',locPerms:{},tasks:[],hourlyDay:null};
@@ -367,6 +367,7 @@ async function afterLogin(user){
   D.tab=(D.profile.role==='patroller'||D.profile.role==='coordinator')?'myschedule':'schedule';
   // Load custom roles first so renderTabs can use them
   try{const{data:cr}=await wt(sb.from('custom_roles').select('*').order('name'),4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
+  try{const{data:lb}=await wt(sb.from('leave_balances').select('*'),4000);D.leaveBalances=lb||[];}catch(e){D.leaveBalances=[];}
   await loadAll();
   render();
 }
@@ -460,6 +461,7 @@ async function afterLogin(user){
   D.tab=(D.profile.role==='patroller'||D.profile.role==='coordinator')?'myschedule':'schedule';
   // Load custom roles first so renderTabs can use them
   try{const{data:cr}=await wt(sb.from('custom_roles').select('*').order('name'),4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
+  try{const{data:lb}=await wt(sb.from('leave_balances').select('*'),4000);D.leaveBalances=lb||[];}catch(e){D.leaveBalances=[];}
   await loadAll();
   // Check & save location permission for this user
   if(D.profile.role==='patroller'||D.profile.role==='coordinator'){
@@ -506,6 +508,7 @@ async function loadAll(){
   try{const{data:hist}=await wt(sb.from('schedule_history').select('*,profiles(full_name)').order('changed_at',{ascending:false}).limit(300),5000);D.history=hist||[];}catch(e){}
   try{const{data:tor}=await wt(sb.from('time_off_requests').select('*').order('created_at',{ascending:false}),5000);D.timeoff=tor||[];}catch(e){}
   try{const{data:cr}=await wt(sb.from('custom_roles').select('*').order('name'),4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
+  try{const{data:lb}=await wt(sb.from('leave_balances').select('*'),4000);D.leaveBalances=lb||[];}catch(e){D.leaveBalances=[];}
 
   if(D.profile?.role==='admin'||D.profile?.role==='lead'){
     try{const{data:users}=await wt(sb.from('profiles').select('*').order('full_name'),5000);D.users=users||[];}catch(e){}
@@ -1333,6 +1336,7 @@ function renderTabs(){
     if(visTabs.includes('Summary'))tabs.push({id:'summary',icon:'ti-chart-bar',label:'Summary'});
     if(visTabs.includes('Attendance')){tabs.push({id:'myattendance',icon:'ti-clock-check',label:'Attendance'});if(canEditData)tabs.push({id:'attendance',icon:'ti-users',label:'Team Attendance'});}
     if(visTabs.includes('Time off & Tasks'))tabs.push({id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'});
+    tabs.push({id:'myleavebalance',icon:'ti-calendar-stats',label:'Leave Balance'});
     if(visTabs.includes('Documents'))tabs.push({id:'documents',icon:'ti-files',label:'Documents'});
     if(isFullAdmin){tabs.push({id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'});tabs.push({id:'access',icon:'ti-lock',label:'Access control'});}
     document.getElementById('tabs').innerHTML=tabs.map(t=>`<button class="tab${D.tab===t.id?' active':''}" onclick="setTab('${t.id}')"><i class="ti ${t.icon}"></i>${t.label}</button>`).join('');
@@ -1342,6 +1346,7 @@ function renderTabs(){
     {id:'myschedule',icon:'ti-user',label:'My schedule'},
     {id:'myattendance',icon:'ti-clock-check',label:'Attendance'},
     {id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'},
+    {id:'myleavebalance',icon:'ti-calendar-stats',label:'Leave Balance'},
     {id:'documents',icon:'ti-files',label:'Documents'},
   ]:[
     {id:'schedule',icon:'ti-calendar',label:'Schedule'},
@@ -1349,6 +1354,7 @@ function renderTabs(){
     {id:'attendance',icon:'ti-clock-check',label:'Attendance'},
     {id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'},
     {id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'},
+    {id:'leavebalance',icon:'ti-calendar-stats',label:'Leave Balance'},
     {id:'documents',icon:'ti-files',label:'Documents'},
     ...(role==='admin'?[{id:'access',icon:'ti-lock',label:'Access control'}]:[]),
   ];
@@ -1436,6 +1442,8 @@ function render(){
   else if(D.tab==='zonenshift')html=operationsView();
   else if(D.tab==='documents')html=docsView();
   else if(D.tab==='access')html=accessView();
+  else if(D.tab==='leavebalance')html=leaveBalanceView();
+  else if(D.tab==='myleavebalance')html=myLeaveBalanceView();
   else if(D.tab==='myschedule')html=mySchedView();
   else if(D.tab==='attendance')html=attendanceView();
   else if(D.tab==='myattendance')html=myAttendanceView();
@@ -1645,6 +1653,22 @@ function renderModal(){
       ${canEdit()&&t.status==='Pending'?`<button class="btn" style="background:#DCFCE7;color:#166534;border-color:#86efac" onclick="reviewTask('${t.id}','Approved');closeM()"><i class="ti ti-check"></i>Approve</button><button class="btn" style="background:#FEE2E2;color:#DC2626;border-color:#fca5a5" onclick="reviewTask('${t.id}','Rejected');closeM()"><i class="ti ti-x"></i>Reject</button>`:''}
       <button class="btn" onclick="closeM()">Close</button>
     </div>`;return;
+  }
+  if(m.type==='editLeaveBalance'){
+    const bal=m.balance||{};
+    const cf=bal.annual_carry_forward||0;
+    const rid=bal.rider_id||'';
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-calendar-stats"></i>Edit Leave Balance — ${m.patrollerName}</div>
+    <div class="msg msg-err" id="lb-e"></div>
+    <div class="info-box" style="background:#FFF0E6;border:1px solid #FFB380;color:#D94D00;font-size:12px;margin-bottom:14px">
+      <i class="ti ti-info-circle" style="margin-right:5px"></i>
+      Only set the <b>carry forward</b> from previous year. All other values are auto-calculated from approved requests.
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>Rider ID</label><input id="lb-rid" value="${rid}" placeholder="e.g. 784315"></div>
+      <div class="fg"><label>Annual leave carry forward (days)</label><input type="number" id="lb-cf" value="${cf}" step="0.001" min="0" placeholder="0"></div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveLeaveBalance('${m.patrollerId}')"><i class="ti ti-check"></i>Save</button></div>`;return;
   }
   if(m.type==='addrole'||m.type==='editrole'){
     const isEdit=m.type==='editrole';const r=isEdit?m.role:{};
@@ -2801,6 +2825,23 @@ async function saveDoc(id){
 
 
 // ── CUSTOM ROLES ──
+async function saveLeaveBalance(patrollerId){
+  const e=document.getElementById('lb-e');e.style.display='none';
+  const cf=parseFloat(document.getElementById('lb-cf').value)||0;
+  const rid=(document.getElementById('lb-rid').value||'').trim();
+  const existing=D.leaveBalances.find(b=>b.patroller_id===patrollerId);
+  const year=getLeaveYear();
+  if(existing){
+    const{error}=await sb.from('leave_balances').update({annual_carry_forward:cf,rider_id:rid||null,year,updated_at:new Date().toISOString()}).eq('id',existing.id);
+    if(error){e.textContent=error.message;e.style.display='block';return;}
+  } else {
+    const{error}=await sb.from('leave_balances').insert({patroller_id:patrollerId,annual_carry_forward:cf,rider_id:rid||null,year});
+    if(error){e.textContent=error.message;e.style.display='block';return;}
+  }
+  closeM();await reload();
+  addNotification('Leave balance updated','success');
+}
+
 function openEditRole(id){
   const r=(D.customRoles||[]).find(x=>x.id===id);
   if(!r){alert('Role not found. Please refresh the page.');return;}
@@ -2826,6 +2867,201 @@ function delCustomRole(id,name){
     await sb.from('custom_roles').delete().eq('id',id);
     closeM();await reload();
   }});
+}
+
+
+const ROSTER_DATA = [
+  {riderId:'38250', name:'Mohamed Zubair', email:'muhammad.zubair.2@talabat.com'},
+  {riderId:'45193', name:'Nizam Moslem', email:'nizam.moslem@talabat.com'},
+  {riderId:'48090', name:'Bilal Dogar', email:'bilal.dogar@talabat.com'},
+  {riderId:'48254', name:'Sayed Ridha', email:'sayed.ridha@talabat.com'},
+  {riderId:'49851', name:'Muhammad Ikram', email:'muhammad.din@talabat.com'},
+  {riderId:'63266', name:'Dulal Ali', email:'dulal.ali@talabat.com'},
+  {riderId:'71266', name:'Habib Ullah', email:'habib.ullah.2@talabat.com'},
+  {riderId:'81784', name:'Mohammed Raza', email:'muhammad.raza@talabat.com'},
+  {riderId:'605117', name:'Hamza Saeed Hamada', email:'hamza.saeed@talabat.com'},
+  {riderId:'605119', name:'Hasan Mansoor Hasan', email:'hasan.mansoor@talabat.com'},
+  {riderId:'605128', name:'Majeed Ali Abdulla', email:'majeed.helal@talabat.com'},
+  {riderId:'605135', name:'Ali Merza Alsayyad', email:'ali.alsayyad@talabat.com'},
+  {riderId:'605139', name:'Hasan Khalil Ebrahim', email:'hassan.khalil.2@talabat.com'},
+  {riderId:'605150', name:'Husain Saeed Saleem', email:'hussain.saeed@talabat.com'},
+  {riderId:'615233', name:'Md Anowar', email:'anowar.hossain@talabat.com'},
+  {riderId:'663396', name:'Mohamed Gamal', email:'mohamed.gamal@talabat.com'},
+  {riderId:'784315', name:'Mohammad Numan', email:'mohammed.numan@talabat.com'},
+  {riderId:'892922', name:'Mohammad Moyeen Ansari', email:'mohammad.moyeen@talabat.com'},
+  {riderId:'1245190', name:'Hasmot Mofazzel Molla', email:'hasmoth.moffazal@talabat.com'},
+  {riderId:'1451195', name:'Farouq Juuko', email:'farouq.juuko@talabat.com'},
+  {riderId:'1516499', name:'Umair Younas', email:'umair.muhammad@talabat.com'},
+  {riderId:'1553175', name:'Deo Ssentongo', email:'deo.ssentongo@talabat.com'},
+  {riderId:'71199', name:'Asim Bilal', email:'asim.bilal@talabat.com'},
+  {riderId:'311970', name:'Muhammad Waqas', email:'muhammad.waqas@talabat.com'},
+];
+
+function getRosterByEmail(email){
+  return ROSTER_DATA.find(r=>r.email.toLowerCase()===(email||'').toLowerCase());
+}
+function getRosterByPatroller(p){
+  const u=D.users.find(u=>u.id===p.user_id);
+  if(!u)return null;
+  return getRosterByEmail(u.email);
+}
+
+// ── LEAVE BALANCE HELPERS ──
+const ANNUAL_DAILY_RATE = 30.295 / 365; // ~0.083 days per day
+
+function getLeaveYear(){ return new Date().getFullYear(); }
+
+function calcAnnualAccrued(){
+  const now = new Date();
+  const jan1 = new Date(now.getFullYear(), 0, 1);
+  const daysElapsed = Math.floor((now - jan1) / 86400000);
+  return Math.round(daysElapsed * ANNUAL_DAILY_RATE * 1000) / 1000;
+}
+
+function getLeaveBalance(patrollerId){
+  const lb = D.leaveBalances.find(b => b.patroller_id === patrollerId);
+  // Auto-match rider ID from roster if not set
+  const pat = D.patrollers.find(p=>p.id===patrollerId);
+  const rosterEntry = pat ? getRosterByPatroller(pat) : null;
+  const year = getLeaveYear();
+  const accrued = calcAnnualAccrued();
+  const carryForward = lb ? (lb.annual_carry_forward || 0) : 0;
+  const totalAnnual = carryForward + accrued;
+
+  // Get consumed this year from approved requests
+  const yearStr = String(year);
+  const approved = (D.timeoff || []).filter(t =>
+    t.patroller_id === patrollerId &&
+    t.status === 'Approved' &&
+    (t.start_date || '').startsWith(yearStr)
+  );
+
+  const consumedAnnual = approved.filter(t => t.request_type === 'Annual Leave')
+    .reduce((s, t) => s + (Math.round((new Date(t.end_date) - new Date(t.start_date)) / 86400000) + 1), 0);
+  const consumedSick = approved.filter(t => t.request_type === 'Sick Leave')
+    .reduce((s, t) => s + (Math.round((new Date(t.end_date) - new Date(t.start_date)) / 86400000) + 1), 0);
+  const consumedSick50 = approved.filter(t => t.request_type === 'Sick Leave 50%')
+    .reduce((s, t) => s + (Math.round((new Date(t.end_date) - new Date(t.start_date)) / 86400000) + 1), 0);
+  const consumedUnpaid = approved.filter(t => t.request_type === 'Sick Leave Unpaid' || t.request_type === 'Unpaid Leave')
+    .reduce((s, t) => s + (Math.round((new Date(t.end_date) - new Date(t.start_date)) / 86400000) + 1), 0);
+  const consumedBereavement = approved.filter(t => t.request_type === 'Death' || t.request_type === 'Bereavement')
+    .reduce((s, t) => s + (Math.round((new Date(t.end_date) - new Date(t.start_date)) / 86400000) + 1), 0);
+
+  const annualRemaining = Math.max(0, Math.round((totalAnnual - consumedAnnual) * 100) / 100);
+  const sickRemaining = Math.max(0, 15 - consumedSick);
+  const sick50Remaining = Math.max(0, 20 - consumedSick50);
+  const unpaidRemaining = Math.max(0, 20 - consumedUnpaid);
+  const bereavementRemaining = Math.max(0, 5 - consumedBereavement);
+
+  return {
+    carryForward: Math.round(carryForward * 100) / 100,
+    accrued: Math.round(accrued * 100) / 100,
+    totalAnnual: Math.round(totalAnnual * 100) / 100,
+    consumedAnnual,
+    annualRemaining,
+    sickRemaining,
+    consumedSick,
+    sick50Remaining,
+    consumedSick50,
+    unpaidRemaining,
+    consumedUnpaid,
+    bereavementRemaining,
+    consumedBereavement,
+    year,
+    riderId: (lb && lb.rider_id) ? lb.rider_id : (rosterEntry ? rosterEntry.riderId : ''),
+    lastUpdated: lb ? lb.updated_at : null,
+  };
+}
+
+function leaveBalanceCard(p, showFull=true){
+  const b = getLeaveBalance(p.id);
+  const u = D.users.find(u => u.id === p.user_id);
+  const cr = u?.custom_role_id ? (D.customRoles||[]).find(r=>r.id===u.custom_role_id) : null;
+  const roleName = cr ? cr.name : (p.user_type||'Patroller');
+  const annualPct = b.totalAnnual > 0 ? Math.round((b.annualRemaining / b.totalAnnual) * 100) : 0;
+  const annualColor = b.annualRemaining < 5 ? '#DC2626' : b.annualRemaining < 10 ? '#D97706' : '#166534';
+  const annualBg = b.annualRemaining < 5 ? '#FEE2E2' : b.annualRemaining < 10 ? '#FEF3C7' : '#DCFCE7';
+
+  return`<div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:16px;padding:18px;box-shadow:0 1px 4px rgba(65,21,23,.06)">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="width:44px;height:44px;border-radius:50%;background:#F9EDEE;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#411517;flex-shrink:0">${ini(p.name)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:700;color:#2A0D0F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+        <div style="font-size:11px;color:#A08070;margin-top:1px">${b.riderId?`ID: ${b.riderId} · `:''}${roleName}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:10px;color:#A08070">${b.year}</div>
+        ${b.annualRemaining < 5 ? '<span style="font-size:9px;background:#FEE2E2;color:#DC2626;padding:2px 6px;border-radius:4px;font-weight:700">⚠ Low</span>' : ''}
+      </div>
+    </div>
+
+    <!-- Annual leave with progress bar -->
+    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid #F0EDE8">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">Annual Leave</span>
+        <span style="font-size:18px;font-weight:700;color:${annualColor}">${b.annualRemaining}</span>
+      </div>
+      <div style="height:6px;background:#E8DDD4;border-radius:3px;margin-bottom:8px">
+        <div style="height:6px;width:${annualPct}%;background:${annualColor};border-radius:3px;transition:width .3s"></div>
+      </div>
+      <div style="display:flex;gap:12px;font-size:10px;color:#A08070">
+        <span>Carry fwd: <strong style="color:#2A0D0F">${b.carryForward}</strong></span>
+        <span>Accrued: <strong style="color:#2A0D0F">${b.accrued}</strong></span>
+        <span>Consumed: <strong style="color:#DC2626">${b.consumedAnnual}</strong></span>
+      </div>
+    </div>
+
+    <!-- Other leave types -->
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+      ${[
+        {label:'Sick Leave',remaining:b.sickRemaining,consumed:b.consumedSick,total:15,color:'#1565C0',bg:'#EAF1FD'},
+        {label:'Sick 50%',remaining:b.sick50Remaining,consumed:b.consumedSick50,total:20,color:'#7C3AED',bg:'#EDE9FE'},
+        {label:'Unpaid Sick',remaining:b.unpaidRemaining,consumed:b.consumedUnpaid,total:20,color:'#D97706',bg:'#FEF3C7'},
+        {label:'Bereavement',remaining:b.bereavementRemaining,consumed:b.consumedBereavement,total:5,color:'#0D9488',bg:'#CCFBF1'},
+      ].map(t=>`<div style="background:${t.bg};border-radius:10px;padding:10px 12px">
+        <div style="font-size:10px;color:${t.color};font-weight:700;margin-bottom:4px">${t.label}</div>
+        <div style="display:flex;align-items:baseline;gap:4px">
+          <span style="font-size:18px;font-weight:700;color:${t.remaining===0?'#DC2626':t.color}">${t.remaining}</span>
+          <span style="font-size:10px;color:${t.color};opacity:.7">/ ${t.total}</span>
+        </div>
+        <div style="font-size:9px;color:${t.color};opacity:.7;margin-top:2px">Used: ${t.consumed}</div>
+      </div>`).join('')}
+    </div>
+
+    ${canEdit()?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #F4EDE3;display:flex;gap:8px">
+      <button class="btn" style="flex:1;font-size:11px" onclick="openM({type:'editLeaveBalance',patrollerId:'${p.id}',patrollerName:'${p.name.replace(/'/g,"\'")}',balance:D.leaveBalances.find(b=>b.patroller_id==='${p.id}')})"><i class="ti ti-edit"></i>Edit balance</button>
+    </div>`:''}
+  </div>`;
+}
+
+// ── LEAVE BALANCE VIEW (admin) ──
+function leaveBalanceView(){
+  const pts = activePats();
+  if(!pts.length) return `<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-calendar-off" style="font-size:40px;display:block;margin-bottom:10px;opacity:.3"></i><div style="font-weight:600">No users yet</div></div>`;
+
+  // Summary stats
+  const allBalances = pts.map(p => getLeaveBalance(p.id));
+  const lowBalance = allBalances.filter(b => b.annualRemaining < 5).length;
+  const totalAnnualUsed = allBalances.reduce((s,b) => s + b.consumedAnnual, 0);
+
+  return`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+    <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">${pts.length} staff · ${getLeaveYear()}</div>
+    <div style="display:flex;gap:8px">
+      ${lowBalance>0?`<span style="font-size:11px;background:#FEE2E2;color:#DC2626;padding:4px 10px;border-radius:8px;font-weight:600">⚠ ${lowBalance} low balance</span>`:''}
+      <span style="font-size:11px;background:#F4EDE3;color:#411517;padding:4px 10px;border-radius:8px">Total used this year: ${totalAnnualUsed} days</span>
+      <button class="btn" onclick="downloadReport('leave')" style="font-size:11px"><i class="ti ti-download"></i>Export</button>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
+    ${pts.map(p => leaveBalanceCard(p)).join('')}
+  </div>`;
+}
+
+// ── MY LEAVE BALANCE VIEW (patroller) ──
+function myLeaveBalanceView(){
+  const p = D.patrollers.find(pt => pt.user_id === D.profile.id);
+  if(!p) return `<div style="padding:40px;text-align:center;color:var(--g3)">Your account is not linked to a schedule record.</div>`;
+  return `<div style="max-width:480px;margin:0 auto">${leaveBalanceCard(p, true)}</div>`;
 }
 
 // ── NOTIFICATIONS ──
