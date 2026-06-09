@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Talabat Operations</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
@@ -10,6 +10,27 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',sans-serif;background:#F4EDE3;color:#2A0D0F;font-size:14px}
+@media(max-width:768px){
+  .page{padding:10px!important}
+  .topbar{padding:0 10px!important;height:48px!important}
+  .topbar-name{font-size:13px!important}
+  .topbar-sub{display:none}
+  .tabs{padding:0 8px!important}
+  .tab{padding:9px 10px!important;font-size:11px!important}
+  .tab i{display:none}
+  .stats{grid-template-columns:1fr 1fr!important}
+  .card-grid{grid-template-columns:1fr!important}
+  .fg-row{grid-template-columns:1fr!important}
+  .modal-box{padding:16px!important;border-radius:12px!important}
+  .toolbar{flex-wrap:wrap!important;gap:6px!important}
+  .search-input{width:130px!important}
+  .user-nm{max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .wk-chip{display:none}
+  table{font-size:10px!important}
+  table th,table td{padding:5px 4px!important}
+  .my-card{flex-direction:column;text-align:center}
+  .auth-box{padding:24px 18px!important}
+}
 :root{
   --blue:#411517;--blue-l:#F9EDEE;--blue-d:#2A0D0F;--blue-b:#C4888A;
   --green:#16A34A;--green-l:#DCFCE7;
@@ -221,6 +242,19 @@ table tr:hover td{background:rgba(26,111,232,.02)}
       <div class="user-chip" id="user-chip"></div>
       <button class="top-btn" onclick="openM({type:'changepw'})"><i class="ti ti-key"></i>Change password</button>
       <span id="back-to-dash-btn"></span>
+      <div style="position:relative">
+        <button class="top-btn" id="notif-btn" onclick="toggleNotifications()" style="position:relative">
+          <i class="ti ti-bell"></i>
+          <span id="notif-badge" style="display:none;position:absolute;top:-3px;right:-3px;width:16px;height:16px;background:#FF5900;border-radius:50%;font-size:9px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center" id="notif-count">0</span>
+        </button>
+        <div id="notif-panel" style="display:none;position:absolute;right:0;top:calc(100% + 8px);width:320px;background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;box-shadow:0 8px 24px rgba(65,21,23,.15);z-index:300;overflow:hidden">
+          <div style="padding:12px 16px;background:#F4EDE3;border-bottom:1.5px solid #E8DDD4;display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:12px;font-weight:700;color:#411517">Notifications</span>
+            <button onclick="clearNotifications()" style="font-size:10px;color:#FF5900;background:none;border:none;cursor:pointer;font-family:inherit">Clear all</button>
+          </div>
+          <div id="notif-list" style="max-height:320px;overflow-y:auto;padding:8px 0"></div>
+        </div>
+      </div>
       <button class="top-btn danger" onclick="doLogout()"><i class="ti ti-logout"></i>Sign out</button>
     </div>
   </div>
@@ -849,6 +883,14 @@ function summaryView(){
   }).join('');
 
   return`
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+    <div style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-chart-bar" style="margin-right:5px"></i>Weekly Summary</div>
+    <div style="display:flex;gap:6px">
+      <button class="btn" onclick="downloadReport('schedule')"><i class="ti ti-download"></i>Schedule</button>
+      <button class="btn" onclick="downloadReport('attendance')"><i class="ti ti-download"></i>Attendance</button>
+      <button class="btn" onclick="downloadReport('timeoff')"><i class="ti ti-download"></i>Time off</button>
+    </div>
+  </div>
   <div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;overflow:hidden;margin-bottom:16px;box-shadow:0 1px 4px rgba(65,21,23,.06)">
     <div style="padding:10px 16px;background:#F4EDE3;border-bottom:1.5px solid #E8DDD4">
       <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-chart-bar" style="margin-right:5px"></i>Weekly Summary by Role</div>
@@ -961,6 +1003,7 @@ function timeOffTaskView(){
 }
 async function reviewTO(id,status){
   await sb.from('time_off_requests').update({status,reviewed_by:D.profile.id,updated_at:new Date().toISOString()}).eq('id',id);
+  addNotification(`Time off request ${status.toLowerCase()}`,'success');
   const req=(D.timeoff||[]).find(r=>r.id===id);
   if(req){const pat=D.patrollers.find(p=>p.id===req.patroller_id);const patUser=pat?D.users.find(u=>u.id===pat.user_id):null;
     sendWebhook('timeoff_reviewed',{patroller_name:req.patroller_name,patroller_email:patUser?.email||'',leave_type:req.request_type,start_date:req.start_date,end_date:req.end_date,status,reviewed_by_name:D.profile.full_name,app_url:REDIRECT});}
@@ -2284,7 +2327,7 @@ function attendanceView(){
   </div>
   <div class="toolbar">
     <input type="date" value="${today}" onchange="D.attDate=this.value;render()" style="padding:7px 11px;border-radius:var(--r8);border:1.5px solid var(--g2);font-family:inherit;font-size:12.5px">
-    <button class="btn" onclick="dlAttendance()"><i class="ti ti-download"></i>Export CSV</button>
+    <button class="btn" onclick="downloadReport('attendance')"><i class="ti ti-download"></i>Export Report</button>
     <span style="font-size:12px;color:var(--g3)">${workingPats.length} scheduled · ${vacPats.length} on vacation · ${offPats.length} off</span>
   </div>
   ${workingPats.length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-calendar-off" style="font-size:40px;display:block;margin-bottom:10px"></i>No one scheduled for this day.</div>`:`
@@ -2596,6 +2639,7 @@ function myTasksView(){
 
 async function reviewTask(id,status){
   await sb.from('task_requests').update({status,reviewed_by:D.profile.id,updated_at:new Date().toISOString()}).eq('id',id);
+  addNotification(`Task ${status.toLowerCase()} successfully`,'success');
   await reload();
 }
 function delTask(id){openM({type:'confirm',msg:'Delete this task request?',cb:async()=>{await sb.from('task_requests').delete().eq('id',id);closeM();await reload();}});}
@@ -2700,6 +2744,90 @@ function delCustomRole(id,name){
   }});
 }
 
+
+// ── NOTIFICATIONS ──
+let D_notifs = [];
+function addNotification(msg, type='info', link=''){
+  D_notifs.unshift({id:Date.now(),msg,type,link,time:new Date()});
+  if(D_notifs.length>20)D_notifs=D_notifs.slice(0,20);
+  renderNotifications();
+}
+function renderNotifications(){
+  const badge=document.getElementById('notif-count');
+  const list=document.getElementById('notif-list');
+  if(!badge||!list)return;
+  const unread=D_notifs.filter(n=>!n.read).length;
+  badge.textContent=unread;
+  badge.style.display=unread>0?'flex':'none';
+  if(!D_notifs.length){
+    list.innerHTML='<div style="padding:20px;text-align:center;color:#A08070;font-size:12px">No notifications</div>';
+    return;
+  }
+  const icons={info:'ti-info-circle',success:'ti-circle-check',warning:'ti-alert-triangle',error:'ti-circle-x'};
+  const cols={info:'#1565C0',success:'#166534',warning:'#D97706',error:'#DC2626'};
+  list.innerHTML=D_notifs.map(n=>`
+    <div style="padding:10px 14px;border-bottom:1px solid #F4EDE3;display:flex;gap:10px;align-items:flex-start;background:${n.read?'#fff':'#FFFBF5'}">
+      <i class="ti ${icons[n.type]||icons.info}" style="font-size:14px;color:${cols[n.type]||cols.info};margin-top:1px;flex-shrink:0"></i>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;color:#2A0D0F;line-height:1.4">${n.msg}</div>
+        <div style="font-size:10px;color:#A08070;margin-top:2px">${n.time.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div>
+      </div>
+    </div>`).join('');
+  D_notifs.forEach(n=>n.read=true);
+}
+function toggleNotifications(){
+  const panel=document.getElementById('notif-panel');
+  if(!panel)return;
+  const open=panel.style.display==='block';
+  panel.style.display=open?'none':'block';
+  if(!open){renderNotifications();setTimeout(()=>document.addEventListener('click',function h(e){if(!panel.contains(e.target)&&e.target.id!=='notif-btn'){panel.style.display='none';document.removeEventListener('click',h);}},),50);}
+}
+function clearNotifications(){D_notifs=[];renderNotifications();}
+
+// ── REPORTS (CSV/PRINT) ──
+function downloadReport(type){
+  let rows=[];let filename='';
+  if(type==='attendance'){
+    filename='attendance_report.csv';
+    rows=[['Name','Role','Date','Status','Clock In','Clock Out','Duration','Clock In Location','Clock Out Location']];
+    (D.attendance||[]).forEach(a=>{
+      const pat=D.patrollers.find(p=>p.id===a.patroller_id);
+      const u=pat?D.users.find(u=>u.id===pat.user_id):null;
+      const cr=u?.custom_role_id?(D.customRoles||[]).find(r=>r.id===u.custom_role_id):null;
+      const dur=a.clock_in&&a.clock_out?`${Math.floor(Math.round((new Date(a.clock_out)-new Date(a.clock_in))/60000)/60)}h ${Math.round((new Date(a.clock_out)-new Date(a.clock_in))/60000)%60}m`:'';
+      rows.push([a.patroller_name||'',cr?cr.name:(pat?'Patroller':''),a.date,a.status||'',
+        a.clock_in?new Date(a.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'',
+        a.clock_out?new Date(a.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'',
+        dur,a.clock_in_map||'',a.clock_out_map||'']);
+    });
+  } else if(type==='schedule'){
+    filename='schedule_report.csv';
+    const dates=wDates();
+    rows=[['Name','Role',...DAYS.map((d,i)=>SD[i]+' '+fmt(dates[i]))]];
+    activePats().forEach(p=>{
+      const u=D.users.find(u=>u.id===p.user_id);
+      const cr=u?.custom_role_id?(D.customRoles||[]).find(r=>r.id===u.custom_role_id):null;
+      rows.push([p.name,cr?cr.name:'Patroller',...DAYS.map((_,i)=>gDZ(p.id,i)||'Off')]);
+    });
+  } else if(type==='timeoff'){
+    filename='timeoff_report.csv';
+    rows=[['Name','Leave Type','Start','End','Days','Status','Comment']];
+    (D.timeoff||[]).forEach(r=>{
+      const days=r.start_date&&r.end_date?Math.round((new Date(r.end_date)-new Date(r.start_date))/86400000)+1:'';
+      rows.push([r.patroller_name||'',r.request_type,r.start_date,r.end_date,days,r.status,r.comment||'']);
+    });
+  } else if(type==='tasks'){
+    filename='tasks_report.csv';
+    rows=[['Name','Task Type','Date','Start','End','Status','Description']];
+    (D.tasks||[]).forEach(t=>{rows.push([t.patroller_name||'',t.task_type,t.date,t.start_time,t.end_time,t.status,t.description||'']);});
+  }
+  if(!rows.length)return alert('No data to export.');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n')],{type:'text/csv'}));
+  a.download=filename;a.click();
+  addNotification(`Report downloaded: ${filename}`,'success');
+}
+
 async function saveArea(){const v=document.getElementById('an').value.trim();if(!v)return;const{error}=await sb.from('areas').insert({name:v});if(error)return alert(error.message);closeM();await reload();}
 async function saveShift(id){const name=document.getElementById('shn').value.trim();if(!name)return;const shift_type=document.getElementById('sht').value;const start_time=document.getElementById('shst').value;const end_time=document.getElementById('shet').value;if(id!=='null')await sb.from('shifts').update({name,shift_type,start_time,end_time}).eq('id',id);else await sb.from('shifts').insert({name,shift_type,start_time,end_time});closeM();await reload();}
 
@@ -2782,6 +2910,7 @@ async function savePat(id){
     if(np)await sb.from('schedules').insert({patroller_id:np.id,week_start:ws,day_0:days[0],day_1:days[1],day_2:days[2],day_3:days[3],day_4:days[4],day_5:days[5],day_6:days[6],shift_0:dayShifts[0]||null,shift_1:dayShifts[1]||null,shift_2:dayShifts[2]||null,shift_3:dayShifts[3]||null,shift_4:dayShifts[4]||null,shift_5:dayShifts[5]||null,shift_6:dayShifts[6]||null});
   }
   closeM();await reload();
+  addNotification('Schedule updated successfully','success');
 }
 
 async function saveTO(){
