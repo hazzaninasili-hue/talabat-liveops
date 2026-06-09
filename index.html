@@ -2375,18 +2375,14 @@ async function startTask(){
   const now=new Date().toISOString();
   const startTime=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   
+  const endDate=new Date();endDate.setHours(endDate.getHours()+1);
+  const defaultEndTime=endDate.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   const{error}=await sb.from('task_requests').insert({
-    patroller_id:pid,
-    patroller_name:pat?.name||'Unknown',
-    task_type:type,
-    date:selectedDate,
-    start_time:startTime,
-    end_time:null,
-    description:desc||null,
-    status:'Running',
-    submitted_by:D.profile.id,
-    created_at:now,
-    updated_at:now
+    patroller_id:pid,patroller_name:pat?.name||'Unknown',
+    task_type:type,date:selectedDate,start_time:startTime,
+    end_time:defaultEndTime,description:desc||null,
+    status:'Running',submitted_by:D.profile.id,
+    created_at:now,updated_at:now
   });
   
   if(error){e.textContent=error.message;e.style.display='block';return;}
