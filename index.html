@@ -545,6 +545,7 @@ async function loadAll(){
   try{const{data:docs}=await wt(sb.from('documents').select('*').order('created_at',{ascending:false}),5000);D.docs=docs||[];}catch(e){}
   try{const{data:hist}=await wt(sb.from('schedule_history').select('*,profiles(full_name)').order('changed_at',{ascending:false}).limit(300),5000);D.history=hist||[];}catch(e){}
   try{const{data:tor}=await wt(sb.from('time_off_requests').select('*').order('created_at',{ascending:false}),5000);D.timeoff=tor||[];}catch(e){}
+  try{const crq=D.currentDept?sb.from('custom_roles').select('*').eq('department_id',D.currentDept).order('name'):sb.from('custom_roles').select('*').order('name');const{data:cr}=await wt(crq,4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
   if(D.profile?.role==='admin'||D.profile?.role==='lead'){
     try{const{data:users}=await wt(sb.from('profiles').select('*').order('full_name'),5000);D.users=users||[];}catch(e){}
   }
@@ -1033,12 +1034,13 @@ function rosterView(){
 }
 function operationsView(){
   const ed=canEdit();const sub=D.opsSub||'areas';
-  const subBtns=['areas','shifts'].map(s=>`<button onclick="D.opsSub='${s}';render()" style="padding:7px 18px;border-radius:8px;border:none;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:all .13s;${sub===s?'background:#411517;color:#F4EDE3;box-shadow:0 2px 8px rgba(65,21,23,.2)':'background:transparent;color:var(--g4)'}">${s==='areas'?'<i class="ti ti-map-pin" style="font-size:13px;margin-right:5px"></i>Areas':'<i class="ti ti-clock" style="font-size:13px;margin-right:5px"></i>Shifts'}</button>`).join('');
+  const subBtns=['areas','shifts','roles'].map(s=>`<button onclick="D.opsSub='${s}';render()" style="padding:7px 18px;border-radius:8px;border:none;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:all .13s;${sub===s?'background:#411517;color:#F4EDE3;box-shadow:0 2px 8px rgba(65,21,23,.2)':'background:transparent;color:var(--g4)'}">${s==='areas'?'<i class="ti ti-map-pin" style="font-size:13px;margin-right:5px"></i>Areas':s==='shifts'?'<i class="ti ti-clock" style="font-size:13px;margin-right:5px"></i>Shifts':'<i class="ti ti-shield" style="font-size:13px;margin-right:5px"></i>Roles'}</button>`).join('');
 
   const header=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
     <div style="display:flex;background:var(--g1);border-radius:10px;padding:4px;gap:2px">${subBtns}</div>
     ${ed&&sub==='areas'?`<button class="btn btn-primary" onclick="openM({type:'area'})"><i class="ti ti-plus"></i>Add area</button>`:''}
     ${ed&&sub==='shifts'?`<button class="btn btn-primary" onclick="openM({type:'addshift',form:{name:'',start:'08:00',end:'16:00',type:'morning'}})"><i class="ti ti-plus"></i>Add shift</button>`:''}
+    ${ed&&sub==='roles'?`<button class="btn btn-primary" onclick="openM({type:'addrole'})"><i class="ti ti-plus"></i>Add role</button>`:''}
   </div>`;
 
   if(sub==='areas'){
@@ -1054,7 +1056,7 @@ function operationsView(){
           <div style="font-size:11px;color:var(--g3);margin-top:3px">${pats.length} patroller${pats.length!==1?'s':''} assigned${pats.length?` · ${pats.map(p=>p.name.split(' ')[0]).join(', ')}`:''}
           </div>
         </div>
-        ${ed?`<button class="icon-btn" onclick="delArea('${a.id}','${a.name.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button>`:''}
+        ${ed?`<button class="icon-btn" onclick="delArea('${a.id}','${a.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>`:''}
       </div>`;
     }).join('');
     return header+`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${areaCards}</div>
@@ -1081,15 +1083,54 @@ function operationsView(){
           </div>
         </div>
         ${ed?`<div style="display:flex;flex-direction:column;gap:4px">
-          <button class="edit-btn" onclick="openM({type:'editshift',id:'${sh.id}',form:{name:'${sh.name.replace(/'/g,"\'")}',start:'${sh.start_time}',end:'${sh.end_time}',type:'${sh.shift_type}'}})" style="width:32px;height:32px"><i class="ti ti-edit"></i></button>
-          <button class="icon-btn" onclick="delShift('${sh.id}','${sh.name.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button>
+          <button class="edit-btn" onclick="openM({type:'editshift',id:'${sh.id}',form:{name:'${sh.name.replace(/'/g,"\\'")}',start:'${sh.start_time}',end:'${sh.end_time}',type:'${sh.shift_type}'}})" style="width:32px;height:32px"><i class="ti ti-edit"></i></button>
+          <button class="icon-btn" onclick="delShift('${sh.id}','${sh.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
         </div>`:''}
       </div>`;
     }).join('');
     return header+`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">${shiftCards}</div>
     <div style="margin-top:14px;padding:11px 14px;background:#F4EDE3;border-radius:10px;font-size:12px;color:#411517">
-      <i class="ti ti-info-circle" style="margin-right:5px"></i>Shifts are automatically linked to patrollers in the schedule. Change a shift here and it reflects everywhere.
+      <i class="ti ti-info-circle" style="margin-right:5px"></i>Shifts are automatically linked to patrollers in the schedule.
     </div>`;
+  }
+
+  if(sub==='roles'){
+    const roles=D.customRoles||[];
+    const alBg={viewer:'#EAF1FD',editor:'#FFF0E6',admin:'#DCFCE7'};
+    const alCol={viewer:'#0C4FB3',editor:'#FF5900',admin:'#166534'};
+    const alLabel={viewer:'👁 Viewer',editor:'✏️ Editor',admin:'🔐 Admin'};
+    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
+    if(!roles.length)return header+`<div style="text-align:center;padding:60px 20px;background:#fff;border-radius:16px;border:2px dashed #E8DDD4">
+      <i class="ti ti-shield" style="font-size:50px;color:#E8DDD4;display:block;margin-bottom:14px"></i>
+      <div style="font-size:16px;font-weight:700;color:#411517;margin-bottom:6px">No roles yet</div>
+      <div style="font-size:12px;color:#A08070;margin-bottom:20px">Create roles to control what each user can see and do.</div>
+      ${ed?`<button class="btn btn-primary" onclick="openM({type:'addrole'})"><i class="ti ti-plus"></i>Create first role</button>`:''}
+    </div>`;
+    const roleCards=roles.map(r=>{
+      const al=r.access_level||'viewer';
+      let tabs=ALL_TABS;try{if(r.visible_tabs)tabs=JSON.parse(r.visible_tabs);}catch(e){}
+      return`<div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:16px;padding:18px;box-shadow:0 1px 4px rgba(65,21,23,.06)">
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
+          <div style="width:44px;height:44px;border-radius:12px;background:${alBg[al]};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i class="ti ti-shield-check" style="font-size:20px;color:${alCol[al]}"></i>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:700;color:#2A0D0F">${r.name}</div>
+            ${r.description?`<div style="font-size:11px;color:#A08070;margin-top:2px">${r.description}</div>`:''}
+            <span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:${alBg[al]};color:${alCol[al]};margin-top:5px;display:inline-block">${alLabel[al]}</span>
+          </div>
+          ${ed?`<div style="display:flex;gap:4px">
+            <button class="edit-btn" style="width:30px;height:30px" onclick="openM({type:'editrole',role:{id:'${r.id}',name:'${r.name.replace(/'/g,"\\'")}',description:'${(r.description||'').replace(/'/g,"\\'")}',access_level:'${al}',visible_tabs:'${r.visible_tabs||'[]'}'}})" ><i class="ti ti-edit"></i></button>
+            <button class="icon-btn" onclick="delCustomRole('${r.id}','${r.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
+          </div>`:''}
+        </div>
+        <div style="border-top:1px solid #F4EDE3;padding-top:10px">
+          <div style="font-size:9px;font-weight:700;color:#A08070;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Visible tabs</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">${ALL_TABS.map(t=>{const v=tabs.includes(t);return`<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:6px;background:${v?'#DCFCE7':'#FEE2E2'};color:${v?'#166534':'#991B1B'}">${v?'✓':'✗'} ${t}</span>`;}).join('')}</div>
+        </div>
+      </div>`;
+    }).join('');
+    return header+`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">${roleCards}</div>`;
   }
   return header;
 }
@@ -1523,6 +1564,39 @@ function renderModal(){
     <div class="modal-footer">
       ${canEdit()&&t.status==='Pending'?`<button class="btn" style="background:#DCFCE7;color:#166534;border-color:#86efac" onclick="reviewTask('${t.id}','Approved');closeM()"><i class="ti ti-check"></i>Approve</button><button class="btn" style="background:#FEE2E2;color:#DC2626;border-color:#fca5a5" onclick="reviewTask('${t.id}','Rejected');closeM()"><i class="ti ti-x"></i>Reject</button>`:''}
       <button class="btn" onclick="closeM()">Close</button>
+    </div>`;return;
+  }
+  if(m.type==='addrole'||m.type==='editrole'){
+    const isEdit=m.type==='editrole';
+    const r=isEdit?m.role:{};
+    let savedTabs=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
+    if(isEdit&&r.visible_tabs){try{savedTabs=JSON.parse(r.visible_tabs);}catch(e){}}
+    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
+    const tabChecks=ALL_TABS.map(t=>{
+      const checked=savedTabs.includes(t);
+      return`<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid ${checked?'#FF5900':'#E8DDD4'};border-radius:8px;cursor:pointer;background:#fff" onclick="const cb=this.querySelector('input');setTimeout(()=>{this.style.borderColor=cb.checked?'#FF5900':'#E8DDD4';},0)">
+        <input type="checkbox" name="role-tab" value="${t}" ${checked?'checked':''} style="accent-color:#FF5900;width:14px;height:14px">
+        <span style="font-size:12.5px;font-weight:500;color:#2A0D0F">${t}</span>
+      </label>`;
+    }).join('');
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-shield"></i>${isEdit?'Edit':'Create'} Role</div>
+    <div class="msg msg-err" id="role-e"></div>
+    <div class="fg-row">
+      <div class="fg"><label>Role name</label><input id="role-name" value="${r.name||''}" placeholder="e.g. Patroller, Supervisor"></div>
+      <div class="fg"><label>Access level</label><select id="role-access">
+        <option value="viewer" ${(r.access_level||'viewer')==='viewer'?'selected':''}>👁 Viewer — view only</option>
+        <option value="editor" ${r.access_level==='editor'?'selected':''}>✏️ Editor — can edit data</option>
+        <option value="admin" ${r.access_level==='admin'?'selected':''}>🔐 Admin — full access</option>
+      </select></div>
+    </div>
+    <div class="fg"><label>Description (optional)</label><input id="role-desc" value="${r.description||''}" placeholder="What does this role do?"></div>
+    <div class="fg"><label>Visible tabs <span style="font-weight:400;font-size:10px;color:var(--g3)">(check what this role can see)</span></label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">${tabChecks}</div>
+    </div>
+    <div class="modal-footer">
+      ${isEdit?`<button class="btn btn-danger modal-footer-left" onclick="delCustomRole('${r.id}','${(r.name||'').replace(/'/g,"\'")}')"><i class="ti ti-trash"></i>Delete</button>`:''}
+      <button class="btn" onclick="closeM()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRole('${isEdit?r.id:'null'}')"><i class="ti ti-check"></i>${isEdit?'Save':'Create role'}</button>
     </div>`;return;
   }
   if(m.type==='cell'){
@@ -2532,6 +2606,32 @@ async function endTaskPatroller(taskId){
 async function saveTaskReq(){
   // Kept for backward compatibility, redirects to startTask
   await startTask();
+}
+
+async function saveRole(id){
+  const e=document.getElementById('role-e');e.style.display='none';
+  const name=(document.getElementById('role-name').value||'').trim();
+  const access=document.getElementById('role-access').value||'viewer';
+  const desc=(document.getElementById('role-desc').value||'').trim();
+  if(!name){e.textContent='Role name required.';e.style.display='block';return;}
+  const tabs=Array.from(document.querySelectorAll('input[name="role-tab"]:checked')).map(x=>x.value);
+  if(!tabs.length){e.textContent='Select at least one tab.';e.style.display='block';return;}
+  const payload={name,access_level:access,description:desc||null,visible_tabs:JSON.stringify(tabs),department_id:D.currentDept||null};
+  if(id!=='null'){
+    const{error}=await sb.from('custom_roles').update({...payload,updated_at:new Date().toISOString()}).eq('id',id);
+    if(error){e.textContent=error.message;e.style.display='block';return;}
+  } else {
+    const{error}=await sb.from('custom_roles').insert(payload);
+    if(error){e.textContent=error.message;e.style.display='block';return;}
+  }
+  closeM();await reload();
+}
+
+function delCustomRole(id,name){
+  openM({type:'confirm',msg:`Delete role <b>${name}</b>?`,cb:async()=>{
+    await sb.from('custom_roles').delete().eq('id',id);
+    closeM();await reload();
+  }});
 }
 
 async function saveArea(){const v=document.getElementById('an').value.trim();if(!v)return;const{error}=await sb.from('areas').insert({name:v});if(error)return alert(error.message);closeM();await reload();}
