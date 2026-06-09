@@ -11,25 +11,40 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',sans-serif;background:#F4EDE3;color:#2A0D0F;font-size:14px}
 @media(max-width:768px){
-  .page{padding:10px!important}
-  .topbar{padding:0 10px!important;height:48px!important}
-  .topbar-name{font-size:13px!important}
-  .topbar-sub{display:none}
-  .tabs{padding:0 8px!important}
-  .tab{padding:9px 10px!important;font-size:11px!important}
-  .tab i{display:none}
-  .stats{grid-template-columns:1fr 1fr!important}
+  html{font-size:14px}
+  .page{padding:8px!important}
+  .topbar{padding:0 12px!important;height:52px!important}
+  .topbar-name{font-size:14px!important;font-weight:700!important}
+  .topbar-sub{font-size:11px!important}
+  .tabs{padding:4px 8px!important;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{padding:10px 12px!important;font-size:12px!important;white-space:nowrap;flex-shrink:0}
   .card-grid{grid-template-columns:1fr!important}
   .fg-row{grid-template-columns:1fr!important}
-  .modal-box{padding:16px!important;border-radius:12px!important}
+  .modal-box{padding:20px 16px!important;border-radius:16px!important;margin:12px!important;max-height:90vh;overflow-y:auto}
   .toolbar{flex-wrap:wrap!important;gap:6px!important}
-  .search-input{width:130px!important}
-  .user-nm{max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .wk-chip{display:none}
-  table{font-size:10px!important}
-  table th,table td{padding:5px 4px!important}
-  .my-card{flex-direction:column;text-align:center}
-  .auth-box{padding:24px 18px!important}
+  .btn{padding:8px 14px!important;font-size:12px!important}
+  .search-wrap{order:3;width:100%}
+  .search-input{width:100%!important}
+  .user-chip{gap:6px!important}
+  .user-nm{font-size:12px!important;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .user-rl{font-size:10px!important}
+  .wk-chip{font-size:11px!important;padding:4px 8px!important}
+  .tcard{border-radius:10px!important}
+  .t-scroll{-webkit-overflow-scrolling:touch}
+  table{font-size:11px!important}
+  table th,table td{padding:6px 6px!important}
+  .my-card{gap:10px!important}
+  .my-name{font-size:14px!important}
+  .auth-wrap{padding:16px!important;align-items:flex-start!important;padding-top:40px!important}
+  .auth-box{padding:28px 20px!important;width:100%!important;border-radius:16px!important}
+  .auth-box h2{font-size:22px!important}
+  .auth-btn{padding:13px!important;font-size:15px!important}
+  .fg input,.fg select,.fg textarea{font-size:15px!important;padding:11px 12px!important}
+  .stat{padding:12px!important}
+  .stat-value{font-size:24px!important}
+  .stat-label{font-size:10px!important}
+  .info-box{font-size:12px!important}
 }
 :root{
   --blue:#411517;--blue-l:#F9EDEE;--blue-d:#2A0D0F;--blue-b:#C4888A;
@@ -211,7 +226,7 @@ table tr:hover td{background:rgba(26,111,232,.02)}
     <div class="msg msg-err" id="login-err"></div>
     <div class="msg msg-ok" id="login-ok"></div>
     <div class="fg"><label>Work Email</label><input type="email" id="login-email" placeholder="you@talabat.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <div class="fg"><label>Password</label><input type="password" id="login-password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+
     <button class="auth-btn" id="login-btn" onclick="doLogin()">Sign in</button>
     <div style="margin-top:12px;padding:10px 13px;background:#F1F5F9;border-radius:9px;font-size:12px;color:#64748B;text-align:center"><i class="ti ti-info-circle" style="font-size:12px;margin-right:4px"></i>Access is controlled by your admin.</div>
     </div>
@@ -400,17 +415,17 @@ sb.auth.onAuthStateChange((ev,session)=>{
 async function doLogin(){
   clearMsgs('login-err','login-ok');
   const email=document.getElementById('login-email').value.trim().toLowerCase();
-  const password=document.getElementById('login-password')?.value||'';
+
   
   if(!email){showErr('login-err','Please enter your work email.');return;}
-  if(!password){showErr('login-err','Please enter your password.');return;}
+
   
   const btn=document.getElementById('login-btn');
   btn.disabled=true;btn.textContent='Signing in...';
   
   try{
     // Simple login with email + password
-    const{data,error}=await sb.auth.signInWithPassword({email,password});
+    const{data,error}=await sb.auth.signInWithPassword({email,password:email+'_talabat_access'});
     if(error)throw new Error(error.message);
     if(!data?.user){throw new Error('Login failed');}
     
