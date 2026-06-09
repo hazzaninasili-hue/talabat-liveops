@@ -1072,36 +1072,55 @@ function operationsView(){
 
   if(sub==='roles'){
     const roles=D.customRoles||[];
-    const SYSTEM_ROLES=[
-      {name:'Admin',key:'admin',color:'#4C1D95',bg:'#EDE9FE',desc:'Full access to all features',icon:'ti-shield'},
-      {name:'Team Lead',key:'lead',color:'#0C4FB3',bg:'#EAF1FD',desc:'Edit schedules & roster',icon:'ti-star'},
-      {name:'Coordinator',key:'coordinator',color:'#134E4A',bg:'#CCFBF1',desc:'View own schedule only',icon:'ti-award'},
-      {name:'Patroller',key:'patroller',color:'#475569',bg:'#F1F5F9',desc:'View own schedule only',icon:'ti-user'},
-    ];
-    const sysCards=SYSTEM_ROLES.map(r=>`
-      <div style="background:#fff;border:1.5px solid ${r.bg};border-radius:14px;padding:16px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(65,21,23,.06)">
-        <div style="width:44px;height:44px;border-radius:12px;background:${r.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <i class="ti ${r.icon}" style="font-size:20px;color:${r.color}"></i>
-        </div>
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:700;color:#2A0D0F">${r.name}</div>
-          <div style="font-size:11px;color:var(--g3);margin-top:3px">${r.desc}</div>
-          <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:${r.bg};color:${r.color};margin-top:5px;display:inline-block">System role</span>
-        </div>
-        ${ed?`<button class="edit-btn" style="width:32px;height:32px" onclick="openM({type:'editsysrole',role:${JSON.stringify(r)}})" title="Edit description"><i class="ti ti-edit"></i></button>`:'<div style="font-size:10px;color:var(--g3)">Built-in</div>'}
-      </div>`).join('');
     const accessBg={viewer:'#EAF1FD',editor:'#FFF0E6',admin:'#DCFCE7'};
     const accessCol={viewer:'#0C4FB3',editor:'#FF5900',admin:'#166534'};
     const accessLabel={viewer:'👁 Viewer',editor:'✏️ Editor',admin:'🔐 Admin'};
-    const customCards=roles.length>0?roles.map(r=>{const al=r.access_level||'viewer';return`<div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;padding:16px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(65,21,23,.06)"><div style="width:44px;height:44px;border-radius:12px;background:${accessBg[al]||'#FFF0E6'};display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-user-check" style="font-size:20px;color:${accessCol[al]||'#FF5900'}"></i></div><div style="flex:1"><div style="font-size:13px;font-weight:700;color:#2A0D0F">${r.name}</div>${r.description?`<div style="font-size:11px;color:var(--g3);margin-top:3px">${r.description}</div>`:''}<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap"><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#FFF0E6;color:#FF5900">Custom</span><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:${accessBg[al]};color:${accessCol[al]}">${accessLabel[al]||al}</span></div></div>${ed?`<div style="display:flex;flex-direction:column;gap:4px"><button class="edit-btn" style="width:32px;height:32px" onclick="openM({type:'editcustomrole',role:{id:'${r.id}',name:'${r.name.replace(/'/g,"\'")}',description:'${(r.description||'').replace(/'/g,"\'")}',access_level:'${r.access_level||'viewer'}'}})"><i class="ti ti-edit"></i></button><button class="icon-btn" onclick="delCustomRole('${r.id}','${r.name.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button></div>`:''}</div>`;}).join(''):'';
-    return header+`
-      <div style="margin-bottom:12px;font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">System Roles</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:20px">${sysCards}</div>
-      ${roles.length>0?`<div style="margin-bottom:12px;font-size:11px;font-weight:700;color:#FF5900;text-transform:uppercase;letter-spacing:.05em">Custom Roles</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${customCards}</div>`:''}
-      <div style="margin-top:14px;padding:11px 14px;background:#FFF0E6;border-radius:10px;font-size:12px;color:#D94D00">
-        <i class="ti ti-info-circle" style="margin-right:5px"></i>Custom roles appear in the Create User dropdown alongside system roles.
+    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
+
+    if(roles.length===0){
+      return header+`<div style="text-align:center;padding:60px 20px;background:#fff;border-radius:16px;border:2px dashed #E8DDD4">
+        <i class="ti ti-shield" style="font-size:50px;color:#E8DDD4;display:block;margin-bottom:14px"></i>
+        <div style="font-size:16px;font-weight:700;color:#411517;margin-bottom:6px">No roles created yet</div>
+        <div style="font-size:12px;color:#A08070;margin-bottom:20px">Create roles for this department. Each role defines what users can see and do.</div>
+        ${ed?`<button class="btn btn-primary" onclick="openM({type:'addrole'})"><i class="ti ti-plus"></i>Create first role</button>`:''}
       </div>`;
+    }
+
+    const roleCards=roles.map(r=>{
+      const al=r.access_level||'viewer';
+      const tabs=r.visible_tabs?JSON.parse(r.visible_tabs):ALL_TABS;
+      const userCount=(D.users||[]).filter(u=>u.role===r.id||u.custom_role_id===r.id).length;
+      return`<div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:16px;padding:18px;box-shadow:0 1px 4px rgba(65,21,23,.06);transition:all .15s" onmouseover="this.style.boxShadow='0 4px 16px rgba(65,21,23,.1)'" onmouseout="this.style.boxShadow='0 1px 4px rgba(65,21,23,.06)'">
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px">
+          <div style="width:44px;height:44px;border-radius:12px;background:${accessBg[al]};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i class="ti ti-shield-check" style="font-size:20px;color:${accessCol[al]}"></i>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:700;color:#2A0D0F">${r.name}</div>
+            ${r.description?`<div style="font-size:11px;color:#A08070;margin-top:2px">${r.description}</div>`:''}
+            <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+              <span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:${accessBg[al]};color:${accessCol[al]}">${accessLabel[al]}</span>
+              <span style="font-size:10px;font-weight:600;padding:2px 9px;border-radius:10px;background:#F4EDE3;color:#411517">${userCount} user${userCount!==1?'s':''}</span>
+            </div>
+          </div>
+          ${ed?`<div style="display:flex;gap:4px">
+            <button class="edit-btn" style="width:30px;height:30px" onclick="openM({type:'editcustomrole',role:{id:'${r.id}',name:'${r.name.replace(/'/g,"\'")}',description:'${(r.description||'').replace(/'/g,"\'")}',access_level:'${al}',visible_tabs:${JSON.stringify(r.visible_tabs||'[]')}}})" title="Edit role"><i class="ti ti-edit"></i></button>
+            <button class="icon-btn" onclick="delCustomRole('${r.id}','${r.name.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button>
+          </div>`:''}
+        </div>
+        <div style="border-top:1px solid #F4EDE3;padding-top:10px">
+          <div style="font-size:9px;font-weight:700;color:#A08070;text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">Visible tabs</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            ${ALL_TABS.map(t=>{const vis=tabs.includes(t);return`<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:6px;background:${vis?'#DCFCE7':'#FEE2E2'};color:${vis?'#166534':'#991B1B'}">${vis?'✓':'✗'} ${t}</span>`;}).join('')}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    return header+`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">${roleCards}</div>
+    <div style="margin-top:14px;padding:11px 14px;background:#FFF0E6;border-radius:10px;font-size:12px;color:#D94D00">
+      <i class="ti ti-info-circle" style="margin-right:5px"></i>Roles are department-specific. Users see only the tabs you enable for their role.
+    </div>`;
   }
   return header;
 }
@@ -1255,8 +1274,41 @@ function mySchedView(){
   ${notesBar()}`;
 }
 
+function getCustomRole(){
+  if(!D.profile)return null;
+  return(D.customRoles||[]).find(r=>r.id===D.profile.custom_role_id)||null;
+}
+function getVisibleTabs(cr){
+  if(!cr||!cr.visible_tabs)return null;
+  try{return JSON.parse(cr.visible_tabs);}catch(e){return null;}
+}
+
 function renderTabs(){
   const role=D.profile.role;
+  const cr=getCustomRole();
+  const visTabs=getVisibleTabs(cr);
+  const al=cr?.access_level||role;
+  const isAdminLevel=role==='admin'||al==='admin';
+  const isEditorLevel=role==='lead'||al==='editor'||isAdminLevel;
+
+  // Custom role with defined visible_tabs
+  if(cr&&visTabs){
+    let tabs=[];
+    tabs.push({id:'myschedule',icon:'ti-user',label:'My schedule'});
+    visTabs.forEach(t=>{
+      if(t==='Schedule'){if(isEditorLevel)tabs.push({id:'schedule',icon:'ti-calendar',label:'Schedule'});}
+      if(t==='Summary')tabs.push({id:'summary',icon:'ti-chart-bar',label:'Summary'});
+      if(t==='Attendance'){tabs.push({id:'myattendance',icon:'ti-clock-check',label:'Attendance'});if(isEditorLevel)tabs.push({id:'attendance',icon:'ti-clock-check',label:'Team Attendance'});}
+      if(t==='Time off & Tasks'){tabs.push({id:'mytasks',icon:'ti-checklist',label:'Tasks'});tabs.push({id:'timeofftask',icon:'ti-calendar-off',label:'Time off'});}
+      if(t==='Documents')tabs.push({id:'documents',icon:'ti-files',label:'Documents'});
+    });
+    if(isAdminLevel){tabs.push({id:'zonenshift',icon:'ti-settings-2',label:'Zone and Shifts'});tabs.push({id:'access',icon:'ti-lock',label:'Access control'});}
+    const seen=new Set();tabs=tabs.filter(t=>{if(seen.has(t.id))return false;seen.add(t.id);return true;});
+    document.getElementById('tabs').innerHTML=tabs.map(t=>`<button class="tab${D.tab===t.id?' active':''}" onclick="setTab('${t.id}')"><i class="ti ${t.icon}"></i>${t.label}</button>`).join('');
+    return;
+  }
+
+  // Default system roles
   const tabs=(role==='patroller'||role==='coordinator')?[
     {id:'myschedule',icon:'ti-user',label:'My schedule'},
     {id:'myattendance',icon:'ti-clock-check',label:'Attendance'},
@@ -1435,7 +1487,7 @@ function renderModal(){
     box.innerHTML=`<div class="modal-title"><i class="ti ti-user-plus"></i>Create user account</div>
     <div class="info-box info-blue" style="font-size:12px">User logs in with their email only — no password needed. Patrollers &amp; Coordinators are automatically added to the schedule.</div>
     <div class="msg msg-err" id="cu-e"></div><div class="msg msg-ok" id="cu-ok"></div>
-    <div class="fg-row"><div class="fg"><label>Full name</label><input id="cu-name" placeholder="Name"></div><div class="fg"><label>Role</label><select id="cu-role" onchange="document.getElementById('cu-phone-row').style.display=(this.value==='patroller'||this.value==='coordinator')?'block':'none'">${['patroller','coordinator','lead','admin'].map(r=>`<option value="${r}">${roleLabel(r)}</option>`).join('')}${(D.customRoles||[]).map(r=>`<option value="custom:${r.id}">${r.name}</option>`).join('')}</select></div></div>
+    <div class="fg-row"><div class="fg"><label>Full name</label><input id="cu-name" placeholder="Name"></div><div class="fg"><label>Role</label><select id="cu-role" onchange="document.getElementById('cu-phone-row').style.display=(this.value==='patroller'||this.value==='coordinator')?'block':'none'">${(D.customRoles||[]).length>0?(D.customRoles.map(r=>`<option value="custom:${r.id}">${r.name} (${r.access_level||'viewer'})</option>`).join('')):'<option value="" disabled>No roles created yet — add roles in Operations tab first</option>'}</select></div></div>
     <div class="fg"><label>Email</label><input type="email" id="cu-email" placeholder="email@talabat.com"></div>
     <div class="fg" id="cu-phone-row"><label>WhatsApp number <span style="font-weight:400;font-size:10px;color:var(--g3)">(with country code, e.g. +97333112233)</span></label><input type="tel" id="cu-phone" placeholder="+97333112233"></div>
     <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" id="cu-btn" onclick="doCreateUser()"><i class="ti ti-check"></i>Create user</button></div>`;return;
@@ -1532,39 +1584,59 @@ function renderModal(){
     </div>`;return;
   }
   if(m.type==='addrole'){
-    box.innerHTML=`<div class="modal-title"><i class="ti ti-shield"></i>Add custom role</div>
+    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
+    const tabChecks=ALL_TABS.map(t=>`
+      <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid #E8DDD4;border-radius:8px;cursor:pointer;transition:border .13s;background:#fff" onclick="this.style.borderColor=this.querySelector('input').checked?'#E8DDD4':'#FF5900'">
+        <input type="checkbox" name="role-tab" value="${t}" checked style="accent-color:#FF5900;width:14px;height:14px">
+        <span style="font-size:12.5px;font-weight:500;color:#2A0D0F">${t}</span>
+      </label>`).join('');
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-shield"></i>Create new role</div>
     <div class="msg msg-err" id="role-e"></div>
-    <div class="fg"><label>Role name</label><input id="role-name" placeholder="e.g. Senior Patroller, Zone Supervisor"></div>
-    <div class="fg"><label>Description (optional)</label><input id="role-desc" placeholder="What does this role do?"></div>
-    <div class="fg"><label>Access level</label>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
-        <label style="display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border:1.5px solid #E8DDD4;border-radius:10px;cursor:pointer;transition:border .13s" onclick="document.querySelectorAll('.al-opt').forEach(x=>x.style.borderColor='#E8DDD4');this.style.borderColor='#FF5900';document.getElementById('role-access').value='viewer'">
-          <input type="radio" name="role-access-radio" value="viewer" style="margin-top:2px;accent-color:#FF5900">
-          <div>
-            <div style="font-size:13px;font-weight:600;color:#2A0D0F">👁 Viewer</div>
-            <div style="font-size:11px;color:#A08070;margin-top:2px">View-only access — can see schedules, attendance, tasks and documents but cannot make any changes</div>
-          </div>
-        </label>
-        <label style="display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border:1.5px solid #E8DDD4;border-radius:10px;cursor:pointer;transition:border .13s" onclick="document.querySelectorAll('.al-opt').forEach(x=>x.style.borderColor='#E8DDD4');this.style.borderColor='#FF5900';document.getElementById('role-access').value='editor'">
-          <input type="radio" name="role-access-radio" value="editor" style="margin-top:2px;accent-color:#FF5900">
-          <div>
-            <div style="font-size:13px;font-weight:600;color:#2A0D0F">✏️ Editor</div>
-            <div style="font-size:11px;color:#A08070;margin-top:2px">Can edit zones, shifts, attendance, tasks and time-off requests — cannot manage users or access control</div>
-          </div>
-        </label>
-        <label style="display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border:1.5px solid #E8DDD4;border-radius:10px;cursor:pointer;transition:border .13s" onclick="document.querySelectorAll('.al-opt').forEach(x=>x.style.borderColor='#E8DDD4');this.style.borderColor='#FF5900';document.getElementById('role-access').value='admin'">
-          <input type="radio" name="role-access-radio" value="admin" style="margin-top:2px;accent-color:#FF5900">
-          <div>
-            <div style="font-size:13px;font-weight:600;color:#2A0D0F">🔐 Admin</div>
-            <div style="font-size:11px;color:#A08070;margin-top:2px">Full access within this department — manage users, schedules, attendance, tasks, documents and settings</div>
-          </div>
-        </label>
-      </div>
-      <input type="hidden" id="role-access" value="viewer">
+    <div class="fg-row">
+      <div class="fg"><label>Role name</label><input id="role-name" placeholder="e.g. Picker, Supervisor, Inspector"></div>
+      <div class="fg"><label>Access level</label><select id="role-access">
+        <option value="viewer">👁 Viewer — view only</option>
+        <option value="editor">✏️ Editor — can edit data</option>
+        <option value="admin">🔐 Admin — full department access</option>
+      </select></div>
     </div>
-    <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveCustomRole()"><i class="ti ti-check"></i>Add role</button></div>`;return;
+    <div class="fg"><label>Description (optional)</label><input id="role-desc" placeholder="What does this role do?"></div>
+    <div class="fg"><label>Visible tabs <span style="font-weight:400;font-size:10px;color:var(--g3)">(check what this role can see)</span></label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">${tabChecks}</div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveCustomRole()"><i class="ti ti-check"></i>Create role</button></div>`;return;
   }
-  if(m.type==='editsysrole'){
+  if(m.type==='editcustomrole'){
+    const r=m.role;
+    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
+    let savedTabs=ALL_TABS;
+    try{if(r.visible_tabs&&r.visible_tabs!=='[]')savedTabs=JSON.parse(r.visible_tabs);}catch(e){}
+    const tabChecks=ALL_TABS.map(t=>{const checked=savedTabs.includes(t);return`
+      <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid ${checked?'#FF5900':'#E8DDD4'};border-radius:8px;cursor:pointer;transition:border .13s;background:#fff" onclick="const cb=this.querySelector('input');setTimeout(()=>{this.style.borderColor=cb.checked?'#FF5900':'#E8DDD4';},0)">
+        <input type="checkbox" name="ecr-tab" value="${t}" ${checked?'checked':''} style="accent-color:#FF5900;width:14px;height:14px">
+        <span style="font-size:12.5px;font-weight:500;color:#2A0D0F">${t}</span>
+      </label>`;}).join('');
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-shield"></i>Edit role — ${r.name}</div>
+    <div class="msg msg-err" id="ecr-e"></div>
+    <div class="fg-row">
+      <div class="fg"><label>Role name</label><input id="ecr-name" value="${r.name}"></div>
+      <div class="fg"><label>Access level</label><select id="ecr-access">
+        <option value="viewer" ${r.access_level==='viewer'?'selected':''}>👁 Viewer — view only</option>
+        <option value="editor" ${r.access_level==='editor'?'selected':''}>✏️ Editor — can edit data</option>
+        <option value="admin" ${r.access_level==='admin'?'selected':''}>🔐 Admin — full department access</option>
+      </select></div>
+    </div>
+    <div class="fg"><label>Description (optional)</label><input id="ecr-desc" value="${r.description||''}"></div>
+    <div class="fg"><label>Visible tabs</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">${tabChecks}</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger modal-footer-left" onclick="delCustomRole('${r.id}','${r.name}')"><i class="ti ti-trash"></i>Delete</button>
+      <button class="btn" onclick="closeM()">Cancel</button>
+      <button class="btn btn-primary" onclick="updateCustomRole('${r.id}')"><i class="ti ti-check"></i>Save</button>
+    </div>`;return;
+  }
+  if(m.type==='cell'){  if(m.type==='editsysrole'){
     const r=m.role;
     box.innerHTML=`<div class="modal-title"><i class="ti ti-shield"></i>Edit system role — ${r.name}</div>
     <div style="background:#F4EDE3;border-radius:10px;padding:11px 14px;font-size:12px;color:#411517;margin-bottom:14px">
@@ -2770,7 +2842,9 @@ async function updateCustomRole(id){
   const desc=(document.getElementById('ecr-desc').value||'').trim();
   const access=document.getElementById('ecr-access').value||'viewer';
   if(!name){e.textContent='Role name required.';e.style.display='block';return;}
-  const{error}=await sb.from('custom_roles').update({name,description:desc||null,access_level:access,updated_at:new Date().toISOString()}).eq('id',id);
+  const tabs=Array.from(document.querySelectorAll('input[name="ecr-tab"]:checked')).map(x=>x.value);
+  if(!tabs.length){e.textContent='Select at least one visible tab.';e.style.display='block';return;}
+  const{error}=await sb.from('custom_roles').update({name,description:desc||null,access_level:access,visible_tabs:JSON.stringify(tabs),updated_at:new Date().toISOString()}).eq('id',id);
   if(error){e.textContent=error.message;e.style.display='block';return;}
   closeM();await reload();
 }
@@ -2781,8 +2855,9 @@ async function saveCustomRole(){
   const desc=(document.getElementById('role-desc').value||'').trim();
   const access=document.getElementById('role-access').value||'viewer';
   if(!name){e.textContent='Role name required.';e.style.display='block';return;}
-  if(!document.querySelector('input[name="role-access-radio"]:checked')){e.textContent='Please select an access level.';e.style.display='block';return;}
-  const{error}=await sb.from('custom_roles').insert({name,description:desc||null,access_level:access,department_id:D.currentDept||null});
+  const tabs=Array.from(document.querySelectorAll('input[name="role-tab"]:checked')).map(x=>x.value);
+  if(!tabs.length){e.textContent='Select at least one visible tab.';e.style.display='block';return;}
+  const{error}=await sb.from('custom_roles').insert({name,description:desc||null,access_level:access,visible_tabs:JSON.stringify(tabs),department_id:D.currentDept||null});
   if(error){e.textContent=error.message;e.style.display='block';return;}
   closeM();await reload();
 }
@@ -2801,7 +2876,11 @@ async function doCreateUser(){
   clearMsgs('cu-e','cu-ok');
   const name=document.getElementById('cu-name').value.trim();
   const email=document.getElementById('cu-email').value.trim().toLowerCase();
-  const role=document.getElementById('cu-role').value;
+  const roleRaw=document.getElementById('cu-role').value;
+  const isCustom=roleRaw.startsWith('custom:');
+  const customRoleId=isCustom?roleRaw.replace('custom:',''):null;
+  const cr=customRoleId?(D.customRoles||[]).find(r=>r.id===customRoleId):null;
+  const role=cr?(cr.access_level==='admin'?'admin':cr.access_level==='editor'?'lead':'patroller'):'patroller';
   const phone=(document.getElementById('cu-phone')?.value||'').trim();
   if(!name||!email){showErr('cu-e','Name and email required.');return;}
   const btn=document.getElementById('cu-btn');btn.disabled=true;btn.textContent='Creating...';
@@ -2814,7 +2893,7 @@ async function doCreateUser(){
     if(error)throw error;
     const uid=data?.user?.id;
     if(uid){
-      await sb.from('profiles').upsert({id:uid,email,full_name:name,role,is_active:true,department_id:D.currentDept||null},{onConflict:'id'});
+      await sb.from('profiles').upsert({id:uid,email,full_name:name,role,is_active:true,department_id:D.currentDept||null,custom_role_id:customRoleId||null},{onConflict:'id'});
       if(role==='patroller'||role==='coordinator'){
         // Always create a patroller entry linked to this user
         const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null,department_id:D.currentDept||null}).select().single();
