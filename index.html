@@ -230,9 +230,9 @@ table tr:hover td{background:rgba(26,111,232,.02)}
 <div class="modal-overlay" id="modal" onclick="if(event.target===this)closeM()"><div class="modal-box" id="modal-box"></div></div>
 
 <script>
-const SURL='https://fjtlquhowezjzhwseyoa.supabase.co';
-const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqdGxxdWhvd2V6anpod3NleW9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0ODYzNDEsImV4cCI6MjA5NjA2MjM0MX0.MyfYq3eTMncNOYZYSgJckzrxBAMuCKWOFtqZvLk9I_M';
-const REDIRECT='https://hazzaninasili-hue.github.io/talabat-patrol';
+const SURL='https://mplkklrposicxeozinhh.supabase.co';
+const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbGtrbHJwb3NpY3hlb3ppbmhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5OTI2MDYsImV4cCI6MjA5NjU2ODYwNn0.i4VMxfDKHjepBy1Xd-pLGAiegrH5E9tY7G397scRb5g';
+const REDIRECT='https://hazzaninasili-hue.github.io/talabat-liveops';
 const WEBHOOK='https://hook.eu1.make.com/d24akwrimt9ipf9go2ourjwalmodng98';
 const sb=supabase.createClient(SURL,SKEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true,flowType:'implicit'}});
 
@@ -1068,8 +1068,8 @@ function accessView(){
       <i class="ti ti-alert-triangle" style="margin-right:5px"></i>
       <strong>${denied} patroller${denied!==1?'s have':' has'} denied location access</strong> — they cannot clock in/out. Ask them to enable location in browser settings and re-login.
     </div>`:''}
-  </div>
-  
+  </div>`;
+
   return`<div class="info-box info-purple"><b>Admin</b> — full access. <b>Team Lead</b> — edit schedules & roster. <b>Coordinator/Patroller</b> — view own schedule only.</div>
   ${locSection}
   
