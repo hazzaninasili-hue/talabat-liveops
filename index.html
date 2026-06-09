@@ -1188,7 +1188,7 @@ function accessView(){
     </table>`:'<div style="font-size:12px;color:var(--g3);text-align:center;padding:10px">No biometric devices registered yet. Devices will appear after patrollers login.</div>'}
   </div>
   <div class="toolbar"><button class="btn btn-primary" onclick="openM({type:'createuser'})"><i class="ti ti-user-plus"></i>Create user</button><span style="font-size:12px;color:var(--g3)">${D.users.length} users</span></div>
-  <div class="card-grid">${D.users.map(u=>`<div class="card"><div class="card-av" style="background:${roleBg(u.role)};color:${roleCol(u.role)}">${ini(u.full_name)}</div><div class="card-info" style="min-width:0"><div class="card-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.full_name}</div><div style="font-size:10.5px;color:var(--g3);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.email}</div><span class="role-badge ${roleCls(u.role)}">${roleLabel(u.role)}</span> <span style="font-size:10px;color:${u.is_active!==false?'var(--teal)':'var(--red)'}">${u.is_active!==false?'Active':'Inactive'}</span></div>${u.id!==D.profile.id?`<div style="display:flex;flex-direction:column;gap:4px"><select class="role-sel" onchange="chRole('${u.id}',this.value)">${['admin','lead','coordinator','patroller'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${roleLabel(r)}</option>`).join('')}</select><button class="edit-btn" onclick="openEditUser('${u.id}')" title="Edit user" style="width:28px;height:28px"><i class="ti ti-edit"></i></button><button class="icon-btn" onclick="togActive('${u.id}',${u.is_active!==false})" title="${u.is_active!==false?'Deactivate':'Activate'}"><i class="ti ti-${u.is_active!==false?'user-off':'user-check'}"></i></button><button class="icon-btn" onclick="delUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button></div>`:'<span style="font-size:10px;color:var(--g3)">You</span>'}</div>`).join('')}</div>`;
+  <div class="card-grid">${D.users.map(u=>`<div class="card"><div class="card-av" style="background:${roleBg(u.role)};color:${roleCol(u.role)}">${ini(u.full_name)}</div><div class="card-info" style="min-width:0"><div class="card-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.full_name}</div><div style="font-size:10.5px;color:var(--g3);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.email}</div><span class="role-badge ${roleCls(u.role)}">${u.custom_role_id&&D.customRoles?(D.customRoles.find(r=>r.id===u.custom_role_id)?.name||roleLabel(u.role)):roleLabel(u.role)}</span> <span style="font-size:10px;color:${u.is_active!==false?'var(--teal)':'var(--red)'}">${u.is_active!==false?'Active':'Inactive'}</span></div>${u.id!==D.profile.id?`<div style="display:flex;flex-direction:column;gap:4px"><select class="role-sel" onchange="chRole('${u.id}',this.value)">${(D.customRoles&&D.customRoles.length)?D.customRoles.map(r=>`<option value="cr:${r.id}" ${u.custom_role_id===r.id?'selected':''}>${r.name}</option>`).join(''):'<option disabled>No roles — add in Zone & Shifts</option>'}</select><button class="edit-btn" onclick="openEditUser('${u.id}')" title="Edit user" style="width:28px;height:28px"><i class="ti ti-edit"></i></button><button class="icon-btn" onclick="togActive('${u.id}',${u.is_active!==false})" title="${u.is_active!==false?'Deactivate':'Activate'}"><i class="ti ti-${u.is_active!==false?'user-off':'user-check'}"></i></button><button class="icon-btn" onclick="delUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button></div>`:'<span style="font-size:10px;color:var(--g3)">You</span>'}</div>`).join('')}</div>`;
 }
 
 function mySchedView(){
@@ -1379,14 +1379,16 @@ function render(){
 }
 function setTab(t){D.tab=t;D.ne=false;render();}
 
-async function chRole(uid,role){
-  await sb.from('profiles').update({role}).eq('id',uid);
-  if(role==='patroller'||role==='coordinator'){
-    // Sync user_type and keep active
-    await sb.from('patrollers').update({user_type:role,is_active:true}).eq('user_id',uid);
+async function chRole(uid,roleRaw){
+  const isCustom=roleRaw.startsWith('cr:');
+  const customRoleId=isCustom?roleRaw.replace('cr:',''):null;
+  const cr=customRoleId?(D.customRoles||[]).find(r=>r.id===customRoleId):null;
+  const sysRole=cr?(cr.access_level==='admin'?'admin':cr.access_level==='editor'?'lead':'patroller'):'patroller';
+  await sb.from('profiles').update({role:sysRole,custom_role_id:customRoleId||null}).eq('id',uid);
+  if(sysRole==='patroller'||sysRole==='coordinator'){
+    await sb.from('patrollers').update({user_type:sysRole,is_active:true}).eq('user_id',uid);
   } else {
-    // admin/lead — hide from schedule by setting is_active false
-    await sb.from('patrollers').update({user_type:role,is_active:false}).eq('user_id',uid);
+    await sb.from('patrollers').update({is_active:false}).eq('user_id',uid);
   }
   await reload();
 }
@@ -1478,7 +1480,7 @@ function renderModal(){
     box.innerHTML=`<div class="modal-title"><i class="ti ti-user-plus"></i>Create user account</div>
     <div class="info-box info-blue" style="font-size:12px">User logs in with their email only — no password needed. Patrollers &amp; Coordinators are automatically added to the schedule.</div>
     <div class="msg msg-err" id="cu-e"></div><div class="msg msg-ok" id="cu-ok"></div>
-    <div class="fg-row"><div class="fg"><label>Full name</label><input id="cu-name" placeholder="Name"></div><div class="fg"><label>Role</label><select id="cu-role" onchange="document.getElementById('cu-phone-row').style.display=(this.value==='patroller'||this.value==='coordinator')?'block':'none'">${['patroller','coordinator','lead','admin'].map(r=>`<option value="${r}">${roleLabel(r)}</option>`).join('')}</select></div></div>
+    <div class="fg-row"><div class="fg"><label>Full name</label><input id="cu-name" placeholder="Name"></div><div class="fg"><label>Role</label><select id="cu-role" onchange="document.getElementById('cu-phone-row').style.display=(this.value==='patroller'||this.value==='coordinator')?'block':'none'">${(D.customRoles&&D.customRoles.length)?D.customRoles.map(r=>`<option value="cr:${r.id}">${r.name} (${r.access_level==='admin'?'Admin':r.access_level==='editor'?'Editor':'Viewer'})</option>`).join(''):'<option value="" disabled>No roles yet — create in Zone & Shifts first</option>'}</select></div></div>
     <div class="fg"><label>Email</label><input type="email" id="cu-email" placeholder="email@talabat.com"></div>
     <div class="fg" id="cu-phone-row"><label>WhatsApp number <span style="font-weight:400;font-size:10px;color:var(--g3)">(with country code, e.g. +97333112233)</span></label><input type="tel" id="cu-phone" placeholder="+97333112233"></div>
     <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" id="cu-btn" onclick="doCreateUser()"><i class="ti ti-check"></i>Create user</button></div>`;return;
@@ -2618,7 +2620,11 @@ async function doCreateUser(){
   clearMsgs('cu-e','cu-ok');
   const name=document.getElementById('cu-name').value.trim();
   const email=document.getElementById('cu-email').value.trim().toLowerCase();
-  const role=document.getElementById('cu-role').value;
+  const roleRaw=document.getElementById('cu-role').value;
+  const isCustomRole=roleRaw.startsWith('cr:');
+  const customRoleId=isCustomRole?roleRaw.replace('cr:',''):null;
+  const cr2=customRoleId?(D.customRoles||[]).find(r=>r.id===customRoleId):null;
+  const role=cr2?(cr2.access_level==='admin'?'admin':cr2.access_level==='editor'?'lead':'patroller'):'patroller';
   const phone=(document.getElementById('cu-phone')?.value||'').trim();
   if(!name||!email){showErr('cu-e','Name and email required.');return;}
   const btn=document.getElementById('cu-btn');btn.disabled=true;btn.textContent='Creating...';
@@ -2631,7 +2637,7 @@ async function doCreateUser(){
     if(error)throw error;
     const uid=data?.user?.id;
     if(uid){
-      await sb.from('profiles').upsert({id:uid,email,full_name:name,role,is_active:true},{onConflict:'id'});
+      await sb.from('profiles').upsert({id:uid,email,full_name:name,role,is_active:true,custom_role_id:customRoleId||null},{onConflict:'id'});
       if(role==='patroller'||role==='coordinator'){
         // Always create a patroller entry linked to this user
         const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null}).select().single();
