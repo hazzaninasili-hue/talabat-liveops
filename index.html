@@ -282,16 +282,17 @@ const REDIRECT='https://hazzaninasili-hue.github.io/talabat-liveops';
 const WEBHOOK='https://hook.eu1.make.com/d24akwrimt9ipf9go2ourjwalmodng98';
 const sb=supabase.createClient(SURL,SKEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true,flowType:'implicit'}});
 
-const DAYS=['Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday','Friday'];
-const SD=['Sat','Sun','Mon','Tue','Wed','Thu','Fri'];
+const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const SD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function getCurrentSaturday(){
+  // Bahrain week starts Sunday (getDay()===0)
   var now=new Date();
-  var day=now.getDay();
-  var diff=day===6?0:-(day+1);
-  var sat=new Date(now);
-  sat.setDate(sat.getDate()+diff);
-  sat.setHours(0,0,0,0);
-  return sat;
+  var day=now.getDay(); // 0=Sun,1=Mon,...,6=Sat
+  var diff=day===0?0:-day; // go back to Sunday
+  var sun=new Date(now);
+  sun.setDate(sun.getDate()+diff);
+  sun.setHours(0,0,0,0);
+  return sun;
 }
 const BASE_DATE=getCurrentSaturday();
 const LEAVE_TYPES=['Annual Leave','Sick Leave','Sick Leave 50%','Sick Leave Unpaid','Unpaid Leave','Death'];
@@ -532,7 +533,13 @@ async function sendWebhook(event,data){
 const ini=n=>n.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
 const gsh=id=>D.shifts.find(s=>s.id===id)||{name:'?',start_time:'?',end_time:'?',shift_type:'morning'};
 const fmt=d=>`${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()}`;
-const wNum=d=>{const j=new Date(d.getFullYear(),0,1);return Math.ceil(((d-j)/86400000+j.getDay()+1)/7);};
+const wNum=d=>{
+  // Week number based on Bahrain week (starts Sunday)
+  const jan1=new Date(d.getFullYear(),0,1);
+  const jan1Day=jan1.getDay(); // 0=Sun
+  const dayOfYear=Math.floor((d-jan1)/86400000);
+  return Math.ceil((dayOfYear+jan1Day+1)/7);
+};
 const fmtT=t=>{if(!t||t==='?')return'?';const[h,m]=t.split(':');const hr=parseInt(h);return`${hr===0?12:hr>12?hr-12:hr}:${m} ${hr<12||hr===24?'AM':'PM'}`;};
 const isAdmin=()=>D.profile&&D.profile.role==='admin';
 const canEdit=()=>D.profile&&(D.profile.role==='admin'||D.profile.role==='lead');
@@ -582,7 +589,7 @@ function getActiveNow(){
   // Get today's day index (0=Sat, 1=Sun, ... 6=Fri)
   const now=new Date();
   const jsDay=now.getDay(); // 0=Sun,1=Mon,...,6=Sat
-  const dayMap={6:0,0:1,1:2,2:3,3:4,4:5,5:6}; // map to our DAYS array
+  const dayMap={0:0,1:1,2:2,3:3,4:4,5:5,6:6}; // Sun=0,Mon=1,...,Sat=6 (Bahrain week)
   const todayIdx=dayMap[jsDay];
   const nowMins=now.getHours()*60+now.getMinutes();
 
@@ -1197,7 +1204,7 @@ function mySchedView(){
   if(!p)return`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-user-off" style="font-size:40px;display:block;margin-bottom:10px"></i>Your account is not linked to a schedule record.<br><span style="font-size:12px">Contact your admin to link your account.</span></div>`;
   const dates=wDates();const sh=gsh(p.shift_id);const wn=wNum(dates[0]);
   const today=todayStr();
-  const todayIdx={6:0,0:1,1:2,2:3,3:4,4:5,5:6}[new Date().getDay()];
+  const todayIdx=new Date().getDay(); // Sun=0,Mon=1,...,Sat=6 (Bahrain)
   const todayZone=gDZ(p.id,todayIdx);
   const todayOnVac=isOnVacationToday(p.id);
   const todayAbsent=isAbsentToday(p.id);
@@ -1350,7 +1357,7 @@ function renderTabs(){
 
 function buildRoleLiveTable(isToday){
   const pts=activePats();
-  const todayIdx={6:0,0:1,1:2,2:3,3:4,4:5,5:6}[new Date().getDay()];
+  const todayIdx=new Date().getDay(); // Sun=0,Mon=1,...,Sat=6 (Bahrain)
   const nowStr=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   // Group by custom role name
   const getRoleName=p=>{const u=D.users.find(u=>u.id===p.user_id);if(u&&u.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr)return cr.name;}return getUtype(p)==='coordinator'?'Coordinator':'Patroller';};
