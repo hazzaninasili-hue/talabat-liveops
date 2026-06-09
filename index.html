@@ -1088,12 +1088,12 @@ function operationsView(){
           <div style="font-size:11px;color:var(--g3);margin-top:3px">${r.desc}</div>
           <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:${r.bg};color:${r.color};margin-top:5px;display:inline-block">System role</span>
         </div>
-        <div style="font-size:10px;color:var(--g3)">Built-in</div>
+        ${ed?`<button class="edit-btn" style="width:32px;height:32px" onclick="openM({type:'editsysrole',role:${JSON.stringify(r)}})" title="Edit description"><i class="ti ti-edit"></i></button>`:'<div style="font-size:10px;color:var(--g3)">Built-in</div>'}
       </div>`).join('');
     const accessBg={viewer:'#EAF1FD',editor:'#FFF0E6',admin:'#DCFCE7'};
     const accessCol={viewer:'#0C4FB3',editor:'#FF5900',admin:'#166534'};
     const accessLabel={viewer:'👁 Viewer',editor:'✏️ Editor',admin:'🔐 Admin'};
-    const customCards=roles.length>0?roles.map(r=>{const al=r.access_level||'viewer';return`<div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;padding:16px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(65,21,23,.06)"><div style="width:44px;height:44px;border-radius:12px;background:${accessBg[al]||'#FFF0E6'};display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-user-check" style="font-size:20px;color:${accessCol[al]||'#FF5900'}"></i></div><div style="flex:1"><div style="font-size:13px;font-weight:700;color:#2A0D0F">${r.name}</div>${r.description?`<div style="font-size:11px;color:var(--g3);margin-top:3px">${r.description}</div>`:''}<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap"><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#FFF0E6;color:#FF5900">Custom</span><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:${accessBg[al]};color:${accessCol[al]}">${accessLabel[al]||al}</span></div></div>${ed?`<button class="icon-btn" onclick="delCustomRole('${r.id}','${r.name.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button>`:''}</div>`;}).join(''):'';
+    const customCards=roles.length>0?roles.map(r=>{const al=r.access_level||'viewer';return`<div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;padding:16px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(65,21,23,.06)"><div style="width:44px;height:44px;border-radius:12px;background:${accessBg[al]||'#FFF0E6'};display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-user-check" style="font-size:20px;color:${accessCol[al]||'#FF5900'}"></i></div><div style="flex:1"><div style="font-size:13px;font-weight:700;color:#2A0D0F">${r.name}</div>${r.description?`<div style="font-size:11px;color:var(--g3);margin-top:3px">${r.description}</div>`:''}<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap"><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#FFF0E6;color:#FF5900">Custom</span><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:${accessBg[al]};color:${accessCol[al]}">${accessLabel[al]||al}</span></div></div>${ed?`<div style="display:flex;flex-direction:column;gap:4px"><button class="edit-btn" style="width:32px;height:32px" onclick="openM({type:'editcustomrole',role:{id:'${r.id}',name:'${r.name.replace(/'/g,"\'")}',description:'${(r.description||'').replace(/'/g,"\'")}',access_level:'${r.access_level||'viewer'}'}})"><i class="ti ti-edit"></i></button><button class="icon-btn" onclick="delCustomRole('${r.id}','${r.name.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button></div>`:''}</div>`;}).join(''):'';
     return header+`
       <div style="margin-bottom:12px;font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">System Roles</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:20px">${sysCards}</div>
@@ -1563,6 +1563,50 @@ function renderModal(){
       <input type="hidden" id="role-access" value="viewer">
     </div>
     <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveCustomRole()"><i class="ti ti-check"></i>Add role</button></div>`;return;
+  }
+  if(m.type==='editsysrole'){
+    const r=m.role;
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-shield"></i>Edit system role — ${r.name}</div>
+    <div style="background:#F4EDE3;border-radius:10px;padding:11px 14px;font-size:12px;color:#411517;margin-bottom:14px">
+      <i class="ti ti-info-circle" style="margin-right:5px"></i>System roles have fixed permissions. You can only update the display name and description.
+    </div>
+    <div class="msg msg-err" id="sre-e"></div>
+    <div class="fg"><label>Display name</label><input id="sre-name" value="${r.name}"></div>
+    <div class="fg"><label>Description</label><input id="sre-desc" value="${r.desc}"></div>
+    <div class="fg"><label>Access level</label>
+      <div style="padding:11px 14px;border:1.5px solid #E8DDD4;border-radius:10px;background:#F8FAFC">
+        <div style="font-size:13px;font-weight:600;color:#411517">${r.key==='admin'?'🔐 Full Admin':r.key==='lead'?'✏️ Editor (Lead)':r.key==='coordinator'?'👁 Viewer + own data':'👁 Viewer (own only)'}</div>
+        <div style="font-size:11px;color:#A08070;margin-top:3px">System permissions cannot be changed</div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveSysRoleEdit('${r.key}')"><i class="ti ti-check"></i>Save</button></div>`;return;
+  }
+  if(m.type==='editcustomrole'){
+    const r=m.role;
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-shield"></i>Edit role — ${r.name}</div>
+    <div class="msg msg-err" id="ecr-e"></div>
+    <div class="fg"><label>Role name</label><input id="ecr-name" value="${r.name}"></div>
+    <div class="fg"><label>Description (optional)</label><input id="ecr-desc" value="${r.description||''}"></div>
+    <div class="fg"><label>Access level</label>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+        ${['viewer','editor','admin'].map(al=>{
+          const alBg={viewer:'#EAF1FD',editor:'#FFF0E6',admin:'#DCFCE7'}[al];
+          const alCol={viewer:'#0C4FB3',editor:'#FF5900',admin:'#166534'}[al];
+          const alLabel={viewer:'👁 Viewer — view only',editor:'✏️ Editor — edit zones, shifts, attendance, tasks, time-off',admin:'🔐 Admin — full access within department'}[al];
+          const isSelected=r.access_level===al;
+          return`<label style="display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border:1.5px solid ${isSelected?alCol:'#E8DDD4'};border-radius:10px;cursor:pointer;background:${isSelected?alBg:'#fff'}" onclick="document.querySelectorAll('.ecr-opt').forEach(x=>{x.style.borderColor='#E8DDD4';x.style.background='#fff'});this.style.borderColor='${alCol}';this.style.background='${alBg}';document.getElementById('ecr-access').value='${al}'">
+            <input type="radio" name="ecr-access-radio" value="${al}" ${isSelected?'checked':''} style="margin-top:2px;accent-color:${alCol}">
+            <div style="font-size:12.5px;font-weight:600;color:#2A0D0F">${alLabel}</div>
+          </label>`;
+        }).join('')}
+      </div>
+      <input type="hidden" id="ecr-access" value="${r.access_level||'viewer'}">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger modal-footer-left" onclick="delCustomRole('${r.id}','${r.name}')"><i class="ti ti-trash"></i>Delete</button>
+      <button class="btn" onclick="closeM()">Cancel</button>
+      <button class="btn btn-primary" onclick="updateCustomRole('${r.id}')"><i class="ti ti-check"></i>Save</button>
+    </div>`;return;
   }
   if(m.type==='cell'){
     const p=D.patrollers.find(x=>x.id===m.pid);const cur=gDZ(m.pid,m.di);
@@ -2707,6 +2751,28 @@ async function saveDept(id){
     if(error){e.textContent=error.message;e.style.display='block';return;}
   }
   closeM();await loadDepartments();renderSuperDash();
+}
+
+// Store system role overrides locally
+const SYSTEM_ROLE_OVERRIDES={};
+async function saveSysRoleEdit(key){
+  const name=(document.getElementById('sre-name').value||'').trim();
+  const desc=(document.getElementById('sre-desc').value||'').trim();
+  if(!name){document.getElementById('sre-e').textContent='Name required.';document.getElementById('sre-e').style.display='block';return;}
+  // Save to local storage as override (system roles can't be changed in DB)
+  SYSTEM_ROLE_OVERRIDES[key]={name,desc};
+  closeM();render();
+}
+
+async function updateCustomRole(id){
+  const e=document.getElementById('ecr-e');e.style.display='none';
+  const name=(document.getElementById('ecr-name').value||'').trim();
+  const desc=(document.getElementById('ecr-desc').value||'').trim();
+  const access=document.getElementById('ecr-access').value||'viewer';
+  if(!name){e.textContent='Role name required.';e.style.display='block';return;}
+  const{error}=await sb.from('custom_roles').update({name,description:desc||null,access_level:access,updated_at:new Date().toISOString()}).eq('id',id);
+  if(error){e.textContent=error.message;e.style.display='block';return;}
+  closeM();await reload();
 }
 
 async function saveCustomRole(){
