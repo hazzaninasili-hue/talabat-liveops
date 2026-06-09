@@ -2283,7 +2283,7 @@ function tasksView(){
   const rows=all.map(t=>{
     const col=TASK_COLORS[t.task_type]||'#411517';
     const bg=TASK_BG[t.task_type]||'#F4EDE3';
-    const duration=t.start_time&&t.end_time?`${t.start_time} → ${t.end_time}`:t.start_time?`Started: ${t.start_time}`:'--';
+    const duration=t.status==='Running'?`${t.start_time} → Running...`:t.start_time&&t.end_time?`${t.start_time} → ${t.end_time}`:t.start_time?`Started: ${t.start_time}`:'--';
     const statusDisplay=t.status==='Running'?`<i class="ti ti-circle-filled" style="font-size:6px;margin-right:4px;animation:pulse 1.5s infinite"></i>${t.status}`:`${t.status==='Completed'?'✓':''} ${t.status}`;
     
     return`<tr>
@@ -2329,7 +2329,7 @@ function myTasksView(){
     return`<tr>
       <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${bg};color:${col}">${t.task_type}</span></td>
       <td style="font-family:monospace;font-size:11px">${t.date||'--'}</td>
-      <td style="font-size:11px">${t.start_time||'--'} → ${t.end_time||'--'}</td>
+      <td style="font-size:11px">${t.start_time||'--'} → ${t.status==='Running'?'<span style="color:#16A34A;font-weight:600;animation:pulse 1.5s infinite">● Running</span>':t.end_time||'--'}</td>
       <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.description||'--'}</td>
       <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;${sc}">${t.status}</span></td>
     </tr>`;
