@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
@@ -10,43 +10,6 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',sans-serif;background:#F4EDE3;color:#2A0D0F;font-size:14px}
-@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-@media(max-width:768px){
-  html{font-size:14px}
-  .page{padding:8px!important}
-  .topbar{padding:0 12px!important;height:52px!important}
-  .topbar-name{font-size:14px!important;font-weight:700!important}
-  .topbar-sub{font-size:11px!important}
-  .tabs{padding:4px 8px!important;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-  .tabs::-webkit-scrollbar{display:none}
-  .tab{padding:10px 12px!important;font-size:12px!important;white-space:nowrap;flex-shrink:0}
-  .card-grid{grid-template-columns:1fr!important}
-  .fg-row{grid-template-columns:1fr!important}
-  .modal-box{padding:20px 16px!important;border-radius:16px!important;margin:12px!important;max-height:90vh;overflow-y:auto}
-  .toolbar{flex-wrap:wrap!important;gap:6px!important}
-  .btn{padding:8px 14px!important;font-size:12px!important}
-  .search-wrap{order:3;width:100%}
-  .search-input{width:100%!important}
-  .user-chip{gap:6px!important}
-  .user-nm{font-size:12px!important;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .user-rl{font-size:10px!important}
-  .wk-chip{font-size:11px!important;padding:4px 8px!important}
-  .tcard{border-radius:10px!important}
-  .t-scroll{-webkit-overflow-scrolling:touch}
-  table{font-size:11px!important}
-  table th,table td{padding:6px 6px!important}
-  .my-card{gap:10px!important}
-  .my-name{font-size:14px!important}
-  .auth-wrap{padding:16px!important;align-items:flex-start!important;padding-top:40px!important}
-  .auth-box{padding:28px 20px!important;width:100%!important;border-radius:16px!important}
-  .auth-box h2{font-size:22px!important}
-  .auth-btn{padding:13px!important;font-size:15px!important}
-  .fg input,.fg select,.fg textarea{font-size:15px!important;padding:11px 12px!important}
-  .stat{padding:12px!important}
-  .stat-value{font-size:24px!important}
-  .stat-label{font-size:10px!important}
-  .info-box{font-size:12px!important}
-}
 :root{
   --blue:#411517;--blue-l:#F9EDEE;--blue-d:#2A0D0F;--blue-b:#C4888A;
   --green:#16A34A;--green-l:#DCFCE7;
@@ -257,22 +220,6 @@ table tr:hover td{background:rgba(26,111,232,.02)}
     <div class="topbar-right">
       <div class="user-chip" id="user-chip"></div>
       <button class="top-btn" onclick="openM({type:'changepw'})"><i class="ti ti-key"></i>Change password</button>
-      <div style="position:relative">
-        <button class="top-btn" id="notif-btn" onclick="toggleNotifications()" style="position:relative">
-          <i class="ti ti-bell"></i>
-          <span id="notif-badge" style="display:none;position:absolute;top:-3px;right:-3px;width:16px;height:16px;background:#FF5900;border-radius:50%;font-size:9px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center" id="notif-count">0</span>
-        </button>
-        <div id="notif-panel" style="display:none;position:absolute;right:0;top:calc(100% + 8px);width:320px;background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;box-shadow:0 8px 24px rgba(65,21,23,.15);z-index:300;overflow:hidden">
-          <div style="padding:12px 16px;background:#F4EDE3;border-bottom:1.5px solid #E8DDD4;display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:12px;font-weight:700;color:#411517">Notifications</span>
-            <div style="display:flex;gap:8px;align-items:center">
-              <button onclick="notifSoundEnabled=!notifSoundEnabled;this.innerHTML=notifSoundEnabled?'🔔':'🔕';this.title=notifSoundEnabled?'Sound on':'Sound off'" title="Sound on" style="background:none;border:none;cursor:pointer;font-size:14px">🔔</button>
-              <button onclick="clearNotifications()" style="font-size:10px;color:#FF5900;background:none;border:none;cursor:pointer;font-family:inherit">Clear all</button>
-            </div>
-          </div>
-          <div id="notif-list" style="max-height:320px;overflow-y:auto;padding:8px 0"></div>
-        </div>
-      </div>
       <button class="top-btn danger" onclick="doLogout()"><i class="ti ti-logout"></i>Sign out</button>
     </div>
   </div>
@@ -303,7 +250,6 @@ function getCurrentSaturday(){
 const BASE_DATE=getCurrentSaturday();
 const LEAVE_TYPES=['Annual Leave','Sick Leave','Sick Leave 50%','Sick Leave Unpaid','Unpaid Leave','Death'];
 
-
 let D={user:null,profile:null,tab:'schedule',view:'week',woff:0,search:'',modal:null,ne:false,hweek:null,
   shifts:[],areas:[],zones:[],patrollers:[],schedules:[],users:[],
   notesAll:{id:null,content:''},notesPat:{id:null,content:''},notesCoo:{id:null,content:''},
@@ -316,46 +262,46 @@ function showOk(id,m){const e=document.getElementById(id);if(e){e.textContent=m;
 function clearMsgs(...ids){ids.forEach(id=>{const e=document.getElementById(id);if(e){e.textContent='';e.style.display='none';}});}
 function togglePw(id,btn){const el=document.getElementById(id);const s=el.type==='password';el.type=s?'text':'password';btn.innerHTML=s?'<i class="ti ti-eye-off"></i>':'<i class="ti ti-eye"></i>';}
 
-
-async function doLogin(){
-  clearMsgs('login-err','login-ok');
-  const email=document.getElementById('login-email').value.trim().toLowerCase();
-  if(!email){showErr('login-err','Please enter your work email.');return;}
-  const btn=document.getElementById('login-btn');
-  btn.disabled=true;btn.textContent='Signing in...';
-  try{
-    const{data,error}=await sb.auth.signInWithPassword({email,password:email+'_talabat_access'});
-    if(!error&&data?.user){
-      const{data:prof}=await wt(sb.from('profiles').select('is_active').eq('email',email).maybeSingle(),5000);
-      if(prof&&prof.is_active===false){await sb.auth.signOut();btn.disabled=false;btn.textContent='Sign in';showErr('login-err','Your account is inactive. Contact your admin.');return;}
-      return;
-    }
-    const{data:prof}=await wt(sb.from('profiles').select('id,email,full_name,role,is_active').eq('email',email).maybeSingle(),5000);
-    if(!prof){btn.disabled=false;btn.textContent='Sign in';showErr('login-err','Email not found. Ask your admin to add you.');return;}
-    if(prof.is_active===false){btn.disabled=false;btn.textContent='Sign in';showErr('login-err','Your account is inactive. Contact your admin.');return;}
-    const{data:d2,error:e2}=await sb.auth.signUp({email,password:email+'_talabat_access',options:{emailRedirectTo:REDIRECT}});
-    if(e2){btn.disabled=false;btn.textContent='Sign in';showErr('login-err',e2.message||'Failed.');return;}
-    const{data:d3,error:e3}=await sb.auth.signInWithPassword({email,password:email+'_talabat_access'});
-    if(!e3&&d3?.user)return;
-    btn.disabled=false;btn.textContent='Sign in';
-    showErr('login-err','Account created! Please try signing in again.');
-  }catch(e){btn.disabled=false;btn.textContent='Sign in';showErr('login-err',e.message||'Login failed.');}
-}
-
-async function doLogout(){
-  await sb.auth.signOut();
-  D.user=null;D.profile=null;
+window.addEventListener('load',async()=>{
   showS('login');
-}
-
+  const{data:{session}}=await sb.auth.getSession();
+  if(session)afterLogin(session.user);
+});
 sb.auth.onAuthStateChange((ev,session)=>{
   if(ev==='SIGNED_OUT')showS('login');
   else if(ev==='SIGNED_IN'&&session)afterLogin(session.user);
 });
 
+async function doLogin(){
+  clearMsgs('login-err','login-ok');
+  const email=document.getElementById('login-email').value.trim().toLowerCase();
+
+  
+  if(!email){showErr('login-err','Please enter your work email.');return;}
+
+  
+  const btn=document.getElementById('login-btn');
+  btn.disabled=true;btn.textContent='Signing in...';
+  
+  try{
+    // Simple login with email + password
+    const{data,error}=await sb.auth.signInWithPassword({email,password:email+'_talabat_access'});
+    if(error)throw new Error(error.message);
+    if(!data?.user){throw new Error('Login failed');}
+    
+    await afterLogin(data.user);
+    
+  }catch(e){
+    btn.disabled=false;
+    btn.textContent='Sign in';
+    showErr('login-err','❌ '+e.message||'Login failed. Try again.');
+    console.error('Login error:',e);
+  }
+}
+
 async function afterLogin(user){
   D.user=user;showApp();
-  document.getElementById('main').innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:14px;color:#94A3B8"><div style="width:34px;height:34px;border:3px solid #E2E8F0;border-top-color:#FF5900;border-radius:50%;animation:spin .7s linear infinite"></div><div>Loading...</div></div>';
+  document.getElementById('main').innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:14px;color:#94A3B8"><div style="width:34px;height:34px;border:3px solid #E2E8F0;border-top-color:#1A6FE8;border-radius:50%;animation:spin .7s linear infinite"></div><div>Loading...</div></div>';
   try{
     let{data:prof}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);
     if(!prof){
@@ -364,7 +310,7 @@ async function afterLogin(user){
         await sb.from('profiles').update({id:user.id}).eq('email',user.email);
         prof={...byEmail,id:user.id};
       } else {
-        await sb.from('profiles').upsert({id:user.id,email:user.email,full_name:user.user_metadata?.full_name||user.email.split('@')[0],role:'patroller',is_active:true},{onConflict:'id'});
+        await sb.from('profiles').upsert({id:user.id,email:user.email,full_name:user.user_metadata?.full_name||user.email.split('@')[0],role:user.user_metadata?.role||'patroller',is_active:true},{onConflict:'id'});
         const{data:p2}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);
         prof=p2;
       }
@@ -373,56 +319,158 @@ async function afterLogin(user){
   }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};}
   D.tab=(D.profile.role==='patroller'||D.profile.role==='coordinator')?'myschedule':'schedule';
   await loadAll();
+  render();
+}
+
+async function syncUserProfile(email){
+  try{
+    console.log('Sync: Checking profile for email:', email);
+    
+    // Step 1: Check if profile exists
+    const{data:prof}=await sb.from('profiles').select('id').eq('email',email.toLowerCase()).maybeSingle();
+    console.log('Sync: Profile check result:', prof ? 'Found' : 'Not found');
+    
+    if(prof){
+      console.log('Sync: Profile already exists');
+      return true;
+    }
+    
+    // Step 2: Check if patroller exists with this email
+    console.log('Sync: Looking for patroller with email:', email);
+    const{data:pat}=await sb.from('patrollers').select('id,name,user_type,phone,email').eq('email',email.toLowerCase()).maybeSingle();
+    console.log('Sync: Patroller check result:', pat);
+    
+    if(!pat){
+      console.log('Sync: No patroller found with email:', email);
+      return false;
+    }
+    
+    // Step 3: Create profile from patroller data
+    console.log('Sync: Creating profile from patroller:', pat.name);
+    const role=pat.user_type||'patroller';
+    const{data:newProf,error:createErr}=await sb.from('profiles').insert({
+      email:email.toLowerCase(),
+      full_name:pat.name,
+      role,
+      is_active:true
+    }).select().single();
+    
+    if(createErr){
+      console.error('Sync: Error creating profile:', createErr);
+      return false;
+    }
+    
+    console.log('Sync: Profile created successfully:', newProf?.email);
+    return true;
+    
+  }catch(e){
+    console.error('Sync profile error:',e.message);
+    return false;
+  }
+}
+async function doReset(){
+  
+  const email='';
+  if(!email){showErr('reset-err','Enter your email.');return;}
+  document.getElementById('reset-btn').disabled=true;
+  const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:REDIRECT});
+  document.getElementById('reset-btn').disabled=false;
+  if(error)showErr('reset-err',error.message);else showOk('reset-ok','Reset email sent!');
+}
+async function doSetPw(){
+  clearMsgs('newpw-err','newpw-ok');
+  const p1=document.getElementById('newpw1').value;const p2=document.getElementById('newpw2').value;
+  if(p1.length<8){showErr('newpw-err','Min 8 characters.');return;}
+  if(p1!==p2){showErr('newpw-err','Passwords do not match.');return;}
+  const{error}=await sb.auth.updateUser({password:p1});
+  if(error)showErr('newpw-err',error.message);
+  else{showOk('newpw-ok','Password updated!');setTimeout(()=>{window.location.hash='';showS('login');},1500);}
+}
+async function doLogout(){await sb.auth.signOut();}
+
+async function afterLogin(user){
+  D.user=user;showApp();
+  document.getElementById('main').innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:14px;color:#94A3B8"><div style="width:34px;height:34px;border:3px solid #E2E8F0;border-top-color:#1A6FE8;border-radius:50%;animation:spin .7s linear infinite"></div><div>Loading...</div></div>';
+  try{
+    let{data:prof}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);
+    if(!prof){
+      // Try matching by email (handles case where profile predates auth account)
+      const{data:byEmail}=await wt(sb.from('profiles').select('*').eq('email',user.email).maybeSingle(),5000);
+      if(byEmail){
+        // Link auth id to existing profile
+        await sb.from('profiles').update({id:user.id}).eq('email',user.email);
+        prof={...byEmail,id:user.id};
+      } else {
+        await sb.from('profiles').upsert({id:user.id,email:user.email,full_name:user.user_metadata?.full_name||user.email.split('@')[0],role:user.user_metadata?.role||'patroller',is_active:true},{onConflict:'id'});
+        const{data:p2}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);
+        prof=p2;
+      }
+    }
+    D.profile=prof||{id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};
+  }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};}
+  D.tab=(D.profile.role==='patroller'||D.profile.role==='coordinator')?'myschedule':'schedule';
+  await loadAll();
+  // Check & save location permission for this user
+  if(D.profile.role==='patroller'||D.profile.role==='coordinator'){
+    checkAndSaveLocationPermission();
+  }
+  // Auto-link patroller record if user_id is not set (fixes first-login issue)
   if(D.profile.role==='patroller'||D.profile.role==='coordinator'){
     const linked=D.patrollers.find(p=>p.user_id===D.profile.id);
     if(!linked){
       const byName=D.patrollers.find(p=>p.name.toLowerCase()===D.profile.full_name.toLowerCase()&&!p.user_id);
-      if(byName){await sb.from('patrollers').update({user_id:D.profile.id,user_type:D.profile.role}).eq('id',byName.id);await loadAll();}
+      if(byName){
+        await sb.from('patrollers').update({user_id:D.profile.id,user_type:D.profile.role}).eq('id',byName.id);
+        await loadAll();
+      }
     }
-    checkAndSaveLocationPermission();
   }
   render();
 }
 
-window.addEventListener('load',async()=>{
-  const{data:{session}}=await sb.auth.getSession();
-  if(session)afterLogin(session.user);
-  else showS('login');
-});
-
 function wt(p,ms=8000){return Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms))]);}
 
 async function loadAll(){
-  const safe=async(fn)=>{try{const r=await fn();return r;}catch(e){return null;}};
-  const[sh,ar,zo,pt,sc,notes,docs,tor,tk,cr,lp,att,users,tasks]=await Promise.all([
-    safe(()=>wt(sb.from('shifts').select('*').order('created_at'),4000)),
-    safe(()=>wt(sb.from('areas').select('*').order('name'),4000)),
-    safe(()=>wt(sb.from('zones').select('*').order('name'),4000)),
-    safe(()=>wt(sb.from('patrollers').select('*').eq('is_active',true).order('name'),4000)),
-    safe(()=>wt(sb.from('schedules').select('*'),4000)),
-    safe(()=>wt(sb.from('notes').select('*'),4000)),
-    safe(()=>wt(sb.from('documents').select('*').order('created_at',{ascending:false}),4000)),
-    safe(()=>wt(sb.from('time_off_requests').select('*').order('created_at',{ascending:false}),4000)),
-    safe(()=>wt(sb.from('custom_roles').select('*').order('name'),4000)),
-    safe(()=>wt(sb.from('custom_roles').select('*').order('name'),4000)),
-    safe(()=>wt(sb.from('location_permissions').select('*'),4000)),
-    safe(()=>wt(sb.from('attendance').select('*').order('date',{ascending:false}).limit(500),4000)),
-    safe(()=>wt(sb.from('profiles').select('*').order('full_name'),4000)),
-    safe(()=>wt(sb.from('task_requests').select('*').order('created_at',{ascending:false}),4000)),
-  ]);
-  D.shifts=sh?.data||[];D.areas=ar?.data||[];D.zones=zo?.data||[];
-  D.patrollers=pt?.data||[];D.schedules=sc?.data||[];
-  D.docs=docs?.data||[];D.timeoff=tor?.data||[];
-  D.customRoles=cr?.data||[];D.tasks=tasks?.data||[];
-  D.attendance=att?.data||[];D.users=users?.data||[];
-  D.locPerms={};(lp?.data||[]).forEach(r=>{D.locPerms[r.patroller_id]=r;});
-  D.biometricDevices=[];
-  if(notes?.data){
-    const nd=notes.data;
-    D.notesAll={id:nd.find(n=>n.audience==='all')?.id||null,content:nd.find(n=>n.audience==='all')?.content||''};
-    D.notesPat={id:nd.find(n=>n.audience==='patroller')?.id||null,content:nd.find(n=>n.audience==='patroller')?.content||''};
-    D.notesCoo={id:nd.find(n=>n.audience==='coordinator')?.id||null,content:nd.find(n=>n.audience==='coordinator')?.content||''};
+  try{
+    const[sh,ar,zo,pt,sc]=await Promise.all([
+      wt(sb.from('shifts').select('*').order('created_at')),
+      wt(sb.from('areas').select('*').order('name')),
+      wt(sb.from('zones').select('*').order('name')),
+      wt(sb.from('patrollers').select('*').eq('is_active',true).order('name')),
+      wt(sb.from('schedules').select('*')),
+    ]);
+    D.shifts=sh.data||[];D.areas=ar.data||[];D.zones=zo.data||[];D.patrollers=pt.data||[];D.schedules=sc.data||[];
+  }catch(e){console.error('data:',e);}
+  try{const{data:notes}=await wt(sb.from('notes').select('*'),5000);
+    if(notes){
+      const nAll=notes.find(n=>n.audience==='all')||notes.find(n=>!n.audience)||notes[0];
+      const nPat=notes.find(n=>n.audience==='patroller');
+      const nCoo=notes.find(n=>n.audience==='coordinator');
+      D.notesAll={id:nAll?.id||null,content:nAll?.content||''};
+      D.notesPat={id:nPat?.id||null,content:nPat?.content||''};
+      D.notesCoo={id:nCoo?.id||null,content:nCoo?.content||''};
+    }
+  }catch(e){}
+  try{const{data:docs}=await wt(sb.from('documents').select('*').order('created_at',{ascending:false}),5000);D.docs=docs||[];}catch(e){}
+  try{const{data:hist}=await wt(sb.from('schedule_history').select('*,profiles(full_name)').order('changed_at',{ascending:false}).limit(300),5000);D.history=hist||[];}catch(e){}
+  try{const{data:tor}=await wt(sb.from('time_off_requests').select('*').order('created_at',{ascending:false}),5000);D.timeoff=tor||[];}catch(e){}
+  if(D.profile?.role==='admin'||D.profile?.role==='lead'){
+    try{const{data:users}=await wt(sb.from('profiles').select('*').order('full_name'),5000);D.users=users||[];}catch(e){}
   }
+  try{const{data:tk}=await wt(sb.from('task_requests').select('*').order('created_at',{ascending:false}),5000);D.tasks=tk||[];}catch(e){D.tasks=[];}
+  try{
+    const{data:lp}=await wt(sb.from('location_permissions').select('*'),5000);
+    D.locPerms={};(lp||[]).forEach(r=>{D.locPerms[r.patroller_id]=r;});
+  }catch(e){D.locPerms={};}
+  try{
+    const{data:bd}=await wt(sb.from('device_biometric').select('*').order('last_login',{ascending:false}),5000);
+    D.biometricDevices=bd||[];
+  }catch(e){D.biometricDevices=[];}
+  try{
+    const{data:att,error:atterr}=await wt(sb.from('attendance').select('*').order('date',{ascending:false}).limit(500),5000);
+    if(atterr){console.warn('Attendance table not ready:',atterr.message);D.attendance=[];}
+    else D.attendance=att||[];
+  }catch(e){D.attendance=[];console.warn('Attendance load failed:',e.message);}
 }
 async function reload(){await loadAll();render();}
 async function sendWebhook(event,data){
@@ -449,10 +497,10 @@ function allZones(){return[...new Set([...D.zones.map(z=>z.name),...D.areas.map(
 function activePats(){return D.patrollers.filter(p=>{
   const u=D.users.find(u=>u.id===p.user_id);
   if(u){
+    // Exclude admin/lead from schedule display
     if(u.role==='admin'||u.role==='lead')return false;
     if(u.is_active===false)return false;
   }
-  if(p.is_active===false)return false;
   return true;
 });}
 function activePatsForSchedule(){
@@ -606,18 +654,15 @@ function weekTable(ed){
     row+=ed?'<td></td></tr>':'</tr>';return row;
   }
   let h=`<div class="tcard"><div class="t-scroll"><table style="table-layout:auto;min-width:900px"><thead><tr><th class="lt" style="min-width:120px">Name</th>${dates.map((d,i)=>`<th style="min-width:88px">${SD[i]}<br><span style="font-family:monospace;font-size:9px;font-weight:400">${fmt(d)}</span></th>`).join('')}${ed?'<th></th>':''}</tr></thead><tbody>`;
-  // Group patrollers by their custom role name
-  const getRoleName=p=>{const u=D.users.find(u=>u.id===p.user_id);if(u?.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr)return cr.name;}return getUtype(p)==='coordinator'?'Coordinator':'Patroller';};
-  const roleGroups={};
-  activePats().filter(p=>p.name.toLowerCase().includes(D.search.toLowerCase())).forEach(p=>{const rn=getRoleName(p);if(!roleGroups[rn])roleGroups[rn]=[];roleGroups[rn].push(p);});
-  if(Object.keys(roleGroups).length){
-    Object.entries(roleGroups).forEach(([rname,rPats])=>{
-      h+=`<tr style="background:#F9EDEE"><td colspan="${8+(ed?1:0)}" style="padding:5px 14px;font-size:9.5px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-user" style="font-size:10px;margin-right:5px"></i>${rname}</td></tr>`;
-      rPats.forEach(p=>{h+=renderRow(p);});
-    });
-  } else {
-    h+=`<tr><td colspan="${8+(ed?1:0)}" style="padding:30px;text-align:center;color:var(--g3)">No users on schedule yet.</td></tr>`;
+  if(patrollers.length){
+    h+=`<tr style="background:#F9EDEE"><td colspan="${8+(ed?1:0)}" style="padding:5px 14px;font-size:9.5px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-user" style="font-size:10px;margin-right:5px"></i>Patrollers</td></tr>`;
+    patrollers.forEach(p=>{h+=renderRow(p);});
   }
+  if(coordinators.length){
+    h+=`<tr style="background:#CCFBF1"><td colspan="${8+(ed?1:0)}" style="padding:5px 14px;font-size:9.5px;font-weight:700;color:#134E4A;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-star" style="font-size:10px;margin-right:5px"></i>Coordinators</td></tr>`;
+    coordinators.forEach(p=>{h+=renderRow(p);});
+  }
+  if(!patrollers.length&&!coordinators.length){h+=`<tr><td colspan="${8+(ed?1:0)}" style="padding:30px;text-align:center;color:var(--g3)">No users on schedule yet.</td></tr>`;}
   h+=`<tr class="row-sum"><td class="row-lbl">AM on duty</td>${am.map(c=>`<td>${c}</td>`).join('')}<td colspan="${ed?2:1}"></td></tr>`;
   h+=`<tr class="row-sum"><td class="row-lbl">PM on duty</td>${pm.map(c=>`<td>${c}</td>`).join('')}<td colspan="${ed?2:1}"></td></tr>`;
   h+=`<tr class="row-off"><td class="row-lbl">Off day</td>${off.map(c=>`<td style="font-weight:700">${c}</td>`).join('')}<td colspan="${ed?2:1}"></td></tr>`;
@@ -691,46 +736,13 @@ function summaryView(){
     </tr>`;
   };
 
-  // Role-based summary table
-  const getRoleNameS=p=>{const u=D.users.find(u=>u.id===p.user_id);if(u&&u.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr)return cr.name;}return getUtype(p)==='coordinator'?'Coordinator':'Patroller';};
-  const roleGroupsS={};pts.forEach(p=>{const rn=getRoleNameS(p);if(!roleGroupsS[rn])roleGroupsS[rn]=[];roleGroupsS[rn].push(p);});
-  const roleSummaryRows=Object.entries(roleGroupsS).map(([rname,rPats])=>{
-    const total=rPats.length;
-    const weekAtt=dates.reduce((t,d)=>{const ds=d.toISOString().split('T')[0];return t+rPats.filter(p=>(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds&&a.status==='Attended')).length;},0);
-    const weekAbs=dates.reduce((t,d)=>{const ds=d.toISOString().split('T')[0];return t+rPats.filter(p=>(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds&&a.status==='Absent')).length;},0);
-    const onVacW=rPats.filter(p=>dates.some(d=>{const ds=d.toISOString().split('T')[0];return D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds>=t.start_date&&ds<=t.end_date);})).length;
-    return`<tr style="border-bottom:1px solid #F4EDE3">
-      <td style="padding:10px 14px;font-weight:700;font-size:13px;color:#2A0D0F">${rname}</td>
-      <td style="padding:10px;text-align:center;font-size:13px;font-weight:700;color:#411517">${total}</td>
-      <td style="padding:10px;text-align:center"><span style="font-size:12px;font-weight:700;color:#166534">${weekAtt}</span></td>
-      <td style="padding:10px;text-align:center"><span style="font-size:12px;font-weight:700;color:#DC2626">${weekAbs}</span></td>
-      <td style="padding:10px;text-align:center"><span style="font-size:12px;font-weight:700;color:#7C3AED">${onVacW>0?onVacW:'-'}</span></td>
-    </tr>`;
-  }).join('');
-
   return`
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-    <div style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-chart-bar" style="margin-right:5px"></i>Weekly Summary</div>
-    <div style="display:flex;gap:6px">
-      <button class="btn" onclick="downloadReport('schedule')"><i class="ti ti-download"></i>Schedule</button>
-      <button class="btn" onclick="downloadReport('attendance')"><i class="ti ti-download"></i>Attendance</button>
-      <button class="btn" onclick="downloadReport('timeoff')"><i class="ti ti-download"></i>Time off</button>
-    </div>
-  </div>
-  <div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;overflow:hidden;margin-bottom:16px;box-shadow:0 1px 4px rgba(65,21,23,.06)">
-    <div style="padding:10px 16px;background:#F4EDE3;border-bottom:1.5px solid #E8DDD4">
-      <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-chart-bar" style="margin-right:5px"></i>Weekly Summary by Role</div>
-    </div>
-    <table style="width:100%;border-collapse:collapse">
-      <thead><tr style="background:#F8FAFC;border-bottom:1.5px solid #E8DDD4">
-        <th style="text-align:left;padding:8px 14px;font-size:10px;font-weight:700;color:#A08070;text-transform:uppercase;letter-spacing:.05em">Role Type</th>
-        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;text-align:center">Total</th>
-        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em;text-align:center">Attended</th>
-        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#DC2626;text-transform:uppercase;letter-spacing:.05em;text-align:center">Absent</th>
-        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:.05em;text-align:center">On Vacation</th>
-      </tr></thead>
-      <tbody>${roleSummaryRows||'<tr><td colspan="5" style="padding:20px;text-align:center;color:#A08070">No users yet.</td></tr>'}</tbody>
-    </table>
+  <div class="stats">
+    <div class="stat blue"><div class="stat-label">Patrollers</div><div class="stat-value">${ptot}</div><div class="stat-sub">Active</div></div>
+    <div class="stat teal"><div class="stat-label">Coordinators</div><div class="stat-value">${ctot}</div><div class="stat-sub">Active</div></div>
+    <div class="stat green"><div class="stat-label">Attended this week</div><div class="stat-value">${weekAttended}</div><div class="stat-sub">Clock-ins</div></div>
+    <div class="stat red"><div class="stat-label">Absent this week</div><div class="stat-value">${weekAbsent}</div><div class="stat-sub">Person-days</div></div>
+    <div class="stat" style="background:#fff"><div class="stat-label" style="color:#7C3AED">On Vacation 🌴</div><div class="stat-value" style="color:#7C3AED">${weekVac}</div><div class="stat-sub">Patroller${weekVac!==1?'s':''} this week</div></div>
   </div>
 
   ${patrollers.length?`
@@ -772,7 +784,7 @@ function summaryView(){
       }).join('');
       const attW=dates.filter(d=>{const ds=d.toISOString().split('T')[0];const r=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);return r?.status==='Attended';}).length;
       const absW=dates.filter(d=>{const ds=d.toISOString().split('T')[0];const r=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);return r?.status==='Absent';}).length;
-      return`<tr><td class="lt">${p.name}</td><td><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:#F4EDE3;color:#411517">${(()=>{const u=D.users.find(u=>u.id===p.user_id);if(u?.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr)return cr.name;}return getUtype(p)==='coordinator'?'Coordinator':'Patroller';})()}</span></td>${cells}<td style="font-weight:700;color:#166534">${attW}</td><td style="font-weight:700;color:#DC2626">${absW}</td></tr>`;
+      return`<tr><td class="lt">${p.name}</td><td><span class="role-badge ${getUtype(p)==='coordinator'?'rb-coord':'rb-pat'}">${getUtype(p)==='coordinator'?'Coord':'Pat'}</span></td>${cells}<td style="font-weight:700;color:#166534">${attW}</td><td style="font-weight:700;color:#DC2626">${absW}</td></tr>`;
     }).join('')}
     </tbody></table></div></div>
   </div>`;
@@ -829,7 +841,6 @@ function timeOffTaskView(){
 }
 async function reviewTO(id,status){
   await sb.from('time_off_requests').update({status,reviewed_by:D.profile.id,updated_at:new Date().toISOString()}).eq('id',id);
-  addNotification(`Time off request ${status.toLowerCase()}`,'success');
   const req=(D.timeoff||[]).find(r=>r.id===id);
   if(req){const pat=D.patrollers.find(p=>p.id===req.patroller_id);const patUser=pat?D.users.find(u=>u.id===pat.user_id):null;
     sendWebhook('timeoff_reviewed',{patroller_name:req.patroller_name,patroller_email:patUser?.email||'',leave_type:req.request_type,start_date:req.start_date,end_date:req.end_date,status,reviewed_by_name:D.profile.full_name,app_url:REDIRECT});}
@@ -931,13 +942,12 @@ function rosterView(){
 }
 function operationsView(){
   const ed=canEdit();const sub=D.opsSub||'areas';
-  const subBtns=['areas','shifts','roles'].map(s=>`<button onclick="D.opsSub='${s}';render()" style="padding:7px 18px;border-radius:8px;border:none;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:all .13s;${sub===s?'background:#411517;color:#F4EDE3;box-shadow:0 2px 8px rgba(65,21,23,.2)':'background:transparent;color:var(--g4)'}">${s==='areas'?'<i class="ti ti-map-pin" style="font-size:13px;margin-right:5px"></i>Areas':s==='shifts'?'<i class="ti ti-clock" style="font-size:13px;margin-right:5px"></i>Shifts':'<i class="ti ti-shield" style="font-size:13px;margin-right:5px"></i>Roles'}</button>`).join('');
+  const subBtns=['areas','shifts'].map(s=>`<button onclick="D.opsSub='${s}';render()" style="padding:7px 18px;border-radius:8px;border:none;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:all .13s;${sub===s?'background:#411517;color:#F4EDE3;box-shadow:0 2px 8px rgba(65,21,23,.2)':'background:transparent;color:var(--g4)'}">${s==='areas'?'<i class="ti ti-map-pin" style="font-size:13px;margin-right:5px"></i>Areas':'<i class="ti ti-clock" style="font-size:13px;margin-right:5px"></i>Shifts'}</button>`).join('');
 
   const header=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
     <div style="display:flex;background:var(--g1);border-radius:10px;padding:4px;gap:2px">${subBtns}</div>
     ${ed&&sub==='areas'?`<button class="btn btn-primary" onclick="openM({type:'area'})"><i class="ti ti-plus"></i>Add area</button>`:''}
     ${ed&&sub==='shifts'?`<button class="btn btn-primary" onclick="openM({type:'addshift',form:{name:'',start:'08:00',end:'16:00',type:'morning'}})"><i class="ti ti-plus"></i>Add shift</button>`:''}
-    ${ed&&sub==='roles'?`<button class="btn btn-primary" onclick="openM({type:'addrole'})"><i class="ti ti-plus"></i>Add role</button>`:''}
   </div>`;
 
   if(sub==='areas'){
@@ -953,7 +963,7 @@ function operationsView(){
           <div style="font-size:11px;color:var(--g3);margin-top:3px">${pats.length} patroller${pats.length!==1?'s':''} assigned${pats.length?` · ${pats.map(p=>p.name.split(' ')[0]).join(', ')}`:''}
           </div>
         </div>
-        ${ed?`<button class="icon-btn" onclick="delArea('${a.id}','${a.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>`:''}
+        ${ed?`<button class="icon-btn" onclick="delArea('${a.id}','${a.name.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button>`:''}
       </div>`;
     }).join('');
     return header+`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${areaCards}</div>
@@ -980,54 +990,15 @@ function operationsView(){
           </div>
         </div>
         ${ed?`<div style="display:flex;flex-direction:column;gap:4px">
-          <button class="edit-btn" onclick="openM({type:'editshift',id:'${sh.id}',form:{name:'${sh.name.replace(/'/g,"\\'")}',start:'${sh.start_time}',end:'${sh.end_time}',type:'${sh.shift_type}'}})" style="width:32px;height:32px"><i class="ti ti-edit"></i></button>
-          <button class="icon-btn" onclick="delShift('${sh.id}','${sh.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
+          <button class="edit-btn" onclick="openM({type:'editshift',id:'${sh.id}',form:{name:'${sh.name.replace(/'/g,"\'")}',start:'${sh.start_time}',end:'${sh.end_time}',type:'${sh.shift_type}'}})" style="width:32px;height:32px"><i class="ti ti-edit"></i></button>
+          <button class="icon-btn" onclick="delShift('${sh.id}','${sh.name.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button>
         </div>`:''}
       </div>`;
     }).join('');
     return header+`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">${shiftCards}</div>
     <div style="margin-top:14px;padding:11px 14px;background:#F4EDE3;border-radius:10px;font-size:12px;color:#411517">
-      <i class="ti ti-info-circle" style="margin-right:5px"></i>Shifts are automatically linked to patrollers in the schedule.
+      <i class="ti ti-info-circle" style="margin-right:5px"></i>Shifts are automatically linked to patrollers in the schedule. Change a shift here and it reflects everywhere.
     </div>`;
-  }
-
-  if(sub==='roles'){
-    const roles=D.customRoles||[];
-    const alBg={viewer:'#EAF1FD',editor:'#FFF0E6',admin:'#DCFCE7'};
-    const alCol={viewer:'#0C4FB3',editor:'#FF5900',admin:'#166534'};
-    const alLabel={viewer:'👁 Viewer',editor:'✏️ Editor',admin:'🔐 Admin'};
-    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
-    if(!roles.length)return header+`<div style="text-align:center;padding:60px 20px;background:#fff;border-radius:16px;border:2px dashed #E8DDD4">
-      <i class="ti ti-shield" style="font-size:50px;color:#E8DDD4;display:block;margin-bottom:14px"></i>
-      <div style="font-size:16px;font-weight:700;color:#411517;margin-bottom:6px">No roles yet</div>
-      <div style="font-size:12px;color:#A08070;margin-bottom:20px">Create roles to control what each user can see and do.</div>
-      ${ed?`<button class="btn btn-primary" onclick="openM({type:'addrole'})"><i class="ti ti-plus"></i>Create first role</button>`:''}
-    </div>`;
-    const roleCards=roles.map(r=>{
-      const al=r.access_level||'viewer';
-      let tabs=ALL_TABS;try{if(r.visible_tabs)tabs=JSON.parse(r.visible_tabs);}catch(e){}
-      return`<div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:16px;padding:18px;box-shadow:0 1px 4px rgba(65,21,23,.06)">
-        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
-          <div style="width:44px;height:44px;border-radius:12px;background:${alBg[al]};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <i class="ti ti-shield-check" style="font-size:20px;color:${alCol[al]}"></i>
-          </div>
-          <div style="flex:1">
-            <div style="font-size:14px;font-weight:700;color:#2A0D0F">${r.name}</div>
-            ${r.description?`<div style="font-size:11px;color:#A08070;margin-top:2px">${r.description}</div>`:''}
-            <span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:${alBg[al]};color:${alCol[al]};margin-top:5px;display:inline-block">${alLabel[al]}</span>
-          </div>
-          ${ed?`<div style="display:flex;gap:4px">
-            <button class="edit-btn" style="width:30px;height:30px" onclick="openM({type:'editrole',role:{id:'${r.id}',name:'${r.name.replace(/'/g,"\\'")}',description:'${(r.description||'').replace(/'/g,"\\'")}',access_level:'${al}',visible_tabs:'${r.visible_tabs||'[]'}'}})" ><i class="ti ti-edit"></i></button>
-            <button class="icon-btn" onclick="delCustomRole('${r.id}','${r.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
-          </div>`:''}
-        </div>
-        <div style="border-top:1px solid #F4EDE3;padding-top:10px">
-          <div style="font-size:9px;font-weight:700;color:#A08070;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Visible tabs</div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap">${ALL_TABS.map(t=>{const v=tabs.includes(t);return`<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:6px;background:${v?'#DCFCE7':'#FEE2E2'};color:${v?'#166534':'#991B1B'}">${v?'✓':'✗'} ${t}</span>`;}).join('')}</div>
-        </div>
-      </div>`;
-    }).join('');
-    return header+`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">${roleCards}</div>`;
   }
   return header;
 }
@@ -1146,7 +1117,7 @@ function accessView(){
     </table>`:'<div style="font-size:12px;color:var(--g3);text-align:center;padding:10px">No biometric devices registered yet. Devices will appear after patrollers login.</div>'}
   </div>
   <div class="toolbar"><button class="btn btn-primary" onclick="openM({type:'createuser'})"><i class="ti ti-user-plus"></i>Create user</button><span style="font-size:12px;color:var(--g3)">${D.users.length} users</span></div>
-  <div class="card-grid">${D.users.map(u=>`<div class="card"><div class="card-av" style="background:${roleBg(u.role)};color:${roleCol(u.role)}">${ini(u.full_name)}</div><div class="card-info" style="min-width:0"><div class="card-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.full_name}</div><div style="font-size:10.5px;color:var(--g3);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.email}</div><span class="role-badge ${roleCls(u.role)}">${roleLabel(u.role)}</span> <span style="font-size:10px;color:${u.is_active!=='var(--red)'}">${u.is_active!=='Inactive'}</span></div>${u.id!==D.profile.id?`<div style="display:flex;flex-direction:column;gap:4px"><select class="role-sel" onchange="chRole('${u.id}',this.value)">${(D.customRoles&&D.customRoles.length?D.customRoles.map(r=>`<option value="cr:${r.id}" ${u.custom_role_id===r.id?'selected':''}>${r.name}</option>`).join(''):'<option value="" disabled>No roles</option>')}</select><button class="edit-btn" onclick="openEditUser('${u.id}')" title="Edit user" style="width:28px;height:28px"><i class="ti ti-edit"></i></button><button class="icon-btn" onclick="togActive('${u.id}',${u.is_active!==false})" title="${u.is_active!=='Activate'}"><i class="ti ti-${u.is_active!==false?'user-off':'user-check'}"></i></button><button class="icon-btn" onclick="delUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button></div>`:'<span style="font-size:10px;color:var(--g3)">You</span>'}</div>`).join('')}</div>`;
+  <div class="card-grid">${D.users.map(u=>`<div class="card"><div class="card-av" style="background:${roleBg(u.role)};color:${roleCol(u.role)}">${ini(u.full_name)}</div><div class="card-info" style="min-width:0"><div class="card-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.full_name}</div><div style="font-size:10.5px;color:var(--g3);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.email}</div><span class="role-badge ${roleCls(u.role)}">${roleLabel(u.role)}</span> <span style="font-size:10px;color:${u.is_active!==false?'var(--teal)':'var(--red)'}">${u.is_active!==false?'Active':'Inactive'}</span></div>${u.id!==D.profile.id?`<div style="display:flex;flex-direction:column;gap:4px"><select class="role-sel" onchange="chRole('${u.id}',this.value)">${['admin','lead','coordinator','patroller'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${roleLabel(r)}</option>`).join('')}</select><button class="edit-btn" onclick="openEditUser('${u.id}')" title="Edit user" style="width:28px;height:28px"><i class="ti ti-edit"></i></button><button class="icon-btn" onclick="togActive('${u.id}',${u.is_active!==false})" title="${u.is_active!==false?'Deactivate':'Activate'}"><i class="ti ti-${u.is_active!==false?'user-off':'user-check'}"></i></button><button class="icon-btn" onclick="delUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button></div>`:'<span style="font-size:10px;color:var(--g3)">You</span>'}</div>`).join('')}</div>`;
 }
 
 function mySchedView(){
@@ -1154,152 +1125,35 @@ function mySchedView(){
   if(!p)return`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-user-off" style="font-size:40px;display:block;margin-bottom:10px"></i>Your account is not linked to a schedule record.<br><span style="font-size:12px">Contact your admin to link your account.</span></div>`;
   const dates=wDates();const sh=gsh(p.shift_id);const wn=wNum(dates[0]);
   const today=todayStr();
-  const todayIdx={6:0,0:1,1:2,2:3,3:4,4:5,5:6}[new Date().getDay()];
-  const todayZone=gDZ(p.id,todayIdx);
-  const todayOnVac=isOnVacationToday(p.id);
-  const todayAbsent=isAbsentToday(p.id);
-  const runningTasks=(D.tasks||[]).filter(t=>t.patroller_id===p.id&&t.status==='Running');
-
-  // ── Hero card: today status ──
-  const heroStatus=todayOnVac?{icon:'🌴',label:'On Vacation',color:'#7C3AED',bg:'linear-gradient(135deg,#7C3AED,#A855F7)'}
-    :todayAbsent?{icon:'✗',label:'Absent Today',color:'#DC2626',bg:'linear-gradient(135deg,#DC2626,#EF4444)'}
-    :!todayZone?{icon:'☕',label:'Off Today',color:'#A08070',bg:'linear-gradient(135deg,#6B4C4E,#A08070)'}
-    :sh.shift_type==='morning'?{icon:'☀️',label:'On Shift',color:'#FF5900',bg:'linear-gradient(135deg,#FF5900,#FF8C42)'}
-    :{icon:'🌙',label:'On Shift',color:'#D97706',bg:'linear-gradient(135deg,#D97706,#F59E0B)'};
-
-  const heroCard=`
-  <div style="background:${heroStatus.bg};border-radius:20px;padding:24px 20px;margin-bottom:16px;color:#fff;position:relative;overflow:hidden">
-    <div style="position:absolute;right:-20px;top:-20px;font-size:100px;opacity:.15">${heroStatus.icon}</div>
-    <div style="display:flex;align-items:center;gap:14px;position:relative">
-      <div style="width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0">${ini(p.name)}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:18px;font-weight:700;margin-bottom:2px">${p.name}</div>
-        <div style="font-size:13px;opacity:.85;margin-bottom:6px">${D.profile.custom_role_id?(D.customRoles||[]).find(r=>r.id===D.profile.custom_role_id)?.name||'':sh.shift_type==='morning'?'Morning Shift':'Evening Shift'}</div>
-        <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.25);padding:5px 12px;border-radius:20px">
-          <span style="font-size:13px;font-weight:700">${heroStatus.icon} ${heroStatus.label}</span>
-          ${todayZone&&!todayOnVac&&!todayAbsent?`<span style="font-size:11px;opacity:.9">· ${todayZone}</span>`:''}
+  
+  // Get active running tasks for this patroller (any date, not just today)
+  const runningTasks=((D.tasks||[]).filter(t=>t.patroller_id===p.id&&t.status==='Running'))||[];
+  
+  const activeTasks=runningTasks.map(t=>{
+    const col=TASK_COLORS[t.task_type]||'#411517';
+    const bg=TASK_BG[t.task_type]||'#F4EDE3';
+    return`<div style="background:${bg};border:1.5px solid #E8DDD4;border-radius:12px;padding:14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${bg};color:${col}">${t.task_type}</span>
+          <span style="font-size:10px;font-weight:700;color:#16A34A;background:#DCFCE7;padding:2px 8px;border-radius:8px"><i class="ti ti-circle-filled" style="font-size:6px;margin-right:3px;animation:pulse 1.5s infinite"></i>Running</span>
         </div>
+        <div style="font-size:13px;font-weight:600;color:#2A0D0F;margin-bottom:3px">${t.description||t.task_type}</div>
+        <div style="font-size:11px;color:var(--g3)">Started: ${t.start_time||'--'}</div>
       </div>
-    </div>
-    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;position:relative">
-      <div style="background:rgba(255,255,255,.2);border-radius:12px;padding:10px 14px">
-        <div style="font-size:10px;opacity:.75;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Shift time</div>
-        <div style="font-size:14px;font-weight:700">${sh.start_time&&sh.start_time!=='?'?fmtT(sh.start_time)+' – '+fmtT(sh.end_time):'Not set'}</div>
-      </div>
-      <div style="background:rgba(255,255,255,.2);border-radius:12px;padding:10px 14px">
-        <div style="font-size:10px;opacity:.75;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Today's zone</div>
-        <div style="font-size:14px;font-weight:700">${todayOnVac?'On vacation':todayAbsent?'Absent':todayZone||'Off day'}</div>
-      </div>
-    </div>
-  </div>`;
-
-  // ── Running tasks ──
-  const taskCards=runningTasks.length?`
-  <div style="margin-bottom:16px">
-    <div style="font-size:11px;font-weight:700;color:#16A34A;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-player-play" style="margin-right:4px"></i>Active Tasks</div>
-    ${runningTasks.map(t=>{
-      const col=TASK_COLORS[t.task_type]||'#411517';
-      const bg=TASK_BG[t.task_type]||'#F4EDE3';
-      return`<div style="background:${bg};border:1.5px solid ${col}33;border-radius:14px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-            <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${col}22;color:${col}">${t.task_type}</span>
-            <span style="font-size:10px;font-weight:700;color:#16A34A"><i class="ti ti-circle-filled" style="font-size:6px;margin-right:2px;animation:pulse 1.5s infinite"></i>Running</span>
-          </div>
-          <div style="font-size:13px;font-weight:600;color:#2A0D0F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.description||t.task_type}</div>
-          <div style="font-size:11px;color:#A08070;margin-top:2px">Started: ${t.start_time||'--'}</div>
-        </div>
-        <button class="btn btn-primary" style="white-space:nowrap;flex-shrink:0" onclick="endTaskPatroller('${t.id}')"><i class="ti ti-player-stop"></i>End</button>
-      </div>`;
-    }).join('')}
-  </div>`:'';
-
-  // ── Week view ──
-  const weekNav=`
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-    <button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button>
-    <span style="font-size:13px;font-weight:600;color:#411517">Week ${wn} · ${fmt(dates[0])} – ${fmt(dates[6])}</span>
-    <button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button>
-  </div>
-  <div style="display:flex;background:#F4EDE3;border-radius:10px;padding:4px;gap:2px;margin-bottom:14px">
-    <button class="seg-btn${D.view==='week'?' active':''}" onclick="D.view='week';render()" style="flex:1">Week</button>
-    <button class="seg-btn${D.view==='date'?' active':''}" onclick="D.view='date';render()" style="flex:1">Daily</button>
-  </div>`;
-
-  const weekGrid=D.view==='week'?`
-  <div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:16px;overflow:hidden">
-    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-      <table style="width:100%;min-width:560px;border-collapse:collapse">
-        <thead><tr style="background:#F4EDE3">${dates.map((d,i)=>{
-          const isToday=d.toISOString().split('T')[0]===today;
-          return`<th style="padding:10px 8px;font-size:11px;font-weight:700;color:${isToday?'#FF5900':'#411517'};text-align:center;border-bottom:1.5px solid #E8DDD4;white-space:nowrap">
-            ${SD[i]}<br><span style="font-size:9px;font-weight:400;font-family:monospace;color:${isToday?'#FF5900':'#A08070'}">${fmt(d)}</span>
-          </th>`;
-        }).join('')}</tr></thead>
-        <tbody><tr>${DAYS.map((_,i)=>{
-          const z=gDZ(p.id,i);
-          const ds=gDS(p.id,i);
-          const dsh=ds?D.shifts.find(s=>s.id===ds):sh;
-          const isToday=dates[i].toISOString().split('T')[0]===today;
-          const onVacDay=D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&dates[i].toISOString().split('T')[0]>=t.start_date&&dates[i].toISOString().split('T')[0]<=t.end_date);
-          if(onVacDay)return`<td style="padding:12px 8px;text-align:center;background:${isToday?'#FFFBF5':''}"><span style="font-size:20px">🌴</span><div style="font-size:9px;color:#7C3AED;font-weight:600;margin-top:2px">Vacation</div></td>`;
-          if(!z)return`<td style="padding:12px 8px;text-align:center;background:${isToday?'#FFFBF5':''}"><span style="font-size:11px;color:#A08070;font-weight:500">Off</span></td>`;
-          return`<td style="padding:10px 8px;text-align:center;background:${isToday?'#FFFBF5':''}">
-            <div style="background:${dsh?.shift_type==='morning'?'#FFF0E6':'#FEF3C7'};border:1.5px solid ${dsh?.shift_type==='morning'?'#FF5900':'#D97706'}33;border-radius:10px;padding:6px 8px">
-              <div style="font-size:12px;font-weight:700;color:${dsh?.shift_type==='morning'?'#FF5900':'#D97706'}">${z}</div>
-              <div style="font-size:9px;color:#A08070;margin-top:2px">${dsh?.shift_type==='morning'?'☀️':'🌙'} ${fmtT(dsh?.start_time)}</div>
-            </div>
-          </td>`;
-        }).join('')}</tr></tbody>
-      </table>
-    </div>
-  </div>`:`
-  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
-    ${dates.map((d,i)=>{
-      const z=gDZ(p.id,i);
-      const ds=d.toISOString().split('T')[0];
-      const isToday=ds===today;
-      const onVacDay=D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds>=t.start_date&&ds<=t.end_date);
-      const status=onVacDay?{label:'🌴 Vacation',color:'#7C3AED',bg:'#EDE9FE'}
-        :!z?{label:'☕ Off Day',color:'#A08070',bg:'#F4EDE3'}
-        :{label:z,color:sh.shift_type==='morning'?'#FF5900':'#D97706',bg:sh.shift_type==='morning'?'#FFF0E6':'#FEF3C7'};
-      return`<div style="background:${isToday?'#FFFBF5':'#fff'};border:${isToday?'2px solid #FF5900':'1.5px solid #E8DDD4'};border-radius:14px;overflow:hidden">
-        <div style="padding:8px 12px;background:${isToday?'#FF5900':'#F4EDE3'}">
-          <div style="font-size:13px;font-weight:700;color:${isToday?'#fff':'#411517'}">${DAYS[i]}</div>
-          <div style="font-size:10px;color:${isToday?'rgba(255,255,255,.8)':'#A08070'};font-family:monospace">${fmt(d)}</div>
-        </div>
-        <div style="padding:12px;text-align:center">
-          <div style="font-size:14px;font-weight:700;color:${status.color}">${status.label}</div>
-          ${!onVacDay&&z?`<div style="font-size:10px;color:#A08070;margin-top:3px">${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}–${fmtT(sh.end_time)}</div>`:''}
-        </div>
-      </div>`;
-    }).join('')}
-  </div>`;
-
-  return heroCard+taskCards+weekNav+weekGrid+notesBar();
+      <button class="btn btn-primary" style="white-space:nowrap" onclick="endTaskPatroller('${t.id}')"><i class="ti ti-player-stop"></i>End Task</button>
+    </div>`;
+  }).join('');
+  
+  return`<div class="toolbar"><button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button><span class="wk-range">Week ${wn} - ${fmt(dates[0])} to ${fmt(dates[6])}</span><button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button><div class="seg"><button class="seg-btn${D.view==='week'?' active':''}" onclick="D.view='week';render()">Week</button><button class="seg-btn${D.view==='date'?' active':''}" onclick="D.view='date';render()">Daily</button></div></div>
+  <div class="my-card"><div class="my-av" style="background:${sh.shift_type==='morning'?'var(--blue-l)':'var(--amber-l)'};color:${sh.shift_type==='morning'?'var(--blue-d)':'var(--amber-d)'}">${ini(p.name)}</div><div><div class="my-name">${p.name}</div><div class="my-meta"><span class="shift-badge ${sh.shift_type==='morning'?'m':'e'}">${sh.name} - ${fmtT(sh.start_time)} to ${fmtT(sh.end_time)}</span>${p.cov_area?` - <span style="color:var(--g3)">${p.cov_area}</span>`:''}</div></div></div>
+  ${runningTasks.length>0?`<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:700;color:#16A34A;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-player-play" style="margin-right:4px"></i>Active Tasks</div><style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}</style>${activeTasks}</div>`:''}
+  ${D.view==='week'?`<div class="tcard"><div class="t-scroll"><table style="table-layout:auto;min-width:700px"><thead><tr>${dates.map((d,i)=>`<th style="min-width:88px">${SD[i]}<br><span style="font-family:monospace;font-size:9px;font-weight:400">${fmt(d)}</span></th>`).join('')}</tr></thead><tbody><tr>${DAYS.map((_,i)=>{const z=gDZ(p.id,i);const ds=gDS(p.id,i);const dsh=ds?D.shifts.find(s=>s.id===ds):sh;return z?`<td><span class="zone-chip">${z}</span><div style="font-size:8px;color:var(--g3);margin-top:2px">${dsh?.shift_type==='morning'?'☀️':'🌙'} ${fmtT(dsh?.start_time)}-${fmtT(dsh?.end_time)}</div></td>`:`<td><span class="off-badge">Off Day</span></td>`;}).join('')}</tr></tbody></table></div></div>`:`<div class="date-grid">${dates.map((d,i)=>{const z=gDZ(p.id,i);const io=!z;return`<div class="date-card"><div class="dc-head"${io?' style="background:var(--red-l)"':''}><div class="dc-day">${DAYS[i]}</div><div class="dc-date">${fmt(d)}</div></div><div style="padding:12px;text-align:center">${io?`<span class="off-badge" style="font-size:11px;padding:4px 12px">Off Day</span>`:`<span class="zone-chip">${z}</span>`}</div></div>`;}).join('')}</div>`}
+  ${notesBar()}`;
 }
 
 function renderTabs(){
-
   const role=D.profile.role;
-  // Check if user has a custom role with defined tabs
-  const customRole=D.profile.custom_role_id?(D.customRoles||[]).find(r=>r.id===D.profile.custom_role_id):null;
-  if(customRole&&customRole.visible_tabs){
-    let visTabs=[];
-    try{visTabs=JSON.parse(customRole.visible_tabs);}catch(e){}
-    const al=customRole.access_level||'viewer';
-    const canEditData=al==='editor'||al==='admin';
-    const isFullAdmin=al==='admin';
-    let tabs=[{id:'myschedule',icon:'ti-user',label:'My schedule'}];
-    if(visTabs.includes('Schedule')&&canEditData)tabs.push({id:'schedule',icon:'ti-calendar',label:'Schedule'});
-    if(visTabs.includes('Summary'))tabs.push({id:'summary',icon:'ti-chart-bar',label:'Summary'});
-    if(visTabs.includes('Attendance')){tabs.push({id:'myattendance',icon:'ti-clock-check',label:'My Attendance'});if(canEditData)tabs.push({id:'attendance',icon:'ti-users',label:'Team Attendance'});}
-    if(visTabs.includes('Time off & Tasks'))tabs.push({id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'});
-    if(visTabs.includes('Documents'))tabs.push({id:'documents',icon:'ti-files',label:'Documents'});
-    if(isFullAdmin){tabs.push({id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'});tabs.push({id:'access',icon:'ti-lock',label:'Access control'});}
-    document.getElementById('tabs').innerHTML=tabs.map(t=>`<button class="tab${D.tab===t.id?' active':''}" onclick="setTab('${t.id}')"><i class="ti ${t.icon}"></i>${t.label}</button>`).join('');
-    return;
-  }
   const tabs=(role==='patroller'||role==='coordinator')?[
     {id:'myschedule',icon:'ti-user',label:'My schedule'},
     {id:'myattendance',icon:'ti-clock-check',label:'Attendance'},
@@ -1330,43 +1184,24 @@ function render(){
     }
   }
   const dates=wDates();const wn=wNum(dates[0]);
-
   document.getElementById('wk-chip').textContent=`Week ${wn} - ${dates[0].getFullYear()}`;
   const u=D.profile;
   document.getElementById('user-chip').innerHTML=`<div class="user-av" style="background:${roleBg(u.role)};color:${roleCol(u.role)}">${ini(u.full_name)}</div><div><div class="user-nm">${u.full_name}</div><div class="user-rl">${roleLabel(u.role)}</div></div>`;
   renderTabs();
   const pts=activePats();const{am,pm,off}=summ(pts);
   const nav=`<div class="toolbar"><div class="seg"><button class="seg-btn${D.view==='week'?' active':''}" onclick="D.view='week';render()"><i class="ti ti-calendar-week" style="font-size:12px;margin-right:3px"></i>Week</button><button class="seg-btn${D.view==='date'?' active':''}" onclick="D.view='date';render()"><i class="ti ti-layout-columns" style="font-size:12px;margin-right:3px"></i>Daily</button><button class="seg-btn${D.view==='hourly'?' active':''}" onclick="D.view='hourly';render()"><i class="ti ti-timeline" style="font-size:12px;margin-right:3px"></i>Hourly</button></div><button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button><span class="wk-range">Week ${wn} - ${fmt(dates[0])} to ${fmt(dates[6])}</span><button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button><div class="search-wrap"><i class="ti ti-search"></i><input class="search-input" type="text" placeholder="Search..." value="${D.search}" oninput="D.search=this.value;render()"></div>${canEdit()?`<button class="btn btn-primary" onclick="openCreateSchedule()"><i class="ti ti-calendar-plus"></i>Create schedule</button>`:''}<button class="btn" onclick="openM({type:'taskreq'})"><i class="ti ti-plus"></i>Task request</button></div>`;
+  const patCount=pts.filter(p=>getUtype(p)==='patroller').length;
+  const coordCount=pts.filter(p=>getUtype(p)==='coordinator').length;
   const liveData=getActiveNow();
   const nowStr=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-  const todayIdx=liveData?liveData.todayIdx:{6:0,0:1,1:2,2:3,3:4,4:5,5:6}[new Date().getDay()];
-  const getRoleNameP=p=>{const u=D.users.find(u=>u.id===p.user_id);if(u&&u.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr)return cr.name;}return getUtype(p)==='coordinator'?'Coordinator':'Patroller';};
-  const roleGroups={};pts.forEach(p=>{const rn=getRoleNameP(p);if(!roleGroups[rn])roleGroups[rn]=[];roleGroups[rn].push(p);});
-  const roleRows=Object.entries(roleGroups).map(([rname,rPats])=>{
-    const onShift=D.woff===0?rPats.filter(p=>gDZ(p.id,todayIdx)&&!isOnVacationToday(p.id)&&!isAbsentToday(p.id)).length:rPats.length;
-    const offDuty=D.woff===0?rPats.filter(p=>!gDZ(p.id,todayIdx)&&!isOnVacationToday(p.id)&&!isAbsentToday(p.id)).length:0;
-    const absent=D.woff===0?rPats.filter(p=>isAbsentToday(p.id)).length:0;
-    const onVac=D.woff===0?rPats.filter(p=>isOnVacationToday(p.id)).length:0;
-    const onTask=D.woff===0?(D.tasks||[]).filter(t=>t.date===todayStr()&&t.status==='Running'&&rPats.find(p=>p.id===t.patroller_id)).length:0;
-    return`<tr style="border-bottom:1px solid #F4EDE3"><td style="padding:10px 14px;font-weight:700;font-size:13px;color:#2A0D0F">${rname}</td><td style="padding:10px;text-align:center"><span style="font-size:13px;font-weight:700;color:#166534">${onShift}</span></td><td style="padding:10px;text-align:center"><span style="font-size:13px;font-weight:700;color:#A08070">${offDuty}</span></td><td style="padding:10px;text-align:center"><span style="font-size:13px;font-weight:700;color:#DC2626">${absent}</span></td><td style="padding:10px;text-align:center"><span style="font-size:13px;font-weight:700;color:#7C3AED">${onVac>0?onVac:'-'}</span></td><td style="padding:10px;text-align:center"><span style="font-size:13px;font-weight:700;color:#FF5900">${onTask>0?onTask:'-'}</span></td></tr>`;
-  }).join('');
-  const statBar=`<style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}</style>
-  <div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;overflow:hidden;margin-bottom:14px;box-shadow:0 1px 4px rgba(65,21,23,.06)">
-    <div style="padding:10px 16px;background:#F4EDE3;border-bottom:1.5px solid #E8DDD4;display:flex;align-items:center;justify-content:space-between">
-      <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-activity" style="margin-right:5px"></i>Live Status${D.woff===0?' · '+nowStr:''}</div>
-      ${D.woff===0?'<span style="font-size:10px;color:#16A34A;font-weight:600"><i class="ti ti-circle-filled" style="font-size:8px;margin-right:3px;animation:pulse 1.5s infinite"></i>Today</span>':'<span style="font-size:10px;color:#A08070">Past/future week</span>'}
-    </div>
-    <table style="width:100%;border-collapse:collapse">
-      <thead><tr style="background:#F8FAFC;border-bottom:1.5px solid #E8DDD4">
-        <th style="text-align:left;padding:8px 14px;font-size:10px;font-weight:700;color:#A08070;text-transform:uppercase;letter-spacing:.05em">Role Type</th>
-        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em;text-align:center">On Shift</th>
-        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#A08070;text-transform:uppercase;letter-spacing:.05em;text-align:center">Off Duty</th>
-        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#DC2626;text-transform:uppercase;letter-spacing:.05em;text-align:center">Absent</th>
-        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:.05em;text-align:center">On Vacation</th>
-        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#FF5900;text-transform:uppercase;letter-spacing:.05em;text-align:center">On Task</th>
-      </tr></thead>
-      <tbody>${roleRows||'<tr><td colspan="6" style="padding:20px;text-align:center;color:#A08070">No users yet.</td></tr>'}</tbody>
-    </table>
+  const livePatLabel=liveData?`<div class="stat-sub" style="color:#16A34A;font-weight:600"><i class="ti ti-circle-filled" style="font-size:7px;margin-right:3px;animation:pulse 1.5s infinite"></i>${liveData.activePatrollers} on shift now · ${nowStr}</div>`:`<div class="stat-sub">Total active</div>`;
+  const liveCoordLabel=liveData?`<div class="stat-sub" style="color:#16A34A;font-weight:600"><i class="ti ti-circle-filled" style="font-size:7px;margin-right:3px;animation:pulse 1.5s infinite"></i>${liveData.activeCoords} on shift now</div>`:`<div class="stat-sub">Total active</div>`;
+  const vacCount=liveData?liveData.onVacCount:0;
+  const statBar=`<style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}</style><div class="stats">
+    <div class="stat blue"><div class="stat-label">Patrollers on duty</div><div class="stat-value">${liveData?liveData.onDutyPats:patCount}</div>${livePatLabel}</div>
+    <div class="stat teal"><div class="stat-label">Coordinators on duty</div><div class="stat-value">${liveData?liveData.onDutyCoords:coordCount}</div>${liveCoordLabel}</div>
+    <div class="stat" style="background:#FFFFFF;border:1.5px solid #E8DDD4"><div class="stat-label" style="color:#7C3AED">On Vacation 🌴</div><div class="stat-value" style="color:#7C3AED">${vacCount}</div><div class="stat-sub">Today</div></div>
+    <div class="stat red"><div class="stat-label">Off today</div><div class="stat-value">${liveData?Math.max(0,patCount+coordCount-liveData.onDutyPats-liveData.onDutyCoords-vacCount):off.reduce((a,b)=>a+b,0)}</div><div class="stat-sub">${liveData?'Not scheduled today':'Person-days this week'}</div></div>
   </div>`;
   const wNav=`<div class="toolbar"><button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button><span class="wk-range">Week ${wn} - ${fmt(dates[0])} to ${fmt(dates[6])}</span><button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button></div>`;
   let html='';
@@ -1386,16 +1221,14 @@ function render(){
 }
 function setTab(t){D.tab=t;D.ne=false;render();}
 
-async function chRole(uid,roleRaw){
-  const isCustom=roleRaw.startsWith('cr:');
-  const customRoleId=isCustom?roleRaw.replace('cr:',''):null;
-  const customRole=customRoleId?(D.customRoles||[]).find(r=>r.id===customRoleId):null;
-  const sysRole=customRole?(customRole.access_level==='admin'?'admin':customRole.access_level==='editor'?'lead':'patroller'):roleRaw;
-  await sb.from('profiles').update({role:sysRole,custom_role_id:customRoleId||null}).eq('id',uid);
-  if(sysRole==='patroller'||sysRole==='coordinator'){
-    await sb.from('patrollers').update({user_type:sysRole,is_active:true}).eq('user_id',uid);
-  } else if(sysRole==='admin'||sysRole==='lead'){
-    await sb.from('patrollers').update({is_active:false}).eq('user_id',uid);
+async function chRole(uid,role){
+  await sb.from('profiles').update({role}).eq('id',uid);
+  if(role==='patroller'||role==='coordinator'){
+    // Sync user_type and keep active
+    await sb.from('patrollers').update({user_type:role,is_active:true}).eq('user_id',uid);
+  } else {
+    // admin/lead — hide from schedule by setting is_active false
+    await sb.from('patrollers').update({user_type:role,is_active:false}).eq('user_id',uid);
   }
   await reload();
 }
@@ -1487,7 +1320,7 @@ function renderModal(){
     box.innerHTML=`<div class="modal-title"><i class="ti ti-user-plus"></i>Create user account</div>
     <div class="info-box info-blue" style="font-size:12px">User logs in with their email only — no password needed. Patrollers &amp; Coordinators are automatically added to the schedule.</div>
     <div class="msg msg-err" id="cu-e"></div><div class="msg msg-ok" id="cu-ok"></div>
-    <div class="fg-row"><div class="fg"><label>Full name</label><input id="cu-name" placeholder="Name"></div><div class="fg"><label>Role</label><select id="cu-role" onchange="document.getElementById('cu-phone-row').style.display=(this.value==='patroller'||this.value==='coordinator')?'block':'none'">${D.customRoles&&D.customRoles.length?D.customRoles.map(r=>`<option value="cr:${r.id}">${r.name} (${r.access_level==='admin'?'Admin':r.access_level==='editor'?'Editor':'Viewer'})</option>`).join(''):'<option value="" disabled>No roles yet — create roles in Zone and Shifts first</option>'}</select></div></div>
+    <div class="fg-row"><div class="fg"><label>Full name</label><input id="cu-name" placeholder="Name"></div><div class="fg"><label>Role</label><select id="cu-role" onchange="document.getElementById('cu-phone-row').style.display=(this.value==='patroller'||this.value==='coordinator')?'block':'none'">${['patroller','coordinator','lead','admin'].map(r=>`<option value="${r}">${roleLabel(r)}</option>`).join('')}</select></div></div>
     <div class="fg"><label>Email</label><input type="email" id="cu-email" placeholder="email@talabat.com"></div>
     <div class="fg" id="cu-phone-row"><label>WhatsApp number <span style="font-weight:400;font-size:10px;color:var(--g3)">(with country code, e.g. +97333112233)</span></label><input type="tel" id="cu-phone" placeholder="+97333112233"></div>
     <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" id="cu-btn" onclick="doCreateUser()"><i class="ti ti-check"></i>Create user</button></div>`;return;
@@ -1581,39 +1414,6 @@ function renderModal(){
     <div class="modal-footer">
       ${canEdit()&&t.status==='Pending'?`<button class="btn" style="background:#DCFCE7;color:#166534;border-color:#86efac" onclick="reviewTask('${t.id}','Approved');closeM()"><i class="ti ti-check"></i>Approve</button><button class="btn" style="background:#FEE2E2;color:#DC2626;border-color:#fca5a5" onclick="reviewTask('${t.id}','Rejected');closeM()"><i class="ti ti-x"></i>Reject</button>`:''}
       <button class="btn" onclick="closeM()">Close</button>
-    </div>`;return;
-  }
-  if(m.type==='addrole'||m.type==='editrole'){
-    const isEdit=m.type==='editrole';
-    const r=isEdit?m.role:{};
-    let savedTabs=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
-    if(isEdit&&r.visible_tabs){try{savedTabs=JSON.parse(r.visible_tabs);}catch(e){}}
-    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
-    const tabChecks=ALL_TABS.map(t=>{
-      const checked=savedTabs.includes(t);
-      return`<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid ${checked?'#FF5900':'#E8DDD4'};border-radius:8px;cursor:pointer;background:#fff" onclick="const cb=this.querySelector('input');setTimeout(()=>{this.style.borderColor=cb.checked?'#FF5900':'#E8DDD4';},0)">
-        <input type="checkbox" name="role-tab" value="${t}" ${checked?'checked':''} style="accent-color:#FF5900;width:14px;height:14px">
-        <span style="font-size:12.5px;font-weight:500;color:#2A0D0F">${t}</span>
-      </label>`;
-    }).join('');
-    box.innerHTML=`<div class="modal-title"><i class="ti ti-shield"></i>${isEdit?'Edit':'Create'} Role</div>
-    <div class="msg msg-err" id="role-e"></div>
-    <div class="fg-row">
-      <div class="fg"><label>Role name</label><input id="role-name" value="${r.name||''}" placeholder="e.g. Patroller, Supervisor"></div>
-      <div class="fg"><label>Access level</label><select id="role-access">
-        <option value="viewer" ${(r.access_level||'viewer')==='viewer'?'selected':''}>👁 Viewer — view only</option>
-        <option value="editor" ${r.access_level==='editor'?'selected':''}>✏️ Editor — can edit data</option>
-        <option value="admin" ${r.access_level==='admin'?'selected':''}>🔐 Admin — full access</option>
-      </select></div>
-    </div>
-    <div class="fg"><label>Description (optional)</label><input id="role-desc" value="${r.description||''}" placeholder="What does this role do?"></div>
-    <div class="fg"><label>Visible tabs <span style="font-weight:400;font-size:10px;color:var(--g3)">(check what this role can see)</span></label>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">${tabChecks}</div>
-    </div>
-    <div class="modal-footer">
-      ${isEdit?`<button class="btn btn-danger modal-footer-left" onclick="delCustomRole('${r.id}','${(r.name||'').replace(/'/g,"\'")}')"><i class="ti ti-trash"></i>Delete</button>`:''}
-      <button class="btn" onclick="closeM()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveRole('${isEdit?r.id:'null'}')"><i class="ti ti-check"></i>${isEdit?'Save':'Create role'}</button>
     </div>`;return;
   }
   if(m.type==='cell'){
@@ -2235,7 +2035,7 @@ function attendanceView(){
   </div>
   <div class="toolbar">
     <input type="date" value="${today}" onchange="D.attDate=this.value;render()" style="padding:7px 11px;border-radius:var(--r8);border:1.5px solid var(--g2);font-family:inherit;font-size:12.5px">
-    <button class="btn" onclick="downloadReport('attendance')"><i class="ti ti-download"></i>Export Report</button>
+    <button class="btn" onclick="dlAttendance()"><i class="ti ti-download"></i>Export CSV</button>
     <span style="font-size:12px;color:var(--g3)">${workingPats.length} scheduled · ${vacPats.length} on vacation · ${offPats.length} off</span>
   </div>
   ${workingPats.length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-calendar-off" style="font-size:40px;display:block;margin-bottom:10px"></i>No one scheduled for this day.</div>`:`
@@ -2547,7 +2347,6 @@ function myTasksView(){
 
 async function reviewTask(id,status){
   await sb.from('task_requests').update({status,reviewed_by:D.profile.id,updated_at:new Date().toISOString()}).eq('id',id);
-  addNotification(`Task ${status.toLowerCase()} successfully`,'success');
   await reload();
 }
 function delTask(id){openM({type:'confirm',msg:'Delete this task request?',cb:async()=>{await sb.from('task_requests').delete().eq('id',id);closeM();await reload();}});}
@@ -2626,184 +2425,6 @@ async function saveTaskReq(){
   await startTask();
 }
 
-async function saveRole(id){
-  const e=document.getElementById('role-e');e.style.display='none';
-  const name=(document.getElementById('role-name').value||'').trim();
-  const access=document.getElementById('role-access').value||'viewer';
-  const desc=(document.getElementById('role-desc').value||'').trim();
-  if(!name){e.textContent='Role name required.';e.style.display='block';return;}
-  const tabs=Array.from(document.querySelectorAll('input[name="role-tab"]:checked')).map(x=>x.value);
-  if(!tabs.length){e.textContent='Select at least one tab.';e.style.display='block';return;}
-  const payload={name,access_level:access,description:desc||null,visible_tabs:JSON.stringify(tabs)};
-  if(id!=='null'){
-    const{error}=await sb.from('custom_roles').update({...payload,updated_at:new Date().toISOString()}).eq('id',id);
-    if(error){e.textContent=error.message;e.style.display='block';return;}
-  } else {
-    const{error}=await sb.from('custom_roles').insert(payload);
-    if(error){e.textContent=error.message;e.style.display='block';return;}
-  }
-  closeM();await reload();
-}
-
-function delCustomRole(id,name){
-  openM({type:'confirm',msg:`Delete role <b>${name}</b>?`,cb:async()=>{
-    await sb.from('custom_roles').delete().eq('id',id);
-    closeM();await reload();
-  }});
-}
-
-
-// ── NOTIFICATIONS ──
-let D_notifs = [];
-let notifSoundEnabled = true;
-
-function playNotifSound(type='info'){
-  if(!notifSoundEnabled)return;
-  try{
-    const ctx=new(window.AudioContext||window.webkitAudioContext)();
-    const osc=ctx.createOscillator();
-    const gain=ctx.createGain();
-    osc.connect(gain);gain.connect(ctx.destination);
-    // Different tones for different types
-    if(type==='success'){
-      // Two-tone upward chime
-      osc.frequency.setValueAtTime(520,ctx.currentTime);
-      osc.frequency.setValueAtTime(780,ctx.currentTime+0.12);
-      gain.gain.setValueAtTime(0.3,ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.4);
-      osc.start(ctx.currentTime);osc.stop(ctx.currentTime+0.4);
-    } else if(type==='warning'){
-      // Double beep
-      osc.frequency.setValueAtTime(440,ctx.currentTime);
-      gain.gain.setValueAtTime(0.3,ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.15);
-      osc.start(ctx.currentTime);osc.stop(ctx.currentTime+0.5);
-      // Second beep
-      const osc2=ctx.createOscillator();const gain2=ctx.createGain();
-      osc2.connect(gain2);gain2.connect(ctx.destination);
-      osc2.frequency.setValueAtTime(440,ctx.currentTime+0.2);
-      gain2.gain.setValueAtTime(0.3,ctx.currentTime+0.2);
-      gain2.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.4);
-      osc2.start(ctx.currentTime+0.2);osc2.stop(ctx.currentTime+0.5);
-    } else if(type==='error'){
-      // Low descending tone
-      osc.frequency.setValueAtTime(330,ctx.currentTime);
-      osc.frequency.setValueAtTime(220,ctx.currentTime+0.15);
-      gain.gain.setValueAtTime(0.3,ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.4);
-      osc.start(ctx.currentTime);osc.stop(ctx.currentTime+0.4);
-    } else {
-      // Soft single ding
-      osc.frequency.setValueAtTime(660,ctx.currentTime);
-      gain.gain.setValueAtTime(0.2,ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.3);
-      osc.start(ctx.currentTime);osc.stop(ctx.currentTime+0.3);
-    }
-  }catch(e){console.warn('Sound not supported:',e);}
-}
-
-function addNotification(msg, type='info', link=''){
-  D_notifs.unshift({id:Date.now(),msg,type,link,time:new Date()});
-  if(D_notifs.length>20)D_notifs=D_notifs.slice(0,20);
-  playNotifSound(type);
-  renderNotifications();
-  // Show toast popup
-  showToast(msg, type);
-}
-
-function showToast(msg, type='info'){
-  const cols={info:'#1565C0',success:'#166534',warning:'#D97706',error:'#DC2626'};
-  const bgs={info:'#EAF1FD',success:'#DCFCE7',warning:'#FEF3C7',error:'#FEE2E2'};
-  const icons={info:'ti-info-circle',success:'ti-circle-check',warning:'ti-alert-triangle',error:'ti-circle-x'};
-  let toast=document.getElementById('toast-container');
-  if(!toast){
-    toast=document.createElement('div');
-    toast.id='toast-container';
-    toast.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:320px';
-    document.body.appendChild(toast);
-  }
-  const t=document.createElement('div');
-  t.style.cssText=`background:${bgs[type]};border:1.5px solid ${cols[type]}33;border-radius:12px;padding:12px 16px;display:flex;align-items:flex-start;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);animation:slideIn .2s ease;font-family:Inter,sans-serif`;
-  t.innerHTML=`<i class="ti ${icons[type]}" style="font-size:16px;color:${cols[type]};flex-shrink:0;margin-top:1px"></i><div style="flex:1;font-size:12.5px;color:#2A0D0F;line-height:1.4">${msg}</div><button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:#A08070;font-size:16px;line-height:1;padding:0;margin-left:4px">×</button>`;
-  toast.appendChild(t);
-  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},4000);
-}
-function renderNotifications(){
-  const badge=document.getElementById('notif-count');
-  const list=document.getElementById('notif-list');
-  if(!badge||!list)return;
-  const unread=D_notifs.filter(n=>!n.read).length;
-  badge.textContent=unread;
-  badge.style.display=unread>0?'flex':'none';
-  if(!D_notifs.length){
-    list.innerHTML='<div style="padding:20px;text-align:center;color:#A08070;font-size:12px">No notifications</div>';
-    return;
-  }
-  const icons={info:'ti-info-circle',success:'ti-circle-check',warning:'ti-alert-triangle',error:'ti-circle-x'};
-  const cols={info:'#1565C0',success:'#166534',warning:'#D97706',error:'#DC2626'};
-  list.innerHTML=D_notifs.map(n=>`
-    <div style="padding:10px 14px;border-bottom:1px solid #F4EDE3;display:flex;gap:10px;align-items:flex-start;background:${n.read?'#fff':'#FFFBF5'}">
-      <i class="ti ${icons[n.type]||icons.info}" style="font-size:14px;color:${cols[n.type]||cols.info};margin-top:1px;flex-shrink:0"></i>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;color:#2A0D0F;line-height:1.4">${n.msg}</div>
-        <div style="font-size:10px;color:#A08070;margin-top:2px">${n.time.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div>
-      </div>
-    </div>`).join('');
-  D_notifs.forEach(n=>n.read=true);
-}
-function toggleNotifications(){
-  const panel=document.getElementById('notif-panel');
-  if(!panel)return;
-  const open=panel.style.display==='block';
-  panel.style.display=open?'none':'block';
-  if(!open){renderNotifications();setTimeout(()=>document.addEventListener('click',function h(e){if(!panel.contains(e.target)&&e.target.id!=='notif-btn'){panel.style.display='none';document.removeEventListener('click',h);}},),50);}
-}
-function clearNotifications(){D_notifs=[];renderNotifications();}
-
-// ── REPORTS (CSV/PRINT) ──
-function downloadReport(type){
-  let rows=[];let filename='';
-  if(type==='attendance'){
-    filename='attendance_report.csv';
-    rows=[['Name','Role','Date','Status','Clock In','Clock Out','Duration','Clock In Location','Clock Out Location']];
-    (D.attendance||[]).forEach(a=>{
-      const pat=D.patrollers.find(p=>p.id===a.patroller_id);
-      const u=pat?D.users.find(u=>u.id===pat.user_id):null;
-      const cr=u?.custom_role_id?(D.customRoles||[]).find(r=>r.id===u.custom_role_id):null;
-      const dur=a.clock_in&&a.clock_out?`${Math.floor(Math.round((new Date(a.clock_out)-new Date(a.clock_in))/60000)/60)}h ${Math.round((new Date(a.clock_out)-new Date(a.clock_in))/60000)%60}m`:'';
-      rows.push([a.patroller_name||'',cr?cr.name:(pat?'Patroller':''),a.date,a.status||'',
-        a.clock_in?new Date(a.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'',
-        a.clock_out?new Date(a.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'',
-        dur,a.clock_in_map||'',a.clock_out_map||'']);
-    });
-  } else if(type==='schedule'){
-    filename='schedule_report.csv';
-    const dates=wDates();
-    rows=[['Name','Role',...DAYS.map((d,i)=>SD[i]+' '+fmt(dates[i]))]];
-    activePats().forEach(p=>{
-      const u=D.users.find(u=>u.id===p.user_id);
-      const cr=u?.custom_role_id?(D.customRoles||[]).find(r=>r.id===u.custom_role_id):null;
-      rows.push([p.name,cr?cr.name:'Patroller',...DAYS.map((_,i)=>gDZ(p.id,i)||'Off')]);
-    });
-  } else if(type==='timeoff'){
-    filename='timeoff_report.csv';
-    rows=[['Name','Leave Type','Start','End','Days','Status','Comment']];
-    (D.timeoff||[]).forEach(r=>{
-      const days=r.start_date&&r.end_date?Math.round((new Date(r.end_date)-new Date(r.start_date))/86400000)+1:'';
-      rows.push([r.patroller_name||'',r.request_type,r.start_date,r.end_date,days,r.status,r.comment||'']);
-    });
-  } else if(type==='tasks'){
-    filename='tasks_report.csv';
-    rows=[['Name','Task Type','Date','Start','End','Status','Description']];
-    (D.tasks||[]).forEach(t=>{rows.push([t.patroller_name||'',t.task_type,t.date,t.start_time,t.end_time,t.status,t.description||'']);});
-  }
-  if(!rows.length)return alert('No data to export.');
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n')],{type:'text/csv'}));
-  a.download=filename;a.click();
-  addNotification(`Report downloaded: ${filename}`,'success');
-}
-
 async function saveArea(){const v=document.getElementById('an').value.trim();if(!v)return;const{error}=await sb.from('areas').insert({name:v});if(error)return alert(error.message);closeM();await reload();}
 async function saveShift(id){const name=document.getElementById('shn').value.trim();if(!name)return;const shift_type=document.getElementById('sht').value;const start_time=document.getElementById('shst').value;const end_time=document.getElementById('shet').value;if(id!=='null')await sb.from('shifts').update({name,shift_type,start_time,end_time}).eq('id',id);else await sb.from('shifts').insert({name,shift_type,start_time,end_time});closeM();await reload();}
 
@@ -2811,12 +2432,7 @@ async function doCreateUser(){
   clearMsgs('cu-e','cu-ok');
   const name=document.getElementById('cu-name').value.trim();
   const email=document.getElementById('cu-email').value.trim().toLowerCase();
-  const roleRaw=document.getElementById('cu-role').value;
-  const isCustomRole=roleRaw.startsWith('cr:');
-  const customRoleId=isCustomRole?roleRaw.replace('cr:',''):null;
-  const customRole=customRoleId?(D.customRoles||[]).find(r=>r.id===customRoleId):null;
-  // Map custom role access level to system role for permissions
-  const role=customRole?(customRole.access_level==='admin'?'admin':customRole.access_level==='editor'?'lead':'patroller'):'patroller';
+  const role=document.getElementById('cu-role').value;
   const phone=(document.getElementById('cu-phone')?.value||'').trim();
   if(!name||!email){showErr('cu-e','Name and email required.');return;}
   const btn=document.getElementById('cu-btn');btn.disabled=true;btn.textContent='Creating...';
@@ -2829,7 +2445,7 @@ async function doCreateUser(){
     if(error)throw error;
     const uid=data?.user?.id;
     if(uid){
-      await sb.from('profiles').upsert({id:uid,email,full_name:name,role,is_active:true,custom_role_id:customRoleId||null},{onConflict:'id'});
+      await sb.from('profiles').upsert({id:uid,email,full_name:name,role,is_active:true},{onConflict:'id'});
       if(role==='patroller'||role==='coordinator'){
         // Always create a patroller entry linked to this user
         const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null}).select().single();
@@ -2886,7 +2502,6 @@ async function savePat(id){
     if(np)await sb.from('schedules').insert({patroller_id:np.id,week_start:ws,day_0:days[0],day_1:days[1],day_2:days[2],day_3:days[3],day_4:days[4],day_5:days[5],day_6:days[6],shift_0:dayShifts[0]||null,shift_1:dayShifts[1]||null,shift_2:dayShifts[2]||null,shift_3:dayShifts[3]||null,shift_4:dayShifts[4]||null,shift_5:dayShifts[5]||null,shift_6:dayShifts[6]||null});
   }
   closeM();await reload();
-  addNotification('Schedule updated successfully','success');
 }
 
 async function saveTO(){
