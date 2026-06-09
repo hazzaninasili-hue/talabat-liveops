@@ -348,6 +348,48 @@ async function doLogout(){
   showS('login');
 }
 
+sb.auth.onAuthStateChange((ev,session)=>{
+  if(ev==='SIGNED_OUT')showS('login');
+  else if(ev==='SIGNED_IN'&&session)afterLogin(session.user);
+});
+
+async function afterLogin(user){
+  D.user=user;showApp();
+  document.getElementById('main').innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:14px;color:#94A3B8"><div style="width:34px;height:34px;border:3px solid #E2E8F0;border-top-color:#FF5900;border-radius:50%;animation:spin .7s linear infinite"></div><div>Loading...</div></div>';
+  try{
+    let{data:prof}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);
+    if(!prof){
+      const{data:byEmail}=await wt(sb.from('profiles').select('*').eq('email',user.email).maybeSingle(),5000);
+      if(byEmail){
+        await sb.from('profiles').update({id:user.id}).eq('email',user.email);
+        prof={...byEmail,id:user.id};
+      } else {
+        await sb.from('profiles').upsert({id:user.id,email:user.email,full_name:user.user_metadata?.full_name||user.email.split('@')[0],role:'patroller',is_active:true},{onConflict:'id'});
+        const{data:p2}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);
+        prof=p2;
+      }
+    }
+    D.profile=prof||{id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};
+  }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};}
+  D.tab=(D.profile.role==='patroller'||D.profile.role==='coordinator')?'myschedule':'schedule';
+  await loadAll();
+  if(D.profile.role==='patroller'||D.profile.role==='coordinator'){
+    const linked=D.patrollers.find(p=>p.user_id===D.profile.id);
+    if(!linked){
+      const byName=D.patrollers.find(p=>p.name.toLowerCase()===D.profile.full_name.toLowerCase()&&!p.user_id);
+      if(byName){await sb.from('patrollers').update({user_id:D.profile.id,user_type:D.profile.role}).eq('id',byName.id);await loadAll();}
+    }
+    checkAndSaveLocationPermission();
+  }
+  render();
+}
+
+window.addEventListener('load',async()=>{
+  const{data:{session}}=await sb.auth.getSession();
+  if(session)afterLogin(session.user);
+  else showS('login');
+});
+
 function wt(p,ms=8000){return Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms))]);}
 
 async function loadAll(){
