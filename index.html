@@ -609,7 +609,7 @@ const gsh=id=>D.shifts.find(s=>s.id===id)||{name:'?',start_time:'?',end_time:'?'
 const fmt=d=>`${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()}`;
 const wNum=d=>{const j=new Date(d.getFullYear(),0,1);return Math.ceil(((d-j)/86400000+j.getDay()+1)/7);};
 const fmtT=t=>{if(!t||t==='?')return'?';const[h,m]=t.split(':');const hr=parseInt(h);return`${hr===0?12:hr>12?hr-12:hr}:${m} ${hr<12||hr===24?'AM':'PM'}`;};
-const isAdmin=()=>D.profile&&D.profile.role==='admin';
+const isAdmin=()=>D.profile&&(D.profile.role==='admin'||(isSuperAdmin()&&!!D.currentDept));
 const canEdit=()=>D.profile&&(D.profile.role==='admin'||D.profile.role==='lead');
 const roleBg=r=>r==='admin'?'#EDE9FE':r==='lead'?'#EAF1FD':r==='coordinator'?'#CCFBF1':'#F1F5F9';
 const roleCol=r=>r==='admin'?'#4C1D95':r==='lead'?'#0C4FB3':r==='coordinator'?'#134E4A':'#475569';
@@ -624,10 +624,10 @@ function allZones(){return[...new Set([...D.zones.map(z=>z.name),...D.areas.map(
 function activePats(){return D.patrollers.filter(p=>{
   const u=D.users.find(u=>u.id===p.user_id);
   if(u){
-    // Exclude admin/lead from schedule display
     if(u.role==='admin'||u.role==='lead')return false;
     if(u.is_active===false)return false;
   }
+  if(p.is_active===false)return false;
   return true;
 });}
 function activePatsForSchedule(){
@@ -1455,6 +1455,20 @@ function mySchedView(){
 }
 
 function renderTabs(){
+  // Super admin inside a department gets full admin tabs
+  if(isSuperAdmin()&&D.currentDept){
+    const tabs=[
+      {id:'schedule',icon:'ti-calendar',label:'Schedule'},
+      {id:'summary',icon:'ti-chart-bar',label:'Summary'},
+      {id:'attendance',icon:'ti-clock-check',label:'Attendance'},
+      {id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'},
+      {id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'},
+      {id:'documents',icon:'ti-files',label:'Documents'},
+      {id:'access',icon:'ti-lock',label:'Access control'},
+    ];
+    document.getElementById('tabs').innerHTML=tabs.map(t=>`<button class="tab${D.tab===t.id?' active':''}" onclick="setTab('${t.id}')"><i class="ti ${t.icon}"></i>${t.label}</button>`).join('');
+    return;
+  }
   const role=D.profile.role;
   // Check if user has a custom role with defined tabs
   const customRole=D.profile.custom_role_id?(D.customRoles||[]).find(r=>r.id===D.profile.custom_role_id):null;
@@ -1867,7 +1881,7 @@ async function saveEditUser(uid){
   if(pat){await sb.from('patrollers').update({name,phone:phone||null,user_type:role}).eq('id',pat.id);}
   // If no patroller entry yet and role is patroller/coordinator, create one
   else if(role==='patroller'||role==='coordinator'){
-    const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null}).select().single();
+    const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null,department_id:D.currentDept||null}).select().single();
     if(np)await sb.from('schedules').insert({patroller_id:np.id,week_start:wStart(),day_0:'',day_1:'',day_2:'',day_3:'',day_4:'',day_5:'',day_6:''});
   }
   // If admin/lead, hide from schedule
@@ -2995,8 +3009,8 @@ function downloadReport(type){
   addNotification(`Report downloaded: ${filename}`,'success');
 }
 
-async function saveArea(){const v=document.getElementById('an').value.trim();if(!v)return;const{error}=await sb.from('areas').insert({name:v});if(error)return alert(error.message);closeM();await reload();}
-async function saveShift(id){const name=document.getElementById('shn').value.trim();if(!name)return;const shift_type=document.getElementById('sht').value;const start_time=document.getElementById('shst').value;const end_time=document.getElementById('shet').value;if(id!=='null')await sb.from('shifts').update({name,shift_type,start_time,end_time}).eq('id',id);else await sb.from('shifts').insert({name,shift_type,start_time,end_time});closeM();await reload();}
+async function saveArea(){const v=document.getElementById('an').value.trim();if(!v)return;const{error}=await sb.from('areas').insert({name:v,department_id:D.currentDept||null});if(error)return alert(error.message);closeM();await reload();}
+async function saveShift(id){const name=document.getElementById('shn').value.trim();if(!name)return;const shift_type=document.getElementById('sht').value;const start_time=document.getElementById('shst').value;const end_time=document.getElementById('shet').value;if(id!=='null')await sb.from('shifts').update({name,shift_type,start_time,end_time}).eq('id',id);else await sb.from('shifts').insert({name,shift_type,start_time,end_time,department_id:D.currentDept||null});closeM();await reload();}
 
 async function doCreateUser(){
   clearMsgs('cu-e','cu-ok');
@@ -3023,7 +3037,7 @@ async function doCreateUser(){
       await sb.from('profiles').upsert({id:uid,email,full_name:name,role,is_active:true,department_id:D.currentDept||null,custom_role_id:customRoleId||null},{onConflict:'id'});
       if(role==='patroller'||role==='coordinator'){
         // Always create a patroller entry linked to this user
-        const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null}).select().single();
+        const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null,department_id:D.currentDept||null}).select().single();
         if(np)await sb.from('schedules').insert({patroller_id:np.id,week_start:wStart(),day_0:'',day_1:'',day_2:'',day_3:'',day_4:'',day_5:'',day_6:''});
       }
     }
