@@ -1350,18 +1350,36 @@ function render(){
   renderTabs();
   const pts=activePats();const{am,pm,off}=summ(pts);
   const nav=`<div class="toolbar"><div class="seg"><button class="seg-btn${D.view==='week'?' active':''}" onclick="D.view='week';render()"><i class="ti ti-calendar-week" style="font-size:12px;margin-right:3px"></i>Week</button><button class="seg-btn${D.view==='date'?' active':''}" onclick="D.view='date';render()"><i class="ti ti-layout-columns" style="font-size:12px;margin-right:3px"></i>Daily</button><button class="seg-btn${D.view==='hourly'?' active':''}" onclick="D.view='hourly';render()"><i class="ti ti-timeline" style="font-size:12px;margin-right:3px"></i>Hourly</button></div><button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button><span class="wk-range">Week ${wn} - ${fmt(dates[0])} to ${fmt(dates[6])}</span><button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button><div class="search-wrap"><i class="ti ti-search"></i><input class="search-input" type="text" placeholder="Search..." value="${D.search}" oninput="D.search=this.value;render()"></div>${canEdit()?`<button class="btn btn-primary" onclick="openCreateSchedule()"><i class="ti ti-calendar-plus"></i>Create schedule</button>`:''}<button class="btn" onclick="openM({type:'taskreq'})"><i class="ti ti-plus"></i>Task request</button></div>`;
-  const patCount=pts.filter(p=>getUtype(p)==='patroller').length;
-  const coordCount=pts.filter(p=>getUtype(p)==='coordinator').length;
   const liveData=getActiveNow();
   const nowStr=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-  const livePatLabel=liveData?`<div class="stat-sub" style="color:#16A34A;font-weight:600"><i class="ti ti-circle-filled" style="font-size:7px;margin-right:3px;animation:pulse 1.5s infinite"></i>${liveData.activePatrollers} on shift now · ${nowStr}</div>`:`<div class="stat-sub">Total active</div>`;
-  const liveCoordLabel=liveData?`<div class="stat-sub" style="color:#16A34A;font-weight:600"><i class="ti ti-circle-filled" style="font-size:7px;margin-right:3px;animation:pulse 1.5s infinite"></i>${liveData.activeCoords} on shift now</div>`:`<div class="stat-sub">Total active</div>`;
-  const vacCount=liveData?liveData.onVacCount:0;
-  const statBar=`<style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}</style><div class="stats">
-    <div class="stat blue"><div class="stat-label">Patrollers on duty</div><div class="stat-value">${liveData?liveData.onDutyPats:patCount}</div>${livePatLabel}</div>
-    <div class="stat teal"><div class="stat-label">Coordinators on duty</div><div class="stat-value">${liveData?liveData.onDutyCoords:coordCount}</div>${liveCoordLabel}</div>
-    <div class="stat" style="background:#FFFFFF;border:1.5px solid #E8DDD4"><div class="stat-label" style="color:#7C3AED">On Vacation 🌴</div><div class="stat-value" style="color:#7C3AED">${vacCount}</div><div class="stat-sub">Today</div></div>
-    <div class="stat red"><div class="stat-label">Off today</div><div class="stat-value">${liveData?Math.max(0,patCount+coordCount-liveData.onDutyPats-liveData.onDutyCoords-vacCount):off.reduce((a,b)=>a+b,0)}</div><div class="stat-sub">${liveData?'Not scheduled today':'Person-days this week'}</div></div>
+  const todayIdx=liveData?liveData.todayIdx:{6:0,0:1,1:2,2:3,3:4,4:5,5:6}[new Date().getDay()];
+  const getRoleNameP=p=>{const u=D.users.find(u=>u.id===p.user_id);if(u&&u.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr)return cr.name;}return getUtype(p)==='coordinator'?'Coordinator':'Patroller';};
+  const roleGroups={};pts.forEach(p=>{const rn=getRoleNameP(p);if(!roleGroups[rn])roleGroups[rn]=[];roleGroups[rn].push(p);});
+  const roleRows=Object.entries(roleGroups).map(([rname,rPats])=>{
+    const onShift=D.woff===0?rPats.filter(p=>gDZ(p.id,todayIdx)&&!isOnVacationToday(p.id)&&!isAbsentToday(p.id)).length:rPats.length;
+    const offDuty=D.woff===0?rPats.filter(p=>!gDZ(p.id,todayIdx)&&!isOnVacationToday(p.id)&&!isAbsentToday(p.id)).length:0;
+    const absent=D.woff===0?rPats.filter(p=>isAbsentToday(p.id)).length:0;
+    const onVac=D.woff===0?rPats.filter(p=>isOnVacationToday(p.id)).length:0;
+    const onTask=D.woff===0?(D.tasks||[]).filter(t=>t.date===todayStr()&&t.status==='Running'&&rPats.find(p=>p.id===t.patroller_id)).length:0;
+    return`<tr style="border-bottom:1px solid #F4EDE3"><td style="padding:10px 14px;font-weight:700;font-size:13px;color:#2A0D0F">${rname}</td><td style="padding:10px;text-align:center"><span style="font-size:13px;font-weight:700;color:#166534">${onShift}</span></td><td style="padding:10px;text-align:center"><span style="font-size:13px;font-weight:700;color:#A08070">${offDuty}</span></td><td style="padding:10px;text-align:center"><span style="font-size:13px;font-weight:700;color:#DC2626">${absent}</span></td><td style="padding:10px;text-align:center"><span style="font-size:13px;font-weight:700;color:#7C3AED">${onVac>0?onVac:'-'}</span></td><td style="padding:10px;text-align:center"><span style="font-size:13px;font-weight:700;color:#FF5900">${onTask>0?onTask:'-'}</span></td></tr>`;
+  }).join('');
+  const statBar=`<style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}</style>
+  <div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;overflow:hidden;margin-bottom:14px;box-shadow:0 1px 4px rgba(65,21,23,.06)">
+    <div style="padding:10px 16px;background:#F4EDE3;border-bottom:1.5px solid #E8DDD4;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-activity" style="margin-right:5px"></i>Live Status${D.woff===0?' · '+nowStr:''}</div>
+      ${D.woff===0?'<span style="font-size:10px;color:#16A34A;font-weight:600"><i class="ti ti-circle-filled" style="font-size:8px;margin-right:3px;animation:pulse 1.5s infinite"></i>Today</span>':'<span style="font-size:10px;color:#A08070">Past/future week</span>'}
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:#F8FAFC;border-bottom:1.5px solid #E8DDD4">
+        <th style="text-align:left;padding:8px 14px;font-size:10px;font-weight:700;color:#A08070;text-transform:uppercase;letter-spacing:.05em">Role Type</th>
+        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em;text-align:center">On Shift</th>
+        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#A08070;text-transform:uppercase;letter-spacing:.05em;text-align:center">Off Duty</th>
+        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#DC2626;text-transform:uppercase;letter-spacing:.05em;text-align:center">Absent</th>
+        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:.05em;text-align:center">On Vacation</th>
+        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#FF5900;text-transform:uppercase;letter-spacing:.05em;text-align:center">On Task</th>
+      </tr></thead>
+      <tbody>${roleRows||'<tr><td colspan="6" style="padding:20px;text-align:center;color:#A08070">No users yet.</td></tr>'}</tbody>
+    </table>
   </div>`;
   const wNav=`<div class="toolbar"><button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button><span class="wk-range">Week ${wn} - ${fmt(dates[0])} to ${fmt(dates[6])}</span><button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button></div>`;
   let html='';
