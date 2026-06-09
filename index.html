@@ -443,28 +443,7 @@ async function doLogin(){
   }
 }
 
-async function afterLogin(user){
-  D.user=user;showApp();
-  document.getElementById('main').innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:14px;color:#94A3B8"><div style="width:34px;height:34px;border:3px solid #E2E8F0;border-top-color:#1A6FE8;border-radius:50%;animation:spin .7s linear infinite"></div><div>Loading...</div></div>';
-  try{
-    let{data:prof}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);
-    if(!prof){
-      const{data:byEmail}=await wt(sb.from('profiles').select('*').eq('email',user.email).maybeSingle(),5000);
-      if(byEmail){
-        await sb.from('profiles').update({id:user.id}).eq('email',user.email);
-        prof={...byEmail,id:user.id};
-      } else {
-        await sb.from('profiles').upsert({id:user.id,email:user.email,full_name:user.user_metadata?.full_name||user.email.split('@')[0],role:user.user_metadata?.role||'patroller',is_active:true},{onConflict:'id'});
-        const{data:p2}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);
-        prof=p2;
-      }
-    }
-    D.profile=prof||{id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};
-  }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};}
-  D.tab=(D.profile.role==='patroller'||D.profile.role==='coordinator')?'myschedule':'schedule';
-  await loadAll();
-  render();
-}
+
 
 async function syncUserProfile(email){
   try{
@@ -553,6 +532,9 @@ async function afterLogin(user){
     D.profile=prof||{id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};
   }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};}
   D.tab=(D.profile.role==='patroller'||D.profile.role==='coordinator')?'myschedule':'schedule';
+  if(isSuperAdmin()){D.superView=true;await loadDepartments();await renderSuperDash();return;}
+  // Department admin auto-routing
+  if(D.profile.department_id&&!D.currentDept){D.currentDept=D.profile.department_id;await loadDepartments();}
   await loadAll();
   // Check & save location permission for this user
   if(D.profile.role==='patroller'||D.profile.role==='coordinator'){
