@@ -190,7 +190,7 @@ table tr:hover td{background:rgba(26,111,232,.02)}
     <div class="msg msg-err" id="login-err"></div>
     <div class="msg msg-ok" id="login-ok"></div>
     <div class="fg"><label>Work Email</label><input type="email" id="login-email" placeholder="you@talabat.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <div class="fg"><label>Password</label><input type="password" id="login-password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+
     <button class="auth-btn" id="login-btn" onclick="doLogin()">Sign in</button>
     <div style="margin-top:12px;padding:10px 13px;background:#F1F5F9;border-radius:9px;font-size:12px;color:#64748B;text-align:center"><i class="ti ti-info-circle" style="font-size:12px;margin-right:4px"></i>Access is controlled by your admin.</div>
     </div>
@@ -275,28 +275,30 @@ sb.auth.onAuthStateChange((ev,session)=>{
 async function doLogin(){
   clearMsgs('login-err','login-ok');
   const email=document.getElementById('login-email').value.trim().toLowerCase();
-  const password=document.getElementById('login-password')?.value||'';
-  
   if(!email){showErr('login-err','Please enter your work email.');return;}
-  if(!password){showErr('login-err','Please enter your password.');return;}
-  
   const btn=document.getElementById('login-btn');
   btn.disabled=true;btn.textContent='Signing in...';
-  
   try{
-    // Simple login with email + password
-    const{data,error}=await sb.auth.signInWithPassword({email,password});
-    if(error)throw new Error(error.message);
-    if(!data?.user){throw new Error('Login failed');}
-    
-    await afterLogin(data.user);
-    
-  }catch(e){
-    btn.disabled=false;
-    btn.textContent='Sign in';
-    showErr('login-err','❌ '+e.message||'Login failed. Try again.');
-    console.error('Login error:',e);
-  }
+    // Step 1: Try sign in with email-derived password
+    const{data,error}=await sb.auth.signInWithPassword({email,password:email+'_talabat_access'});
+    if(!error&&data?.user){
+      const{data:prof}=await wt(sb.from('profiles').select('is_active').eq('email',email).maybeSingle(),5000);
+      if(prof&&prof.is_active===false){await sb.auth.signOut();btn.disabled=false;btn.textContent='Sign in';showErr('login-err','Your account is inactive. Contact your admin.');return;}
+      return;
+    }
+    // Step 2: Check profiles table
+    const{data:prof}=await wt(sb.from('profiles').select('id,email,full_name,role,is_active').eq('email',email).maybeSingle(),5000);
+    if(!prof){btn.disabled=false;btn.textContent='Sign in';showErr('login-err','Email not found. Ask your admin to add you.');return;}
+    if(prof.is_active===false){btn.disabled=false;btn.textContent='Sign in';showErr('login-err','Your account is inactive. Contact your admin.');return;}
+    // Step 3: Create auth account
+    const{data:d2,error:e2}=await sb.auth.signUp({email,password:email+'_talabat_access',options:{data:{full_name:prof.full_name,role:prof.role},emailRedirectTo:REDIRECT}});
+    if(e2){btn.disabled=false;btn.textContent='Sign in';showErr('login-err',e2.message||'Failed.');return;}
+    const{data:d3,error:e3}=await sb.auth.signInWithPassword({email,password:email+'_talabat_access'});
+    if(!e3&&d3?.user)return;
+    if(d2?.user){return;}
+    btn.disabled=false;btn.textContent='Sign in';
+    showErr('login-err','Account created! Please try signing in again.');
+  }catch(e){btn.disabled=false;btn.textContent='Sign in';showErr('login-err',e.message||'Login failed. Try again.');}
 }
 
 async function afterLogin(user){
