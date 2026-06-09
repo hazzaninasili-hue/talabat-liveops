@@ -220,6 +220,7 @@ table tr:hover td{background:rgba(26,111,232,.02)}
     <div class="topbar-right">
       <div class="user-chip" id="user-chip"></div>
       <button class="top-btn" onclick="openM({type:'changepw'})"><i class="ti ti-key"></i>Change password</button>
+      <span id="back-to-dash"></span>
       <button class="top-btn danger" onclick="doLogout()"><i class="ti ti-logout"></i>Sign out</button>
     </div>
   </div>
@@ -250,11 +251,14 @@ function getCurrentSaturday(){
 const BASE_DATE=getCurrentSaturday();
 const LEAVE_TYPES=['Annual Leave','Sick Leave','Sick Leave 50%','Sick Leave Unpaid','Unpaid Leave','Death'];
 
+const SUPER_ADMIN='hazzani.nasili@talabat.com';
 let D={user:null,profile:null,tab:'schedule',view:'week',woff:0,search:'',modal:null,ne:false,hweek:null,
   shifts:[],areas:[],zones:[],patrollers:[],schedules:[],users:[],
   notesAll:{id:null,content:''},notesPat:{id:null,content:''},notesCoo:{id:null,content:''},
-  docs:[],history:[],timeoff:[],attendance:[],attDate:null,opsSub:'areas',locPerms:{},tasks:[],hourlyDay:null};
+  docs:[],history:[],timeoff:[],attendance:[],attDate:null,opsSub:'areas',locPerms:{},tasks:[],hourlyDay:null,
+  departments:[],currentDept:null,superView:false};
 
+const isSuperAdmin=()=>D.user?.email===SUPER_ADMIN;
 function showS(n){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display=n==='login'?'flex':'none';if(np)np.style.display=n==='newpw'?'flex':'none';document.getElementById('app').style.display='none';}
 function showApp(){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display='none';if(np)np.style.display='none';document.getElementById('app').style.display='block';}
 function showErr(id,m){const e=document.getElementById(id);if(e){e.textContent=m;e.style.display='block';}}
@@ -320,6 +324,12 @@ async function afterLogin(user){
     D.profile=prof||{id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};
   }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};}
   D.tab=(D.profile.role==='patroller'||D.profile.role==='coordinator')?'myschedule':'schedule';
+  if(isSuperAdmin()){
+    D.superView=true;
+    await loadDepartments();
+    renderSuperDash();
+    return;
+  }
   await loadAll();
   render();
 }
@@ -411,6 +421,12 @@ async function afterLogin(user){
     D.profile=prof||{id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};
   }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};}
   D.tab=(D.profile.role==='patroller'||D.profile.role==='coordinator')?'myschedule':'schedule';
+  if(isSuperAdmin()){
+    D.superView=true;
+    await loadDepartments();
+    renderSuperDash();
+    return;
+  }
   await loadAll();
   // Check & save location permission for this user
   if(D.profile.role==='patroller'||D.profile.role==='coordinator'){
@@ -457,7 +473,11 @@ async function loadAll(){
   try{const{data:hist}=await wt(sb.from('schedule_history').select('*,profiles(full_name)').order('changed_at',{ascending:false}).limit(300),5000);D.history=hist||[];}catch(e){}
   try{const{data:tor}=await wt(sb.from('time_off_requests').select('*').order('created_at',{ascending:false}),5000);D.timeoff=tor||[];}catch(e){}
   if(D.profile?.role==='admin'||D.profile?.role==='lead'){
-    try{const{data:users}=await wt(sb.from('profiles').select('*').order('full_name'),5000);D.users=users||[];}catch(e){}
+    try{
+      const deptFilter=D.currentDept;
+      const q=deptFilter?sb.from('profiles').select('*').eq('department_id',deptFilter).order('full_name'):sb.from('profiles').select('*').order('full_name');
+      const{data:users}=await wt(q,5000);D.users=users||[];
+    }catch(e){}
   }
   try{const{data:tk}=await wt(sb.from('task_requests').select('*').order('created_at',{ascending:false}),5000);D.tasks=tk||[];}catch(e){D.tasks=[];}
   try{
@@ -1186,7 +1206,8 @@ function render(){
     }
   }
   const dates=wDates();const wn=wNum(dates[0]);
-  document.getElementById('wk-chip').textContent=`Week ${wn} - ${dates[0].getFullYear()}`;
+  const dept=D.currentDept?D.departments.find(d=>d.id===D.currentDept):null;
+  document.getElementById('wk-chip').textContent=dept?dept.name:`Week ${wn} - ${dates[0].getFullYear()}`;
   const u=D.profile;
   document.getElementById('user-chip').innerHTML=`<div class="user-av" style="background:${roleBg(u.role)};color:${roleCol(u.role)}">${ini(u.full_name)}</div><div><div class="user-nm">${u.full_name}</div><div class="user-rl">${roleLabel(u.role)}</div></div>`;
   renderTabs();
@@ -1264,6 +1285,8 @@ function renderModal(){
   const ov=document.getElementById('modal'),box=document.getElementById('modal-box');
   const m=D.modal;if(!m){ov.classList.remove('open');return;}
   ov.classList.add('open');
+  // Department modals handled separately
+  if(m.type==='createdept'||m.type==='editdept'){renderDeptModal(m);return;}
 
   if(m.type==='confirm'){box.innerHTML=`<div class="modal-title"><i class="ti ti-alert-triangle" style="color:var(--red)"></i>Confirm</div><p style="font-size:13px;color:var(--g4);margin-bottom:4px">${m.msg}</p><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-danger" id="cok"><i class="ti ti-trash"></i>Remove</button></div>`;document.getElementById('cok').onclick=async()=>{await m.cb();};return;}
   if(m.type==='changepw'){box.innerHTML=`<div class="modal-title"><i class="ti ti-key"></i>Change password</div><div class="msg msg-err" id="cpw-e"></div><div class="msg msg-ok" id="cpw-ok"></div><div class="fg"><label>New password</label><div class="pw-wrap"><input type="password" id="cpw1" placeholder="Min 8 chars"><button class="pw-eye" onclick="togglePw('cpw1',this)"><i class="ti ti-eye"></i></button></div></div><div class="fg"><label>Confirm</label><div class="pw-wrap"><input type="password" id="cpw2" placeholder="Repeat"><button class="pw-eye" onclick="togglePw('cpw2',this)"><i class="ti ti-eye"></i></button></div></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="doCPW()"><i class="ti ti-check"></i>Update</button></div>`;return;}
@@ -1478,7 +1501,7 @@ async function saveEditUser(uid){
   if(pat){await sb.from('patrollers').update({name,phone:phone||null,user_type:role}).eq('id',pat.id);}
   // If no patroller entry yet and role is patroller/coordinator, create one
   else if(role==='patroller'||role==='coordinator'){
-    const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null}).select().single();
+    const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null,department_id:D.currentDept||null}).select().single();
     if(np)await sb.from('schedules').insert({patroller_id:np.id,week_start:wStart(),day_0:'',day_1:'',day_2:'',day_3:'',day_4:'',day_5:'',day_6:''});
   }
   // If admin/lead, hide from schedule
@@ -2423,8 +2446,147 @@ async function saveTaskReq(){
   await startTask();
 }
 
-async function saveArea(){const v=document.getElementById('an').value.trim();if(!v)return;const{error}=await sb.from('areas').insert({name:v});if(error)return alert(error.message);closeM();await reload();}
-async function saveShift(id){const name=document.getElementById('shn').value.trim();if(!name)return;const shift_type=document.getElementById('sht').value;const start_time=document.getElementById('shst').value;const end_time=document.getElementById('shet').value;if(id!=='null')await sb.from('shifts').update({name,shift_type,start_time,end_time}).eq('id',id);else await sb.from('shifts').insert({name,shift_type,start_time,end_time});closeM();await reload();}
+
+// ── DEPARTMENT FUNCTIONS ──
+async function loadDepartments(){
+  try{
+    const{data}=await wt(sb.from('departments').select('*').order('name'),8000);
+    D.departments=data||[];
+  }catch(e){D.departments=[];console.warn('Dept load:',e);}
+}
+
+async function enterDepartment(deptId){
+  D.currentDept=deptId;
+  D.superView=false;
+  const dept=D.departments.find(d=>d.id===deptId);
+  // Load profile for this dept context
+  D.tab='schedule';
+  await loadAll();
+  render();
+}
+
+function exitToDashboard(){
+  D.currentDept=null;
+  D.superView=true;
+  D.tasks=[];D.attendance=[];D.shifts=[];D.areas=[];D.patrollers=[];D.schedules=[];D.users=[];D.timeoff=[];
+  loadDepartments().then(()=>renderSuperDash());
+}
+
+function renderSuperDash(){
+  showApp();
+  // Update topbar for super admin
+  const u=D.profile;
+  document.getElementById('wk-chip').textContent='Super Admin';
+  document.getElementById('user-chip').innerHTML=`<div class="user-av" style="background:#FF5900;color:#fff">SA</div><div><div class="user-nm">${u.full_name}</div><div class="user-rl">Super Admin</div></div>`;
+  document.getElementById('tabs').innerHTML='';
+
+  const depts=D.departments||[];
+  const totalDepts=depts.length;
+
+  let html=`
+  <style>
+    .dept-card{background:#fff;border:1.5px solid #E8DDD4;border-radius:16px;padding:20px;cursor:pointer;transition:all .18s;box-shadow:0 1px 4px rgba(65,21,23,.06)}
+    .dept-card:hover{box-shadow:0 8px 24px rgba(65,21,23,.14);transform:translateY(-2px);border-color:#FF5900}
+    .dept-stat{text-align:center;padding:10px;background:#F4EDE3;border-radius:10px}
+    .dept-stat-val{font-size:22px;font-weight:700;color:#411517}
+    .dept-stat-lbl{font-size:9px;font-weight:700;color:#A08070;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+  </style>
+  <div style="max-width:1400px;margin:0 auto;padding:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-size:22px;font-weight:700;color:#411517">🏢 Department Overview</div>
+        <div style="font-size:13px;color:#A08070;margin-top:3px">${totalDepts} department${totalDepts!==1?'s':''} · Super Admin Dashboard</div>
+      </div>
+      <button onclick="openM({type:'createdept'})" style="padding:10px 20px;background:#FF5900;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px">
+        <i class="ti ti-building-plus" style="font-size:16px"></i> Create Department
+      </button>
+    </div>`;
+
+  if(depts.length===0){
+    html+=`<div style="text-align:center;padding:80px 20px;background:#fff;border-radius:20px;border:2px dashed #E8DDD4">
+      <i class="ti ti-building" style="font-size:60px;color:#E8DDD4;display:block;margin-bottom:16px"></i>
+      <div style="font-size:18px;font-weight:700;color:#411517;margin-bottom:8px">No departments yet</div>
+      <div style="font-size:13px;color:#A08070;margin-bottom:20px">Create your first department to get started</div>
+      <button onclick="openM({type:'createdept'})" style="padding:10px 24px;background:#FF5900;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">
+        <i class="ti ti-plus"></i> Create Department
+      </button>
+    </div>`;
+  } else {
+    html+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">`;
+    depts.forEach(dept=>{
+      const adminEmail=dept.admin_email||'No admin set';
+      const color=dept.color||'#411517';
+      html+=`<div class="dept-card" onclick="enterDepartment('${dept.id}')">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+          <div style="width:46px;height:46px;border-radius:12px;background:${color};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i class="ti ti-building" style="font-size:22px;color:#fff"></i>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:700;color:#2A0D0F">${dept.name}</div>
+            <div style="font-size:11px;color:#A08070;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${adminEmail}</div>
+          </div>
+          <div style="display:flex;gap:5px">
+            <button onclick="event.stopPropagation();openM({type:'editdept',dept:D.departments.find(d=>d.id==='${dept.id}')})" style="width:30px;height:30px;border-radius:7px;border:1.5px solid #E8DDD4;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#A08070" title="Edit"><i class="ti ti-edit" style="font-size:13px"></i></button>
+            <button onclick="event.stopPropagation();delDept('${dept.id}','${dept.name.replace(/'/g,"\'")}');" style="width:30px;height:30px;border-radius:7px;border:1.5px solid #E8DDD4;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#A08070" title="Delete"><i class="ti ti-trash" style="font-size:13px"></i></button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <div class="dept-stat"><div class="dept-stat-val" style="color:${color}">${dept.user_count||0}</div><div class="dept-stat-lbl">Users</div></div>
+          <div class="dept-stat"><div class="dept-stat-val" style="color:#16A34A">${dept.active_count||0}</div><div class="dept-stat-lbl">Active now</div></div>
+          <div class="dept-stat"><div class="dept-stat-val" style="color:#DC2626">${dept.absent_count||0}</div><div class="dept-stat-lbl">Absent today</div></div>
+        </div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid #F4EDE3;display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:11px;color:#A08070">Created ${new Date(dept.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</span>
+          <span style="font-size:11px;font-weight:600;color:#FF5900">Enter →</span>
+        </div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+  html+=`</div>`;
+  document.getElementById('main').innerHTML=html;
+}
+
+function delDept(id,name){
+  openM({type:'confirm',msg:`Delete department <b>${name}</b>? All data will be permanently removed.`,cb:async()=>{
+    await sb.from('departments').delete().eq('id',id);
+    closeM();await loadDepartments();renderSuperDash();
+  }});
+}
+
+// ── DEPT CREATE/EDIT MODAL RENDERING ──
+function renderDeptModal(m){
+  const box=document.getElementById('modal-box');
+  const isEdit=m.type==='editdept';
+  const dept=isEdit?m.dept:{};
+  const colors=['#411517','#FF5900','#1565C0','#166534','#7C3AED','#D97706','#0D9488','#DC2626'];
+  const colorPicker=colors.map(c=>`<div onclick="document.getElementById('dept-color').value='${c}';document.querySelectorAll('.color-swatch').forEach(s=>s.style.outline='none');this.style.outline='3px solid #FF5900'" class="color-swatch" style="width:28px;height:28px;border-radius:7px;background:${c};cursor:pointer;${(dept.color||'#411517')===c?'outline:3px solid #FF5900':''}"></div>`).join('');
+  box.innerHTML=`<div class="modal-title"><i class="ti ti-building-plus"></i>${isEdit?'Edit Department':'Create Department'}</div>
+  <div class="msg msg-err" id="dept-e"></div>
+  <div class="fg"><label>Department name</label><input id="dept-name" value="${dept.name||''}" placeholder="e.g. NFV Picker, Bahrain Operations"></div>
+  <div class="fg"><label>Admin email (optional)</label><input type="email" id="dept-admin-email" value="${dept.admin_email||''}" placeholder="admin@company.com"></div>
+  <div class="fg"><label>Color</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:5px">${colorPicker}</div><input type="hidden" id="dept-color" value="${dept.color||'#411517'}"></div>
+  <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveDept('${isEdit?dept.id:'null'}')"><i class="ti ti-check"></i>Save</button></div>`;
+  document.getElementById('modal').classList.add('open');
+}
+
+async function saveDept(id){
+  const e=document.getElementById('dept-e');e.style.display='none';
+  const name=(document.getElementById('dept-name').value||'').trim();
+  const adminEmail=(document.getElementById('dept-admin-email').value||'').trim().toLowerCase();
+  const color=document.getElementById('dept-color').value||'#411517';
+  if(!name){e.textContent='Department name required.';e.style.display='block';return;}
+  if(id!=='null'){
+    await sb.from('departments').update({name,admin_email:adminEmail||null,color,updated_at:new Date().toISOString()}).eq('id',id);
+  } else {
+    const{error}=await sb.from('departments').insert({name,admin_email:adminEmail||null,color,created_by:D.profile.id});
+    if(error){e.textContent=error.message;e.style.display='block';return;}
+  }
+  closeM();await loadDepartments();renderSuperDash();
+}
+
+async function saveArea(){const v=document.getElementById('an').value.trim();if(!v)return;const{error}=await sb.from('areas').insert({name:v,department_id:D.currentDept||null});if(error)return alert(error.message);closeM();await reload();}
+async function saveShift(id){const name=document.getElementById('shn').value.trim();if(!name)return;const shift_type=document.getElementById('sht').value;const start_time=document.getElementById('shst').value;const end_time=document.getElementById('shet').value;if(id!=='null')await sb.from('shifts').update({name,shift_type,start_time,end_time}).eq('id',id);else await sb.from('shifts').insert({name,shift_type,start_time,end_time,department_id:D.currentDept||null});closeM();await reload();}
 
 async function doCreateUser(){
   clearMsgs('cu-e','cu-ok');
@@ -2443,10 +2605,10 @@ async function doCreateUser(){
     if(error)throw error;
     const uid=data?.user?.id;
     if(uid){
-      await sb.from('profiles').upsert({id:uid,email,full_name:name,role,is_active:true},{onConflict:'id'});
+      await sb.from('profiles').upsert({id:uid,email,full_name:name,role,is_active:true,department_id:D.currentDept||null},{onConflict:'id'});
       if(role==='patroller'||role==='coordinator'){
         // Always create a patroller entry linked to this user
-        const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null}).select().single();
+        const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null,department_id:D.currentDept||null}).select().single();
         if(np)await sb.from('schedules').insert({patroller_id:np.id,week_start:wStart(),day_0:'',day_1:'',day_2:'',day_3:'',day_4:'',day_5:'',day_6:''});
       }
     }
