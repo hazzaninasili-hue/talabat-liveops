@@ -831,13 +831,38 @@ function summaryView(){
     </tr>`;
   };
 
+  // Role-based summary table
+  const getRoleNameS=p=>{const u=D.users.find(u=>u.id===p.user_id);if(u&&u.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr)return cr.name;}return getUtype(p)==='coordinator'?'Coordinator':'Patroller';};
+  const roleGroupsS={};pts.forEach(p=>{const rn=getRoleNameS(p);if(!roleGroupsS[rn])roleGroupsS[rn]=[];roleGroupsS[rn].push(p);});
+  const roleSummaryRows=Object.entries(roleGroupsS).map(([rname,rPats])=>{
+    const total=rPats.length;
+    const weekAtt=dates.reduce((t,d)=>{const ds=d.toISOString().split('T')[0];return t+rPats.filter(p=>(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds&&a.status==='Attended')).length;},0);
+    const weekAbs=dates.reduce((t,d)=>{const ds=d.toISOString().split('T')[0];return t+rPats.filter(p=>(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds&&a.status==='Absent')).length;},0);
+    const onVacW=rPats.filter(p=>dates.some(d=>{const ds=d.toISOString().split('T')[0];return D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds>=t.start_date&&ds<=t.end_date);})).length;
+    return`<tr style="border-bottom:1px solid #F4EDE3">
+      <td style="padding:10px 14px;font-weight:700;font-size:13px;color:#2A0D0F">${rname}</td>
+      <td style="padding:10px;text-align:center;font-size:13px;font-weight:700;color:#411517">${total}</td>
+      <td style="padding:10px;text-align:center"><span style="font-size:12px;font-weight:700;color:#166534">${weekAtt}</span></td>
+      <td style="padding:10px;text-align:center"><span style="font-size:12px;font-weight:700;color:#DC2626">${weekAbs}</span></td>
+      <td style="padding:10px;text-align:center"><span style="font-size:12px;font-weight:700;color:#7C3AED">${onVacW>0?onVacW:'-'}</span></td>
+    </tr>`;
+  }).join('');
+
   return`
-  <div class="stats">
-    <div class="stat blue"><div class="stat-label">Patrollers</div><div class="stat-value">${ptot}</div><div class="stat-sub">Active</div></div>
-    <div class="stat teal"><div class="stat-label">Coordinators</div><div class="stat-value">${ctot}</div><div class="stat-sub">Active</div></div>
-    <div class="stat green"><div class="stat-label">Attended this week</div><div class="stat-value">${weekAttended}</div><div class="stat-sub">Clock-ins</div></div>
-    <div class="stat red"><div class="stat-label">Absent this week</div><div class="stat-value">${weekAbsent}</div><div class="stat-sub">Person-days</div></div>
-    <div class="stat" style="background:#fff"><div class="stat-label" style="color:#7C3AED">On Vacation 🌴</div><div class="stat-value" style="color:#7C3AED">${weekVac}</div><div class="stat-sub">Patroller${weekVac!==1?'s':''} this week</div></div>
+  <div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;overflow:hidden;margin-bottom:16px;box-shadow:0 1px 4px rgba(65,21,23,.06)">
+    <div style="padding:10px 16px;background:#F4EDE3;border-bottom:1.5px solid #E8DDD4">
+      <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-chart-bar" style="margin-right:5px"></i>Weekly Summary by Role</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:#F8FAFC;border-bottom:1.5px solid #E8DDD4">
+        <th style="text-align:left;padding:8px 14px;font-size:10px;font-weight:700;color:#A08070;text-transform:uppercase;letter-spacing:.05em">Role Type</th>
+        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;text-align:center">Total</th>
+        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em;text-align:center">Attended</th>
+        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#DC2626;text-transform:uppercase;letter-spacing:.05em;text-align:center">Absent</th>
+        <th style="padding:8px 10px;font-size:10px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:.05em;text-align:center">On Vacation</th>
+      </tr></thead>
+      <tbody>${roleSummaryRows||'<tr><td colspan="5" style="padding:20px;text-align:center;color:#A08070">No users yet.</td></tr>'}</tbody>
+    </table>
   </div>
 
   ${patrollers.length?`
