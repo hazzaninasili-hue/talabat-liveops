@@ -349,7 +349,7 @@ async function afterLogin(user){
   D.user=user;showApp();
   document.getElementById('main').innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:14px;color:#94A3B8"><div style="width:34px;height:34px;border:3px solid #E2E8F0;border-top-color:#1A6FE8;border-radius:50%;animation:spin .7s linear infinite"></div><div>Loading...</div></div>';
   try{
-    let{data:prof}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);
+    let{data:prof}=await wt(sb.from('profiles').select('*,custom_roles(id,name,access_level,visible_tabs)').eq('id',user.id).single(),5000);
     if(!prof){
       const{data:byEmail}=await wt(sb.from('profiles').select('*').eq('email',user.email).maybeSingle(),5000);
       if(byEmail){
@@ -364,6 +364,8 @@ async function afterLogin(user){
     D.profile=prof||{id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};
   }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};}
   D.tab=(D.profile.role==='patroller'||D.profile.role==='coordinator')?'myschedule':'schedule';
+  // Load custom roles first so renderTabs can use them
+  try{const{data:cr}=await wt(sb.from('custom_roles').select('*').order('name'),4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
   await loadAll();
   render();
 }
@@ -438,7 +440,7 @@ async function afterLogin(user){
   D.user=user;showApp();
   document.getElementById('main').innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:14px;color:#94A3B8"><div style="width:34px;height:34px;border:3px solid #E2E8F0;border-top-color:#1A6FE8;border-radius:50%;animation:spin .7s linear infinite"></div><div>Loading...</div></div>';
   try{
-    let{data:prof}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);
+    let{data:prof}=await wt(sb.from('profiles').select('*,custom_roles(id,name,access_level,visible_tabs)').eq('id',user.id).single(),5000);
     if(!prof){
       // Try matching by email (handles case where profile predates auth account)
       const{data:byEmail}=await wt(sb.from('profiles').select('*').eq('email',user.email).maybeSingle(),5000);
@@ -455,6 +457,8 @@ async function afterLogin(user){
     D.profile=prof||{id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};
   }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};}
   D.tab=(D.profile.role==='patroller'||D.profile.role==='coordinator')?'myschedule':'schedule';
+  // Load custom roles first so renderTabs can use them
+  try{const{data:cr}=await wt(sb.from('custom_roles').select('*').order('name'),4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
   await loadAll();
   // Check & save location permission for this user
   if(D.profile.role==='patroller'||D.profile.role==='coordinator'){
@@ -501,8 +505,7 @@ async function loadAll(){
   try{const{data:hist}=await wt(sb.from('schedule_history').select('*,profiles(full_name)').order('changed_at',{ascending:false}).limit(300),5000);D.history=hist||[];}catch(e){}
   try{const{data:tor}=await wt(sb.from('time_off_requests').select('*').order('created_at',{ascending:false}),5000);D.timeoff=tor||[];}catch(e){}
   try{const{data:cr}=await wt(sb.from('custom_roles').select('*').order('name'),4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
-  // Reload profile with custom_role_id
-  try{const{data:freshProf}=await wt(sb.from('profiles').select('*').eq('id',D.profile.id).single(),4000);if(freshProf)D.profile={...D.profile,...freshProf};}catch(e){}
+
   if(D.profile?.role==='admin'||D.profile?.role==='lead'){
     try{const{data:users}=await wt(sb.from('profiles').select('*').order('full_name'),5000);D.users=users||[];}catch(e){}
   }
@@ -1314,7 +1317,9 @@ function mySchedView(){
 
 function renderTabs(){
   const role=D.profile.role;
-  const cr=D.profile.custom_role_id?(D.customRoles||[]).find(r=>r.id===D.profile.custom_role_id):null;
+  // Check custom role - try profile.custom_role_id first, then custom_roles relation
+  const crId=D.profile.custom_role_id||(D.profile.custom_roles?.id);
+  const cr=crId?(D.customRoles||[]).find(r=>r.id===crId)||D.profile.custom_roles||null:null;
   if(cr&&cr.visible_tabs){
     let visTabs=[];try{visTabs=JSON.parse(cr.visible_tabs);}catch(e){}
     const al=cr.access_level||'viewer';
@@ -2755,7 +2760,7 @@ async function saveDoc(id){
 // ── CUSTOM ROLES ──
 function openEditRole(id){
   const r=(D.customRoles||[]).find(x=>x.id===id);
-  if(!r)return;
+  if(!r){alert('Role not found. Please refresh the page.');return;}
   openM({type:'editrole',role:{id:r.id,name:r.name,description:r.description||'',access_level:r.access_level||'viewer',visible_tabs:r.visible_tabs||'[]'}});
 }
 
