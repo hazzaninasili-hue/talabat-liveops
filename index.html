@@ -257,7 +257,6 @@ table tr:hover td{background:rgba(26,111,232,.02)}
     <div class="topbar-right">
       <div class="user-chip" id="user-chip"></div>
       <button class="top-btn" onclick="openM({type:'changepw'})"><i class="ti ti-key"></i>Change password</button>
-      <span id="back-to-dash-btn"></span>
       <div style="position:relative">
         <button class="top-btn" id="notif-btn" onclick="toggleNotifications()" style="position:relative">
           <i class="ti ti-bell"></i>
@@ -304,8 +303,7 @@ function getCurrentSaturday(){
 const BASE_DATE=getCurrentSaturday();
 const LEAVE_TYPES=['Annual Leave','Sick Leave','Sick Leave 50%','Sick Leave Unpaid','Unpaid Leave','Death'];
 
-const SUPER_ADMIN='hazzani.nasili@talabat.com';
-const isSuperAdmin=()=>D.user?.email===SUPER_ADMIN;
+
 let D={user:null,profile:null,departments:[],currentDept:null,tab:'schedule',view:'week',woff:0,search:'',modal:null,ne:false,hweek:null,
   shifts:[],areas:[],zones:[],patrollers:[],schedules:[],users:[],
   notesAll:{id:null,content:''},notesPat:{id:null,content:''},notesCoo:{id:null,content:''},
@@ -318,251 +316,15 @@ function showOk(id,m){const e=document.getElementById(id);if(e){e.textContent=m;
 function clearMsgs(...ids){ids.forEach(id=>{const e=document.getElementById(id);if(e){e.textContent='';e.style.display='none';}});}
 function togglePw(id,btn){const el=document.getElementById(id);const s=el.type==='password';el.type=s?'text':'password';btn.innerHTML=s?'<i class="ti ti-eye-off"></i>':'<i class="ti ti-eye"></i>';}
 
-async function loadDepartments(){
-  try{
-    const{data,error}=await wt(sb.from('departments').select('*').order('name'),5000);
-    if(!error)D.departments=data||[];
-  }catch(e){D.departments=[];}
-}
-
-async function renderSuperDash(){
-  showApp();
-  document.getElementById('tabs').innerHTML='';
-  document.getElementById('wk-chip').innerHTML='All Departments <i class="ti ti-chevron-down" style="font-size:9px"></i>';
-  const u=D.profile;
-  document.getElementById('user-chip').innerHTML=`<div class="user-av" style="background:#FF5900;color:#fff">SA</div><div><div class="user-nm">${u.full_name}</div><div class="user-rl">Super Admin</div></div>`;
-  const depts=D.departments||[];
-  let html=`<div style="max-width:1400px;margin:0 auto;padding:24px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
-      <div>
-        <div style="font-size:22px;font-weight:700;color:#411517">🏢 Department Overview</div>
-        <div style="font-size:13px;color:#A08070;margin-top:3px">${depts.length} department${depts.length!==1?'s':''} · Super Admin</div>
-      </div>
-      <button onclick="openM({type:'createdept'})" style="padding:10px 20px;background:#FF5900;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer"><i class="ti ti-building-plus" style="margin-right:5px"></i>Create Department</button>
-    </div>`;
-  if(!depts.length){
-    html+=`<div style="text-align:center;padding:80px;background:#fff;border-radius:20px;border:2px dashed #E8DDD4">
-      <i class="ti ti-building" style="font-size:60px;color:#E8DDD4;display:block;margin-bottom:16px"></i>
-      <div style="font-size:18px;font-weight:700;color:#411517;margin-bottom:8px">No departments yet</div>
-      <button onclick="openM({type:'createdept'})" style="padding:10px 24px;background:#FF5900;color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Create First Department</button>
-    </div>`;
-  } else {
-    html+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">`;
-    depts.forEach(dept=>{
-      const color=dept.color||'#411517';
-      html+=`<div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:16px;padding:20px;cursor:pointer;transition:all .18s;box-shadow:0 1px 4px rgba(65,21,23,.06)" onmouseover="this.style.boxShadow='0 8px 24px rgba(65,21,23,.14)';this.style.borderColor='#FF5900'" onmouseout="this.style.boxShadow='0 1px 4px rgba(65,21,23,.06)';this.style.borderColor='#E8DDD4'" onclick="enterDepartment('${dept.id}')">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-          <div style="width:46px;height:46px;border-radius:12px;background:${color};display:flex;align-items:center;justify-content:center">
-            <i class="ti ti-building" style="font-size:22px;color:#fff"></i>
-          </div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:15px;font-weight:700;color:#2A0D0F">${dept.name}</div>
-            <div style="font-size:11px;color:#A08070;margin-top:2px">${dept.admin_email||'No admin set'}</div>
-          </div>
-          <div style="display:flex;gap:4px">
-            <button onclick="event.stopPropagation();openM({type:'editdept',dept:{...${JSON.stringify(dept)}}})" style="width:28px;height:28px;border-radius:7px;border:1.5px solid #E8DDD4;background:transparent;cursor:pointer;color:#A08070"><i class="ti ti-edit" style="font-size:12px"></i></button>
-            <button onclick="event.stopPropagation();delDept('${dept.id}','${dept.name.replace(/'/g,"\'")}');" style="width:28px;height:28px;border-radius:7px;border:1.5px solid #E8DDD4;background:transparent;cursor:pointer;color:#A08070"><i class="ti ti-trash" style="font-size:12px"></i></button>
-          </div>
-        </div>
-        <div style="margin-top:12px;padding-top:12px;border-top:1px solid #F4EDE3;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:11px;color:#A08070">Created ${new Date(dept.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</span>
-          <span style="font-size:12px;font-weight:600;color:#FF5900">Enter →</span>
-        </div>
-      </div>`;
-    });
-    html+=`</div>`;
-  }
-  html+=`</div>`;
-  document.getElementById('main').innerHTML=html;
-}
-
-async function enterDepartment(deptId){
-  D.currentDept=deptId;D.tab='schedule';D.woff=0;
-  const main=document.getElementById('main');
-  if(main)main.innerHTML='<div style="display:flex;justify-content:center;align-items:center;min-height:300px"><div style="width:34px;height:34px;border:3px solid #E2E8F0;border-top-color:#FF5900;border-radius:50%;animation:spin .7s linear infinite"></div></div>';
-  await loadAll();render();
-}
-
-function exitToDashboard(){
-  D.currentDept=null;
-  loadDepartments().then(()=>renderSuperDash());
-}
-
-function delDept(id,name){
-  openM({type:'confirm',msg:`Delete department <b>${name}</b>?`,cb:async()=>{
-    await sb.from('departments').delete().eq('id',id);
-    closeM();await loadDepartments();renderSuperDash();
-  }});
-}
-
-async function saveDept(id){
-  const e=document.getElementById('dept-e');if(e)e.style.display='none';
-  const name=(document.getElementById('dept-name').value||'').trim();
-  const adminEmail=(document.getElementById('dept-admin-email').value||'').trim();
-  const color=document.getElementById('dept-color').value||'#411517';
-  if(!name){if(e){e.textContent='Name required.';e.style.display='block';}return;}
-  if(id!=='null'){await sb.from('departments').update({name,admin_email:adminEmail||null,color}).eq('id',id);}
-  else{const{error}=await sb.from('departments').insert({name,admin_email:adminEmail||null,color,created_by:D.profile.id});if(error){if(e){e.textContent=error.message;e.style.display='block';}return;}}
-  closeM();await loadDepartments();renderSuperDash();
-}
-
-window.addEventListener('load',async()=>{
-  showS('login');
-  const{data:{session}}=await sb.auth.getSession();
-  if(session)afterLogin(session.user);
-});
-sb.auth.onAuthStateChange((ev,session)=>{
-  if(ev==='SIGNED_OUT')showS('login');
-  else if(ev==='SIGNED_IN'&&session)afterLogin(session.user);
-});
-
-async function doLogin(){
-  clearMsgs('login-err','login-ok');
-  const email=document.getElementById('login-email').value.trim().toLowerCase();
-
-  
-  if(!email){showErr('login-err','Please enter your work email.');return;}
-
-  
-  const btn=document.getElementById('login-btn');
-  btn.disabled=true;btn.textContent='Signing in...';
-  
-  try{
-    // Simple login with email + password
-    const{data,error}=await sb.auth.signInWithPassword({email,password:email+'_talabat_access'});
-    if(error)throw new Error(error.message);
-    if(!data?.user){throw new Error('Login failed');}
-    
-    await afterLogin(data.user);
-    
-  }catch(e){
-    btn.disabled=false;
-    btn.textContent='Sign in';
-    showErr('login-err','❌ '+e.message||'Login failed. Try again.');
-    console.error('Login error:',e);
-  }
-}
-
-
-
-async function syncUserProfile(email){
-  try{
-    console.log('Sync: Checking profile for email:', email);
-    
-    // Step 1: Check if profile exists
-    const{data:prof}=await sb.from('profiles').select('id').eq('email',email.toLowerCase()).maybeSingle();
-    console.log('Sync: Profile check result:', prof ? 'Found' : 'Not found');
-    
-    if(prof){
-      console.log('Sync: Profile already exists');
-      return true;
-    }
-    
-    // Step 2: Check if patroller exists with this email
-    console.log('Sync: Looking for patroller with email:', email);
-    const{data:pat}=await sb.from('patrollers').select('id,name,user_type,phone,email').eq('email',email.toLowerCase()).maybeSingle();
-    console.log('Sync: Patroller check result:', pat);
-    
-    if(!pat){
-      console.log('Sync: No patroller found with email:', email);
-      return false;
-    }
-    
-    // Step 3: Create profile from patroller data
-    console.log('Sync: Creating profile from patroller:', pat.name);
-    const role=pat.user_type||'patroller';
-    const{data:newProf,error:createErr}=await sb.from('profiles').insert({
-      email:email.toLowerCase(),
-      full_name:pat.name,
-      role,
-      is_active:true
-    }).select().single();
-    
-    if(createErr){
-      console.error('Sync: Error creating profile:', createErr);
-      return false;
-    }
-    
-    console.log('Sync: Profile created successfully:', newProf?.email);
-    return true;
-    
-  }catch(e){
-    console.error('Sync profile error:',e.message);
-    return false;
-  }
-}
-async function doReset(){
-  
-  const email='';
-  if(!email){showErr('reset-err','Enter your email.');return;}
-  document.getElementById('reset-btn').disabled=true;
-  const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:REDIRECT});
-  document.getElementById('reset-btn').disabled=false;
-  if(error)showErr('reset-err',error.message);else showOk('reset-ok','Reset email sent!');
-}
-async function doSetPw(){
-  clearMsgs('newpw-err','newpw-ok');
-  const p1=document.getElementById('newpw1').value;const p2=document.getElementById('newpw2').value;
-  if(p1.length<8){showErr('newpw-err','Min 8 characters.');return;}
-  if(p1!==p2){showErr('newpw-err','Passwords do not match.');return;}
-  const{error}=await sb.auth.updateUser({password:p1});
-  if(error)showErr('newpw-err',error.message);
-  else{showOk('newpw-ok','Password updated!');setTimeout(()=>{window.location.hash='';showS('login');},1500);}
-}
-async function doLogout(){await sb.auth.signOut();}
-
-async function afterLogin(user){
-  D.user=user;showApp();
-  document.getElementById('main').innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:14px;color:#94A3B8"><div style="width:34px;height:34px;border:3px solid #E2E8F0;border-top-color:#1A6FE8;border-radius:50%;animation:spin .7s linear infinite"></div><div>Loading...</div></div>';
-  try{
-    let{data:prof}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);
-    if(!prof){
-      // Try matching by email (handles case where profile predates auth account)
-      const{data:byEmail}=await wt(sb.from('profiles').select('*').eq('email',user.email).maybeSingle(),5000);
-      if(byEmail){
-        // Link auth id to existing profile
-        await sb.from('profiles').update({id:user.id}).eq('email',user.email);
-        prof={...byEmail,id:user.id};
-      } else {
-        await sb.from('profiles').upsert({id:user.id,email:user.email,full_name:user.user_metadata?.full_name||user.email.split('@')[0],role:user.user_metadata?.role||'patroller',is_active:true},{onConflict:'id'});
-        const{data:p2}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);
-        prof=p2;
-      }
-    }
-    D.profile=prof||{id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};
-  }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};}
-  D.tab=(D.profile.role==='patroller'||D.profile.role==='coordinator')?'myschedule':'schedule';
-  if(isSuperAdmin()){D.superView=true;await loadDepartments();await renderSuperDash();return;}
-  // Department admin auto-routing
-  if(D.profile.department_id&&!D.currentDept){D.currentDept=D.profile.department_id;await loadDepartments();}
-  await loadAll();
-  // Check & save location permission for this user
-  if(D.profile.role==='patroller'||D.profile.role==='coordinator'){
-    checkAndSaveLocationPermission();
-  }
-  // Auto-link patroller record if user_id is not set (fixes first-login issue)
-  if(D.profile.role==='patroller'||D.profile.role==='coordinator'){
-    const linked=D.patrollers.find(p=>p.user_id===D.profile.id);
-    if(!linked){
-      const byName=D.patrollers.find(p=>p.name.toLowerCase()===D.profile.full_name.toLowerCase()&&!p.user_id);
-      if(byName){
-        await sb.from('patrollers').update({user_id:D.profile.id,user_type:D.profile.role}).eq('id',byName.id);
-        await loadAll();
-      }
-    }
-  }
-  render();
-}
-
 function wt(p,ms=8000){return Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms))]);}
 
 async function loadAll(){
   try{
     const[sh,ar,zo,pt,sc]=await Promise.all([
-      wt(D.currentDept?sb.from('shifts').select('*').eq('department_id',D.currentDept).order('created_at'):sb.from('shifts').select('*').order('created_at')),
-      wt(D.currentDept?sb.from('areas').select('*').eq('department_id',D.currentDept).order('name'):sb.from('areas').select('*').order('name')),
+      wt(false?sb.from('shifts').select('*').eq('department_id',null).order('created_at'):sb.from('shifts').select('*').order('created_at')),
+      wt(false?sb.from('areas').select('*').eq('department_id',null).order('name'):sb.from('areas').select('*').order('name')),
       wt(sb.from('zones').select('*').order('name')),
-      wt(D.currentDept?sb.from('patrollers').select('*').eq('department_id',D.currentDept).eq('is_active',true).order('name'):sb.from('patrollers').select('*').eq('is_active',true).order('name')),
+      wt(false?sb.from('patrollers').select('*').eq('department_id',null).eq('is_active',true).order('name'):sb.from('patrollers').select('*').eq('is_active',true).order('name')),
       wt(sb.from('schedules').select('*')),
     ]);
     D.shifts=sh.data||[];D.areas=ar.data||[];D.zones=zo.data||[];D.patrollers=pt.data||[];D.schedules=sc.data||[];
@@ -580,7 +342,7 @@ async function loadAll(){
   try{const{data:docs}=await wt(sb.from('documents').select('*').order('created_at',{ascending:false}),5000);D.docs=docs||[];}catch(e){}
   try{const{data:hist}=await wt(sb.from('schedule_history').select('*,profiles(full_name)').order('changed_at',{ascending:false}).limit(300),5000);D.history=hist||[];}catch(e){}
   try{const{data:tor}=await wt(sb.from('time_off_requests').select('*').order('created_at',{ascending:false}),5000);D.timeoff=tor||[];}catch(e){}
-  try{const crq=D.currentDept?sb.from('custom_roles').select('*').eq('department_id',D.currentDept).order('name'):sb.from('custom_roles').select('*').order('name');const{data:cr}=await wt(crq,4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
+  try{const crq=false?sb.from('custom_roles').select('*').eq('department_id',null).order('name'):sb.from('custom_roles').select('*').order('name');const{data:cr}=await wt(crq,4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
   if(D.profile?.role==='admin'||D.profile?.role==='lead'){
     try{const{data:users}=await wt(sb.from('profiles').select('*').order('full_name'),5000);D.users=users||[];}catch(e){}
   }
@@ -609,7 +371,7 @@ const gsh=id=>D.shifts.find(s=>s.id===id)||{name:'?',start_time:'?',end_time:'?'
 const fmt=d=>`${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()}`;
 const wNum=d=>{const j=new Date(d.getFullYear(),0,1);return Math.ceil(((d-j)/86400000+j.getDay()+1)/7);};
 const fmtT=t=>{if(!t||t==='?')return'?';const[h,m]=t.split(':');const hr=parseInt(h);return`${hr===0?12:hr>12?hr-12:hr}:${m} ${hr<12||hr===24?'AM':'PM'}`;};
-const isAdmin=()=>D.profile&&(D.profile.role==='admin'||(isSuperAdmin()&&!!D.currentDept));
+const isAdmin=()=>D.profile&&D.profile.role==='admin';
 const canEdit=()=>D.profile&&(D.profile.role==='admin'||D.profile.role==='lead');
 const roleBg=r=>r==='admin'?'#EDE9FE':r==='lead'?'#EAF1FD':r==='coordinator'?'#CCFBF1':'#F1F5F9';
 const roleCol=r=>r==='admin'?'#4C1D95':r==='lead'?'#0C4FB3':r==='coordinator'?'#134E4A':'#475569';
@@ -1455,20 +1217,7 @@ function mySchedView(){
 }
 
 function renderTabs(){
-  // Super admin inside a department gets full admin tabs
-  if(isSuperAdmin()&&D.currentDept){
-    const tabs=[
-      {id:'schedule',icon:'ti-calendar',label:'Schedule'},
-      {id:'summary',icon:'ti-chart-bar',label:'Summary'},
-      {id:'attendance',icon:'ti-clock-check',label:'Attendance'},
-      {id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'},
-      {id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'},
-      {id:'documents',icon:'ti-files',label:'Documents'},
-      {id:'access',icon:'ti-lock',label:'Access control'},
-    ];
-    document.getElementById('tabs').innerHTML=tabs.map(t=>`<button class="tab${D.tab===t.id?' active':''}" onclick="setTab('${t.id}')"><i class="ti ${t.icon}"></i>${t.label}</button>`).join('');
-    return;
-  }
+
   const role=D.profile.role;
   // Check if user has a custom role with defined tabs
   const customRole=D.profile.custom_role_id?(D.customRoles||[]).find(r=>r.id===D.profile.custom_role_id):null;
@@ -1518,13 +1267,7 @@ function render(){
     }
   }
   const dates=wDates();const wn=wNum(dates[0]);
-  const backBtn=document.getElementById('back-to-dash-btn');
-  if(backBtn){
-    if(isSuperAdmin()&&D.currentDept){
-      const dept=D.departments.find(d=>d.id===D.currentDept);
-      backBtn.innerHTML=`<button class="top-btn" onclick="exitToDashboard()" style="border-color:rgba(255,149,0,.5);color:#FF9500;margin-right:4px"><i class="ti ti-layout-grid"></i>${dept?dept.name:'Departments'}</button>`;
-    } else backBtn.innerHTML='';
-  }
+
   document.getElementById('wk-chip').textContent=`Week ${wn} - ${dates[0].getFullYear()}`;
   const u=D.profile;
   document.getElementById('user-chip').innerHTML=`<div class="user-av" style="background:${roleBg(u.role)};color:${roleCol(u.role)}">${ini(u.full_name)}</div><div><div class="user-nm">${u.full_name}</div><div class="user-rl">${roleLabel(u.role)}</div></div>`;
@@ -1623,17 +1366,6 @@ function renderModal(){
   const ov=document.getElementById('modal'),box=document.getElementById('modal-box');
   const m=D.modal;if(!m){ov.classList.remove('open');return;}
   ov.classList.add('open');
-  if(m.type==='createdept'||m.type==='editdept'){
-    const d=m.type==='editdept'?m.dept:{};
-    const colors=['#411517','#FF5900','#1565C0','#166534','#7C3AED','#D97706','#0D9488','#DC2626'];
-    box.innerHTML=`<div class="modal-title"><i class="ti ti-building"></i>${m.type==='editdept'?'Edit':'Create'} Department</div>
-    <div class="msg msg-err" id="dept-e"></div>
-    <div class="fg"><label>Department name</label><input id="dept-name" value="${d.name||''}" placeholder="e.g. NFV Picker"></div>
-    <div class="fg"><label>Admin email (optional)</label><input type="email" id="dept-admin-email" value="${d.admin_email||''}" placeholder="admin@company.com"></div>
-    <div class="fg"><label>Color</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:5px">${colors.map(c=>`<div onclick="document.getElementById('dept-color').value='${c}';document.querySelectorAll('.dept-color-sw').forEach(s=>s.style.outline='none');this.style.outline='3px solid #FF5900'" class="dept-color-sw" style="width:28px;height:28px;border-radius:7px;background:${c};cursor:pointer;${(d.color||'#411517')===c?'outline:3px solid #FF5900':''}"></div>`).join('')}</div><input type="hidden" id="dept-color" value="${d.color||'#411517'}"></div>
-    <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveDept('${m.type==='editdept'?d.id:'null'}')"><i class="ti ti-check"></i>Save</button></div>`;
-    return;
-  }
 
   if(m.type==='confirm'){box.innerHTML=`<div class="modal-title"><i class="ti ti-alert-triangle" style="color:var(--red)"></i>Confirm</div><p style="font-size:13px;color:var(--g4);margin-bottom:4px">${m.msg}</p><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-danger" id="cok"><i class="ti ti-trash"></i>Remove</button></div>`;document.getElementById('cok').onclick=async()=>{await m.cb();};return;}
   if(m.type==='changepw'){box.innerHTML=`<div class="modal-title"><i class="ti ti-key"></i>Change password</div><div class="msg msg-err" id="cpw-e"></div><div class="msg msg-ok" id="cpw-ok"></div><div class="fg"><label>New password</label><div class="pw-wrap"><input type="password" id="cpw1" placeholder="Min 8 chars"><button class="pw-eye" onclick="togglePw('cpw1',this)"><i class="ti ti-eye"></i></button></div></div><div class="fg"><label>Confirm</label><div class="pw-wrap"><input type="password" id="cpw2" placeholder="Repeat"><button class="pw-eye" onclick="togglePw('cpw2',this)"><i class="ti ti-eye"></i></button></div></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="doCPW()"><i class="ti ti-check"></i>Update</button></div>`;return;}
@@ -1881,7 +1613,7 @@ async function saveEditUser(uid){
   if(pat){await sb.from('patrollers').update({name,phone:phone||null,user_type:role}).eq('id',pat.id);}
   // If no patroller entry yet and role is patroller/coordinator, create one
   else if(role==='patroller'||role==='coordinator'){
-    const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null,department_id:D.currentDept||null}).select().single();
+    const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null,department_id:null}).select().single();
     if(np)await sb.from('schedules').insert({patroller_id:np.id,week_start:wStart(),day_0:'',day_1:'',day_2:'',day_3:'',day_4:'',day_5:'',day_6:''});
   }
   // If admin/lead, hide from schedule
@@ -2839,7 +2571,7 @@ async function saveRole(id){
   if(!name){e.textContent='Role name required.';e.style.display='block';return;}
   const tabs=Array.from(document.querySelectorAll('input[name="role-tab"]:checked')).map(x=>x.value);
   if(!tabs.length){e.textContent='Select at least one tab.';e.style.display='block';return;}
-  const payload={name,access_level:access,description:desc||null,visible_tabs:JSON.stringify(tabs),department_id:D.currentDept||null};
+  const payload={name,access_level:access,description:desc||null,visible_tabs:JSON.stringify(tabs),department_id:null};
   if(id!=='null'){
     const{error}=await sb.from('custom_roles').update({...payload,updated_at:new Date().toISOString()}).eq('id',id);
     if(error){e.textContent=error.message;e.style.display='block';return;}
@@ -3009,8 +2741,8 @@ function downloadReport(type){
   addNotification(`Report downloaded: ${filename}`,'success');
 }
 
-async function saveArea(){const v=document.getElementById('an').value.trim();if(!v)return;const{error}=await sb.from('areas').insert({name:v,department_id:D.currentDept||null});if(error)return alert(error.message);closeM();await reload();}
-async function saveShift(id){const name=document.getElementById('shn').value.trim();if(!name)return;const shift_type=document.getElementById('sht').value;const start_time=document.getElementById('shst').value;const end_time=document.getElementById('shet').value;if(id!=='null')await sb.from('shifts').update({name,shift_type,start_time,end_time}).eq('id',id);else await sb.from('shifts').insert({name,shift_type,start_time,end_time,department_id:D.currentDept||null});closeM();await reload();}
+async function saveArea(){const v=document.getElementById('an').value.trim();if(!v)return;const{error}=await sb.from('areas').insert({name:v,department_id:null});if(error)return alert(error.message);closeM();await reload();}
+async function saveShift(id){const name=document.getElementById('shn').value.trim();if(!name)return;const shift_type=document.getElementById('sht').value;const start_time=document.getElementById('shst').value;const end_time=document.getElementById('shet').value;if(id!=='null')await sb.from('shifts').update({name,shift_type,start_time,end_time}).eq('id',id);else await sb.from('shifts').insert({name,shift_type,start_time,end_time,department_id:null});closeM();await reload();}
 
 async function doCreateUser(){
   clearMsgs('cu-e','cu-ok');
@@ -3034,10 +2766,10 @@ async function doCreateUser(){
     if(error)throw error;
     const uid=data?.user?.id;
     if(uid){
-      await sb.from('profiles').upsert({id:uid,email,full_name:name,role,is_active:true,department_id:D.currentDept||null,custom_role_id:customRoleId||null},{onConflict:'id'});
+      await sb.from('profiles').upsert({id:uid,email,full_name:name,role,is_active:true,department_id:null,custom_role_id:customRoleId||null},{onConflict:'id'});
       if(role==='patroller'||role==='coordinator'){
         // Always create a patroller entry linked to this user
-        const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null,department_id:D.currentDept||null}).select().single();
+        const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null,department_id:null}).select().single();
         if(np)await sb.from('schedules').insert({patroller_id:np.id,week_start:wStart(),day_0:'',day_1:'',day_2:'',day_3:'',day_4:'',day_5:'',day_6:''});
       }
     }
