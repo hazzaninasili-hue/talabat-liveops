@@ -1065,7 +1065,7 @@ function operationsView(){
     const alBg={viewer:'#EAF1FD',editor:'#FFF0E6',admin:'#DCFCE7'};
     const alCol={viewer:'#0C4FB3',editor:'#FF5900',admin:'#166534'};
     const alLabel={viewer:'👁 Viewer',editor:'✏️ Editor',admin:'🔐 Admin'};
-    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
+    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents'];
     if(!roles.length)return header+`<div style="text-align:center;padding:60px 20px;background:#fff;border-radius:16px;border:2px dashed #E8DDD4"><i class="ti ti-shield" style="font-size:50px;color:#E8DDD4;display:block;margin-bottom:14px"></i><div style="font-size:16px;font-weight:700;color:#411517;margin-bottom:6px">No roles yet</div><div style="font-size:12px;color:#A08070;margin-bottom:20px">Create roles to control what each user can see and do.</div>${ed?`<button class="btn btn-primary" onclick="openM({type:'addrole'})"><i class="ti ti-plus"></i>Create first role</button>`:''}</div>`;
     const roleCards=roles.map(r=>{
       const al=r.access_level||'viewer';
@@ -1336,7 +1336,7 @@ function renderTabs(){
     if(visTabs.includes('Summary'))tabs.push({id:'summary',icon:'ti-chart-bar',label:'Summary'});
     if(visTabs.includes('Attendance')){tabs.push({id:'myattendance',icon:'ti-clock-check',label:'Attendance'});if(canEditData)tabs.push({id:'attendance',icon:'ti-users',label:'Team Attendance'});}
     if(visTabs.includes('Time off & Tasks'))tabs.push({id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'});
-    tabs.push({id:'myleavebalance',icon:'ti-calendar-stats',label:'Leave Balance'});
+    if(visTabs.includes('Leave Balance'))tabs.push({id:'myleavebalance',icon:'ti-calendar-stats',label:'Leave Balance'});
     if(visTabs.includes('Documents'))tabs.push({id:'documents',icon:'ti-files',label:'Documents'});
     if(isFullAdmin){tabs.push({id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'});tabs.push({id:'access',icon:'ti-lock',label:'Access control'});}
     document.getElementById('tabs').innerHTML=tabs.map(t=>`<button class="tab${D.tab===t.id?' active':''}" onclick="setTab('${t.id}')"><i class="ti ${t.icon}"></i>${t.label}</button>`).join('');
@@ -1681,7 +1681,7 @@ function renderModal(){
     const isEdit=m.type==='editrole';const r=isEdit?m.role:{};
     let savedTabs=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
     if(isEdit&&r.visible_tabs){try{savedTabs=JSON.parse(r.visible_tabs);}catch(e){}}
-    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
+    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents'];
     const tabChecks=ALL_TABS.map(t=>{const checked=savedTabs.includes(t);
       return`<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid ${checked?'#FF5900':'#E8DDD4'};border-radius:8px;cursor:pointer;background:#fff" onclick="const cb=this.querySelector('input');setTimeout(()=>{this.style.borderColor=cb.checked?'#FF5900':'#E8DDD4';},0)">
         <input type="checkbox" name="role-tab" value="${t}" ${checked?'checked':''} style="accent-color:#FF5900;width:14px;height:14px">
@@ -2931,7 +2931,12 @@ function calcAnnualAccrued(){
 function getLeaveBalance(patrollerId){
   const lb = D.leaveBalances.find(b => b.patroller_id === patrollerId);
   const pat = D.patrollers.find(p=>p.id===patrollerId);
-  const rosterEntry = pat ? getRosterByPatroller(pat) : null;
+  // For patroller's own view, use their profile email directly
+  const isOwnProfile = pat && D.profile && pat.user_id === D.profile.id;
+  const ownEmail = isOwnProfile ? D.profile.email : null;
+  const rosterEntry = ownEmail
+    ? getRosterByEmail(ownEmail)
+    : (pat ? getRosterByPatroller(pat) : null);
   const year = getLeaveYear();
   const accrued = calcAnnualAccrued();
 
