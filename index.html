@@ -501,6 +501,8 @@ async function loadAll(){
   try{const{data:hist}=await wt(sb.from('schedule_history').select('*,profiles(full_name)').order('changed_at',{ascending:false}).limit(300),5000);D.history=hist||[];}catch(e){}
   try{const{data:tor}=await wt(sb.from('time_off_requests').select('*').order('created_at',{ascending:false}),5000);D.timeoff=tor||[];}catch(e){}
   try{const{data:cr}=await wt(sb.from('custom_roles').select('*').order('name'),4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
+  // Reload profile with custom_role_id
+  try{const{data:freshProf}=await wt(sb.from('profiles').select('*').eq('id',D.profile.id).single(),4000);if(freshProf)D.profile={...D.profile,...freshProf};}catch(e){}
   if(D.profile?.role==='admin'||D.profile?.role==='lead'){
     try{const{data:users}=await wt(sb.from('profiles').select('*').order('full_name'),5000);D.users=users||[];}catch(e){}
   }
@@ -1063,7 +1065,7 @@ function operationsView(){
         <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
           <div style="width:44px;height:44px;border-radius:12px;background:${alBg[al]};display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-shield-check" style="font-size:20px;color:${alCol[al]}"></i></div>
           <div style="flex:1"><div style="font-size:14px;font-weight:700;color:#2A0D0F">${r.name}</div>${r.description?`<div style="font-size:11px;color:#A08070;margin-top:2px">${r.description}</div>`:''}<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;background:${alBg[al]};color:${alCol[al]};margin-top:5px;display:inline-block">${alLabel[al]}</span></div>
-          ${ed?`<div style="display:flex;gap:4px"><button class="edit-btn" style="width:30px;height:30px" onclick="openM({type:'editrole',role:{id:'${r.id}',name:'${r.name.replace(/'/g,"\'")}',description:'${(r.description||'').replace(/'/g,"\'")}',access_level:'${al}',visible_tabs:'${r.visible_tabs||'[]'}'}})" ><i class="ti ti-edit"></i></button><button class="icon-btn" onclick="delCustomRole('${r.id}','${r.name.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button></div>`:''}
+          ${ed?`<div style="display:flex;gap:4px"><button class="edit-btn" style="width:30px;height:30px" onclick="openEditRole('${r.id}')" ><i class="ti ti-edit"></i></button><button class="icon-btn" onclick="delCustomRole('${r.id}','${r.name.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button></div>`:''}
         </div>
         <div style="border-top:1px solid #F4EDE3;padding-top:10px"><div style="font-size:9px;font-weight:700;color:#A08070;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Visible tabs</div>
         <div style="display:flex;gap:5px;flex-wrap:wrap">${ALL_TABS.map(t=>{const v=tabs.includes(t);return`<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:6px;background:${v?'#DCFCE7':'#FEE2E2'};color:${v?'#166534':'#991B1B'}">${v?'✓':'✗'} ${t}</span>`;}).join('')}</div></div>
@@ -1312,6 +1314,22 @@ function mySchedView(){
 
 function renderTabs(){
   const role=D.profile.role;
+  const cr=D.profile.custom_role_id?(D.customRoles||[]).find(r=>r.id===D.profile.custom_role_id):null;
+  if(cr&&cr.visible_tabs){
+    let visTabs=[];try{visTabs=JSON.parse(cr.visible_tabs);}catch(e){}
+    const al=cr.access_level||'viewer';
+    const canEditData=al==='editor'||al==='admin';
+    const isFullAdmin=al==='admin';
+    let tabs=[{id:'myschedule',icon:'ti-user',label:'My schedule'}];
+    if(visTabs.includes('Schedule')&&canEditData)tabs.push({id:'schedule',icon:'ti-calendar',label:'Schedule'});
+    if(visTabs.includes('Summary'))tabs.push({id:'summary',icon:'ti-chart-bar',label:'Summary'});
+    if(visTabs.includes('Attendance')){tabs.push({id:'myattendance',icon:'ti-clock-check',label:'Attendance'});if(canEditData)tabs.push({id:'attendance',icon:'ti-users',label:'Team Attendance'});}
+    if(visTabs.includes('Time off & Tasks'))tabs.push({id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'});
+    if(visTabs.includes('Documents'))tabs.push({id:'documents',icon:'ti-files',label:'Documents'});
+    if(isFullAdmin){tabs.push({id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'});tabs.push({id:'access',icon:'ti-lock',label:'Access control'});}
+    document.getElementById('tabs').innerHTML=tabs.map(t=>`<button class="tab${D.tab===t.id?' active':''}" onclick="setTab('${t.id}')"><i class="ti ${t.icon}"></i>${t.label}</button>`).join('');
+    return;
+  }
   const tabs=(role==='patroller'||role==='coordinator')?[
     {id:'myschedule',icon:'ti-user',label:'My schedule'},
     {id:'myattendance',icon:'ti-clock-check',label:'Attendance'},
@@ -1385,10 +1403,14 @@ async function chRole(uid,roleRaw){
   const cr=customRoleId?(D.customRoles||[]).find(r=>r.id===customRoleId):null;
   const sysRole=cr?(cr.access_level==='admin'?'admin':cr.access_level==='editor'?'lead':'patroller'):'patroller';
   await sb.from('profiles').update({role:sysRole,custom_role_id:customRoleId||null}).eq('id',uid);
-  if(sysRole==='patroller'||sysRole==='coordinator'){
-    await sb.from('patrollers').update({user_type:sysRole,is_active:true}).eq('user_id',uid);
-  } else {
-    await sb.from('patrollers').update({is_active:false}).eq('user_id',uid);
+  // Only update existing patroller record - never create a new one here
+  const{data:existPat}=await sb.from('patrollers').select('id').eq('user_id',uid).maybeSingle();
+  if(existPat){
+    if(sysRole==='patroller'||sysRole==='coordinator'){
+      await sb.from('patrollers').update({user_type:sysRole,is_active:true}).eq('user_id',uid);
+    } else {
+      await sb.from('patrollers').update({is_active:false}).eq('user_id',uid);
+    }
   }
   await reload();
 }
@@ -2639,9 +2661,15 @@ async function doCreateUser(){
     if(uid){
       await sb.from('profiles').upsert({id:uid,email,full_name:name,role,is_active:true,custom_role_id:customRoleId||null},{onConflict:'id'});
       if(role==='patroller'||role==='coordinator'){
-        // Always create a patroller entry linked to this user
-        const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null}).select().single();
-        if(np)await sb.from('schedules').insert({patroller_id:np.id,week_start:wStart(),day_0:'',day_1:'',day_2:'',day_3:'',day_4:'',day_5:'',day_6:''});
+        // Check if patroller entry already exists for this user
+        const{data:existingPat}=await sb.from('patrollers').select('id').eq('user_id',uid).maybeSingle();
+        if(!existingPat){
+          const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null}).select().single();
+          if(np)await sb.from('schedules').insert({patroller_id:np.id,week_start:wStart(),day_0:'',day_1:'',day_2:'',day_3:'',day_4:'',day_5:'',day_6:''});
+        } else {
+          // Update existing patroller
+          await sb.from('patrollers').update({name,user_type:role,is_active:true}).eq('user_id',uid);
+        }
       }
     }
     showOk('cu-ok',`User "${name}" created! They can log in with their email.`);
@@ -2725,6 +2753,12 @@ async function saveDoc(id){
 
 
 // ── CUSTOM ROLES ──
+function openEditRole(id){
+  const r=(D.customRoles||[]).find(x=>x.id===id);
+  if(!r)return;
+  openM({type:'editrole',role:{id:r.id,name:r.name,description:r.description||'',access_level:r.access_level||'viewer',visible_tabs:r.visible_tabs||'[]'}});
+}
+
 async function saveRole(id){
   const e=document.getElementById('role-e');e.style.display='none';
   const name=(document.getElementById('role-name').value||'').trim();
