@@ -316,6 +316,38 @@ function showOk(id,m){const e=document.getElementById(id);if(e){e.textContent=m;
 function clearMsgs(...ids){ids.forEach(id=>{const e=document.getElementById(id);if(e){e.textContent='';e.style.display='none';}});}
 function togglePw(id,btn){const el=document.getElementById(id);const s=el.type==='password';el.type=s?'text':'password';btn.innerHTML=s?'<i class="ti ti-eye-off"></i>':'<i class="ti ti-eye"></i>';}
 
+
+async function doLogin(){
+  clearMsgs('login-err','login-ok');
+  const email=document.getElementById('login-email').value.trim().toLowerCase();
+  if(!email){showErr('login-err','Please enter your work email.');return;}
+  const btn=document.getElementById('login-btn');
+  btn.disabled=true;btn.textContent='Signing in...';
+  try{
+    const{data,error}=await sb.auth.signInWithPassword({email,password:email+'_talabat_access'});
+    if(!error&&data?.user){
+      const{data:prof}=await wt(sb.from('profiles').select('is_active').eq('email',email).maybeSingle(),5000);
+      if(prof&&prof.is_active===false){await sb.auth.signOut();btn.disabled=false;btn.textContent='Sign in';showErr('login-err','Your account is inactive. Contact your admin.');return;}
+      return;
+    }
+    const{data:prof}=await wt(sb.from('profiles').select('id,email,full_name,role,is_active').eq('email',email).maybeSingle(),5000);
+    if(!prof){btn.disabled=false;btn.textContent='Sign in';showErr('login-err','Email not found. Ask your admin to add you.');return;}
+    if(prof.is_active===false){btn.disabled=false;btn.textContent='Sign in';showErr('login-err','Your account is inactive. Contact your admin.');return;}
+    const{data:d2,error:e2}=await sb.auth.signUp({email,password:email+'_talabat_access',options:{emailRedirectTo:REDIRECT}});
+    if(e2){btn.disabled=false;btn.textContent='Sign in';showErr('login-err',e2.message||'Failed.');return;}
+    const{data:d3,error:e3}=await sb.auth.signInWithPassword({email,password:email+'_talabat_access'});
+    if(!e3&&d3?.user)return;
+    btn.disabled=false;btn.textContent='Sign in';
+    showErr('login-err','Account created! Please try signing in again.');
+  }catch(e){btn.disabled=false;btn.textContent='Sign in';showErr('login-err',e.message||'Login failed.');}
+}
+
+async function doLogout(){
+  await sb.auth.signOut();
+  D.user=null;D.profile=null;
+  showS('login');
+}
+
 function wt(p,ms=8000){return Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms))]);}
 
 async function loadAll(){
