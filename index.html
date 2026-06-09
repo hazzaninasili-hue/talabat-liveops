@@ -243,15 +243,6 @@ const sb=supabase.createClient(SURL,SKEY,{auth:{autoRefreshToken:true,persistSes
 
 const DAYS=['Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday','Friday'];
 const SD=['Sat','Sun','Mon','Tue','Wed','Thu','Fri'];
-function getCurrentSaturday(){
-  var now=new Date();
-  var day=now.getDay();
-  var diff=day===6?0:-(day+1);
-  var sat=new Date(now);
-  sat.setDate(sat.getDate()+diff);
-  sat.setHours(0,0,0,0);
-  return sat;
-}
 const BASE_DATE=getCurrentSaturday();
 const LEAVE_TYPES=['Annual Leave','Sick Leave','Sick Leave 50%','Sick Leave Unpaid','Unpaid Leave','Death'];
 
@@ -596,6 +587,33 @@ const roleBg=r=>r==='admin'?'#EDE9FE':r==='lead'?'#EAF1FD':r==='coordinator'?'#C
 const roleCol=r=>r==='admin'?'#4C1D95':r==='lead'?'#0C4FB3':r==='coordinator'?'#134E4A':'#475569';
 const roleLabel=r=>r==='admin'?'Admin':r==='lead'?'Team Lead':r==='coordinator'?'Coordinator':'Patroller';
 const roleCls=r=>r==='admin'?'rb-admin':r==='lead'?'rb-lead':r==='coordinator'?'rb-coord':'rb-pat';
+function todayStr(){
+  const today=new Date();
+  const y=today.getFullYear();
+  const m=String(today.getMonth()+1).padStart(2,'0');
+  const d=String(today.getDate()).padStart(2,'0');
+  return`${y}-${m}-${d}`;
+}
+function todayDayIdx(){const jsDay=new Date().getDay();return{6:0,0:1,1:2,2:3,3:4,4:5,5:6}[jsDay];}
+function isOnVacationToday(pid){const today=todayStr();return D.timeoff.find(t=>t.patroller_id===pid&&t.status==='Approved'&&today>=t.start_date&&today<=t.end_date);}
+function fmtDateTime(ts){if(!ts)return'--';const d=new Date(ts);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
+function mapsLink(lat,lng){return`https://www.google.com/maps?q=${lat},${lng}`;}
+function getWeekStartForDate(dateStr){
+  const d=new Date(dateStr);const jsDay=d.getDay();
+  const diff=jsDay===6?0:-(jsDay+1);
+  const sat=new Date(d);sat.setDate(sat.getDate()+diff);sat.setHours(0,0,0,0);
+  return sat.toISOString().split('T')[0];
+}
+function getCurrentSaturday(){
+  var now=new Date();
+  var day=now.getDay();
+  var diff=day===6?0:-(day+1);
+  var sat=new Date(now);
+  sat.setDate(sat.getDate()+diff);
+  sat.setHours(0,0,0,0);
+  return sat;
+}
+
 function wDates(){const b=getCurrentSaturday();return DAYS.map((_,i)=>{const d=new Date(b);d.setDate(d.getDate()+D.woff*7+i);return d;});}
 function wStart(){const b=getCurrentSaturday();const d=new Date(b);d.setDate(d.getDate()+D.woff*7);return d.toISOString().split('T')[0];}
 function gDZ(pid,di){const ws=wStart();const sc=D.schedules.find(s=>s.patroller_id===pid&&s.week_start===ws);return sc?sc['day_'+di]||'':'';}
@@ -2015,18 +2033,7 @@ async function removeDevice(deviceId){
 }
 
 // ── ATTENDANCE HELPERS ──
-function todayStr(){
-  const today=new Date();
-  const y=today.getFullYear();
-  const m=String(today.getMonth()+1).padStart(2,'0');
-  const d=String(today.getDate()).padStart(2,'0');
-  return`${y}-${m}-${d}`;
-}
-function todayDayIdx(){const jsDay=new Date().getDay();return{6:0,0:1,1:2,2:3,3:4,4:5,5:6}[jsDay];}
 function getMyAttRecord(){const today=todayStr();return(D.attendance||[]).find(a=>a.patroller_id===(D.patrollers.find(p=>p.user_id===D.profile.id)?.id)&&a.date===today);}
-function isOnVacationToday(pid){const today=todayStr();return D.timeoff.find(t=>t.patroller_id===pid&&t.status==='Approved'&&today>=t.start_date&&today<=t.end_date);}
-function fmtDateTime(ts){if(!ts)return'--';const d=new Date(ts);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
-function mapsLink(lat,lng){return`https://www.google.com/maps?q=${lat},${lng}`;}
 
 // ── GET LOCATION ──
 async function checkAndSaveLocationPermission(){
@@ -2349,12 +2356,6 @@ function attendanceView(){
   ${offPats.length>0?`<div style="margin-top:12px"><div style="font-size:11px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Off Today</div><div style="display:flex;gap:8px;flex-wrap:wrap">${offPats.map(p=>`<span style="background:var(--g1);color:var(--g4);padding:4px 12px;border-radius:20px;font-size:12px">${p.name}</span>`).join('')}</div></div>`:''}`;
 }
 
-function getWeekStartForDate(dateStr){
-  const d=new Date(dateStr);const jsDay=d.getDay();
-  const diff=jsDay===6?0:-(jsDay+1);
-  const sat=new Date(d);sat.setDate(sat.getDate()+diff);sat.setHours(0,0,0,0);
-  return sat.toISOString().split('T')[0];
-}
 
 function dlAttendance(){
   const rows=[['Name','Date','Status','Clock In','Clock Out','Duration','Clock In Location','Clock Out Location']];
