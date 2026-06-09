@@ -260,7 +260,7 @@ let D={user:null,profile:null,tab:'schedule',view:'week',woff:0,search:'',modal:
   shifts:[],areas:[],zones:[],patrollers:[],schedules:[],users:[],
   notesAll:{id:null,content:''},notesPat:{id:null,content:''},notesCoo:{id:null,content:''},
   docs:[],history:[],timeoff:[],attendance:[],attDate:null,opsSub:'areas',locPerms:{},tasks:[],hourlyDay:null,
-  departments:[],currentDept:null,superView:false};
+  departments:[],currentDept:null,superView:false,customRoles:[]};
 
 const isSuperAdmin=()=>D.user?.email===SUPER_ADMIN;
 
@@ -515,6 +515,7 @@ async function loadAll(){
     }catch(e){}
   }
   try{const{data:tk}=await wt(sb.from('task_requests').select('*').order('created_at',{ascending:false}),5000);D.tasks=tk||[];}catch(e){D.tasks=[];}
+  try{const deptF=D.currentDept;const rq=deptF?sb.from('custom_roles').select('*').eq('department_id',deptF).order('name'):sb.from('custom_roles').select('*').order('name');const{data:cr}=await wt(rq,5000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
   try{
     const{data:lp}=await wt(sb.from('location_permissions').select('*'),5000);
     D.locPerms={};(lp||[]).forEach(r=>{D.locPerms[r.patroller_id]=r;});
@@ -999,12 +1000,13 @@ function rosterView(){
 }
 function operationsView(){
   const ed=canEdit();const sub=D.opsSub||'areas';
-  const subBtns=['areas','shifts'].map(s=>`<button onclick="D.opsSub='${s}';render()" style="padding:7px 18px;border-radius:8px;border:none;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:all .13s;${sub===s?'background:#411517;color:#F4EDE3;box-shadow:0 2px 8px rgba(65,21,23,.2)':'background:transparent;color:var(--g4)'}">${s==='areas'?'<i class="ti ti-map-pin" style="font-size:13px;margin-right:5px"></i>Areas':'<i class="ti ti-clock" style="font-size:13px;margin-right:5px"></i>Shifts'}</button>`).join('');
+  const subBtns=['areas','shifts','roles'].map(s=>`<button onclick="D.opsSub='${s}';render()" style="padding:7px 18px;border-radius:8px;border:none;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:all .13s;${sub===s?'background:#411517;color:#F4EDE3;box-shadow:0 2px 8px rgba(65,21,23,.2)':'background:transparent;color:var(--g4)'}">${s==='areas'?'<i class="ti ti-map-pin" style="font-size:13px;margin-right:5px"></i>Areas':s==='shifts'?'<i class="ti ti-clock" style="font-size:13px;margin-right:5px"></i>Shifts':'<i class="ti ti-shield" style="font-size:13px;margin-right:5px"></i>Roles'}</button>`).join('');
 
   const header=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
     <div style="display:flex;background:var(--g1);border-radius:10px;padding:4px;gap:2px">${subBtns}</div>
     ${ed&&sub==='areas'?`<button class="btn btn-primary" onclick="openM({type:'area'})"><i class="ti ti-plus"></i>Add area</button>`:''}
     ${ed&&sub==='shifts'?`<button class="btn btn-primary" onclick="openM({type:'addshift',form:{name:'',start:'08:00',end:'16:00',type:'morning'}})"><i class="ti ti-plus"></i>Add shift</button>`:''}
+    ${ed&&sub==='roles'?`<button class="btn btn-primary" onclick="openM({type:'addrole'})"><i class="ti ti-plus"></i>Add role</button>`:''}
   </div>`;
 
   if(sub==='areas'){
@@ -1020,7 +1022,7 @@ function operationsView(){
           <div style="font-size:11px;color:var(--g3);margin-top:3px">${pats.length} patroller${pats.length!==1?'s':''} assigned${pats.length?` · ${pats.map(p=>p.name.split(' ')[0]).join(', ')}`:''}
           </div>
         </div>
-        ${ed?`<button class="icon-btn" onclick="delArea('${a.id}','${a.name.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button>`:''}
+        ${ed?`<button class="icon-btn" onclick="delArea('${a.id}','${a.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>`:''}
       </div>`;
     }).join('');
     return header+`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${areaCards}</div>
@@ -1047,8 +1049,8 @@ function operationsView(){
           </div>
         </div>
         ${ed?`<div style="display:flex;flex-direction:column;gap:4px">
-          <button class="edit-btn" onclick="openM({type:'editshift',id:'${sh.id}',form:{name:'${sh.name.replace(/'/g,"\'")}',start:'${sh.start_time}',end:'${sh.end_time}',type:'${sh.shift_type}'}})" style="width:32px;height:32px"><i class="ti ti-edit"></i></button>
-          <button class="icon-btn" onclick="delShift('${sh.id}','${sh.name.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button>
+          <button class="edit-btn" onclick="openM({type:'editshift',id:'${sh.id}',form:{name:'${sh.name.replace(/'/g,"\\'")}',start:'${sh.start_time}',end:'${sh.end_time}',type:'${sh.shift_type}'}})" style="width:32px;height:32px"><i class="ti ti-edit"></i></button>
+          <button class="icon-btn" onclick="delShift('${sh.id}','${sh.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
         </div>`:''}
       </div>`;
     }).join('');
@@ -1056,6 +1058,48 @@ function operationsView(){
     <div style="margin-top:14px;padding:11px 14px;background:#F4EDE3;border-radius:10px;font-size:12px;color:#411517">
       <i class="ti ti-info-circle" style="margin-right:5px"></i>Shifts are automatically linked to patrollers in the schedule. Change a shift here and it reflects everywhere.
     </div>`;
+  }
+
+  if(sub==='roles'){
+    const roles=D.customRoles||[];
+    const SYSTEM_ROLES=[
+      {name:'Admin',key:'admin',color:'#4C1D95',bg:'#EDE9FE',desc:'Full access to all features',icon:'ti-shield'},
+      {name:'Team Lead',key:'lead',color:'#0C4FB3',bg:'#EAF1FD',desc:'Edit schedules & roster',icon:'ti-star'},
+      {name:'Coordinator',key:'coordinator',color:'#134E4A',bg:'#CCFBF1',desc:'View own schedule only',icon:'ti-award'},
+      {name:'Patroller',key:'patroller',color:'#475569',bg:'#F1F5F9',desc:'View own schedule only',icon:'ti-user'},
+    ];
+    const sysCards=SYSTEM_ROLES.map(r=>`
+      <div style="background:#fff;border:1.5px solid ${r.bg};border-radius:14px;padding:16px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(65,21,23,.06)">
+        <div style="width:44px;height:44px;border-radius:12px;background:${r.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="ti ${r.icon}" style="font-size:20px;color:${r.color}"></i>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;color:#2A0D0F">${r.name}</div>
+          <div style="font-size:11px;color:var(--g3);margin-top:3px">${r.desc}</div>
+          <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:${r.bg};color:${r.color};margin-top:5px;display:inline-block">System role</span>
+        </div>
+        <div style="font-size:10px;color:var(--g3)">Built-in</div>
+      </div>`).join('');
+    const customCards=roles.length>0?roles.map(r=>`
+      <div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;padding:16px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(65,21,23,.06)">
+        <div style="width:44px;height:44px;border-radius:12px;background:#FFF0E6;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="ti ti-user-check" style="font-size:20px;color:#FF5900"></i>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;color:#2A0D0F">${r.name}</div>
+          ${r.description?`<div style="font-size:11px;color:var(--g3);margin-top:3px">${r.description}</div>`:''}
+          <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#FFF0E6;color:#FF5900;margin-top:5px;display:inline-block">Custom role</span>
+        </div>
+        ${ed?`<button class="icon-btn" onclick="delCustomRole('${r.id}','${r.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>`:''}
+      </div>`).join(''):'';
+    return header+`
+      <div style="margin-bottom:12px;font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">System Roles</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:20px">${sysCards}</div>
+      ${roles.length>0?`<div style="margin-bottom:12px;font-size:11px;font-weight:700;color:#FF5900;text-transform:uppercase;letter-spacing:.05em">Custom Roles</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${customCards}</div>`:''}
+      <div style="margin-top:14px;padding:11px 14px;background:#FFF0E6;border-radius:10px;font-size:12px;color:#D94D00">
+        <i class="ti ti-info-circle" style="margin-right:5px"></i>Custom roles appear in the Create User dropdown alongside system roles.
+      </div>`;
   }
   return header;
 }
@@ -1389,7 +1433,7 @@ function renderModal(){
     box.innerHTML=`<div class="modal-title"><i class="ti ti-user-plus"></i>Create user account</div>
     <div class="info-box info-blue" style="font-size:12px">User logs in with their email only — no password needed. Patrollers &amp; Coordinators are automatically added to the schedule.</div>
     <div class="msg msg-err" id="cu-e"></div><div class="msg msg-ok" id="cu-ok"></div>
-    <div class="fg-row"><div class="fg"><label>Full name</label><input id="cu-name" placeholder="Name"></div><div class="fg"><label>Role</label><select id="cu-role" onchange="document.getElementById('cu-phone-row').style.display=(this.value==='patroller'||this.value==='coordinator')?'block':'none'">${['patroller','coordinator','lead','admin'].map(r=>`<option value="${r}">${roleLabel(r)}</option>`).join('')}</select></div></div>
+    <div class="fg-row"><div class="fg"><label>Full name</label><input id="cu-name" placeholder="Name"></div><div class="fg"><label>Role</label><select id="cu-role" onchange="document.getElementById('cu-phone-row').style.display=(this.value==='patroller'||this.value==='coordinator')?'block':'none'">${['patroller','coordinator','lead','admin'].map(r=>`<option value="${r}">${roleLabel(r)}</option>`).join('')}${(D.customRoles||[]).map(r=>`<option value="custom:${r.id}">${r.name}</option>`).join('')}</select></div></div>
     <div class="fg"><label>Email</label><input type="email" id="cu-email" placeholder="email@talabat.com"></div>
     <div class="fg" id="cu-phone-row"><label>WhatsApp number <span style="font-weight:400;font-size:10px;color:var(--g3)">(with country code, e.g. +97333112233)</span></label><input type="tel" id="cu-phone" placeholder="+97333112233"></div>
     <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" id="cu-btn" onclick="doCreateUser()"><i class="ti ti-check"></i>Create user</button></div>`;return;
@@ -1484,6 +1528,13 @@ function renderModal(){
       ${canEdit()&&t.status==='Pending'?`<button class="btn" style="background:#DCFCE7;color:#166534;border-color:#86efac" onclick="reviewTask('${t.id}','Approved');closeM()"><i class="ti ti-check"></i>Approve</button><button class="btn" style="background:#FEE2E2;color:#DC2626;border-color:#fca5a5" onclick="reviewTask('${t.id}','Rejected');closeM()"><i class="ti ti-x"></i>Reject</button>`:''}
       <button class="btn" onclick="closeM()">Close</button>
     </div>`;return;
+  }
+  if(m.type==='addrole'){
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-shield"></i>Add custom role</div>
+    <div class="msg msg-err" id="role-e"></div>
+    <div class="fg"><label>Role name</label><input id="role-name" placeholder="e.g. Senior Patroller, Zone Supervisor"></div>
+    <div class="fg"><label>Description (optional)</label><input id="role-desc" placeholder="What does this role do?"></div>
+    <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveCustomRole()"><i class="ti ti-check"></i>Add role</button></div>`;return;
   }
   if(m.type==='cell'){
     const p=D.patrollers.find(x=>x.id===m.pid);const cur=gDZ(m.pid,m.di);
@@ -2628,6 +2679,23 @@ async function saveDept(id){
     if(error){e.textContent=error.message;e.style.display='block';return;}
   }
   closeM();await loadDepartments();renderSuperDash();
+}
+
+async function saveCustomRole(){
+  const e=document.getElementById('role-e');e.style.display='none';
+  const name=(document.getElementById('role-name').value||'').trim();
+  const desc=(document.getElementById('role-desc').value||'').trim();
+  if(!name){e.textContent='Role name required.';e.style.display='block';return;}
+  const{error}=await sb.from('custom_roles').insert({name,description:desc||null,department_id:D.currentDept||null});
+  if(error){e.textContent=error.message;e.style.display='block';return;}
+  closeM();await reload();
+}
+
+function delCustomRole(id,name){
+  openM({type:'confirm',msg:`Remove role <b>${name}</b>?`,cb:async()=>{
+    await sb.from('custom_roles').delete().eq('id',id);
+    closeM();await reload();
+  }});
 }
 
 async function saveArea(){const v=document.getElementById('an').value.trim();if(!v)return;const{error}=await sb.from('areas').insert({name:v,department_id:D.currentDept||null});if(error)return alert(error.message);closeM();await reload();}
