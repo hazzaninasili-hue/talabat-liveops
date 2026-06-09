@@ -746,15 +746,18 @@ function weekTable(ed){
     row+=ed?'<td></td></tr>':'</tr>';return row;
   }
   let h=`<div class="tcard"><div class="t-scroll"><table style="table-layout:auto;min-width:900px"><thead><tr><th class="lt" style="min-width:120px">Name</th>${dates.map((d,i)=>`<th style="min-width:88px">${SD[i]}<br><span style="font-family:monospace;font-size:9px;font-weight:400">${fmt(d)}</span></th>`).join('')}${ed?'<th></th>':''}</tr></thead><tbody>`;
-  if(patrollers.length){
-    h+=`<tr style="background:#F9EDEE"><td colspan="${8+(ed?1:0)}" style="padding:5px 14px;font-size:9.5px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-user" style="font-size:10px;margin-right:5px"></i>Patrollers</td></tr>`;
-    patrollers.forEach(p=>{h+=renderRow(p);});
+  // Group patrollers by their custom role name
+  const getRoleName=p=>{const u=D.users.find(u=>u.id===p.user_id);if(u?.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr)return cr.name;}return getUtype(p)==='coordinator'?'Coordinator':'Patroller';};
+  const roleGroups={};
+  activePats().filter(p=>p.name.toLowerCase().includes(D.search.toLowerCase())).forEach(p=>{const rn=getRoleName(p);if(!roleGroups[rn])roleGroups[rn]=[];roleGroups[rn].push(p);});
+  if(Object.keys(roleGroups).length){
+    Object.entries(roleGroups).forEach(([rname,rPats])=>{
+      h+=`<tr style="background:#F9EDEE"><td colspan="${8+(ed?1:0)}" style="padding:5px 14px;font-size:9.5px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-user" style="font-size:10px;margin-right:5px"></i>${rname}</td></tr>`;
+      rPats.forEach(p=>{h+=renderRow(p);});
+    });
+  } else {
+    h+=`<tr><td colspan="${8+(ed?1:0)}" style="padding:30px;text-align:center;color:var(--g3)">No users on schedule yet.</td></tr>`;
   }
-  if(coordinators.length){
-    h+=`<tr style="background:#CCFBF1"><td colspan="${8+(ed?1:0)}" style="padding:5px 14px;font-size:9.5px;font-weight:700;color:#134E4A;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-star" style="font-size:10px;margin-right:5px"></i>Coordinators</td></tr>`;
-    coordinators.forEach(p=>{h+=renderRow(p);});
-  }
-  if(!patrollers.length&&!coordinators.length){h+=`<tr><td colspan="${8+(ed?1:0)}" style="padding:30px;text-align:center;color:var(--g3)">No users on schedule yet.</td></tr>`;}
   h+=`<tr class="row-sum"><td class="row-lbl">AM on duty</td>${am.map(c=>`<td>${c}</td>`).join('')}<td colspan="${ed?2:1}"></td></tr>`;
   h+=`<tr class="row-sum"><td class="row-lbl">PM on duty</td>${pm.map(c=>`<td>${c}</td>`).join('')}<td colspan="${ed?2:1}"></td></tr>`;
   h+=`<tr class="row-off"><td class="row-lbl">Off day</td>${off.map(c=>`<td style="font-weight:700">${c}</td>`).join('')}<td colspan="${ed?2:1}"></td></tr>`;
@@ -876,7 +879,7 @@ function summaryView(){
       }).join('');
       const attW=dates.filter(d=>{const ds=d.toISOString().split('T')[0];const r=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);return r?.status==='Attended';}).length;
       const absW=dates.filter(d=>{const ds=d.toISOString().split('T')[0];const r=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);return r?.status==='Absent';}).length;
-      return`<tr><td class="lt">${p.name}</td><td><span class="role-badge ${getUtype(p)==='coordinator'?'rb-coord':'rb-pat'}">${getUtype(p)==='coordinator'?'Coord':'Pat'}</span></td>${cells}<td style="font-weight:700;color:#166534">${attW}</td><td style="font-weight:700;color:#DC2626">${absW}</td></tr>`;
+      return`<tr><td class="lt">${p.name}</td><td><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:#F4EDE3;color:#411517">${(()=>{const u=D.users.find(u=>u.id===p.user_id);if(u?.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr)return cr.name;}return getUtype(p)==='coordinator'?'Coordinator':'Patroller';})()}</span></td>${cells}<td style="font-weight:700;color:#166534">${attW}</td><td style="font-weight:700;color:#DC2626">${absW}</td></tr>`;
     }).join('')}
     </tbody></table></div></div>
   </div>`;
@@ -1249,7 +1252,7 @@ function accessView(){
     </table>`:'<div style="font-size:12px;color:var(--g3);text-align:center;padding:10px">No biometric devices registered yet. Devices will appear after patrollers login.</div>'}
   </div>
   <div class="toolbar"><button class="btn btn-primary" onclick="openM({type:'createuser'})"><i class="ti ti-user-plus"></i>Create user</button><span style="font-size:12px;color:var(--g3)">${D.users.length} users</span></div>
-  <div class="card-grid">${D.users.map(u=>`<div class="card"><div class="card-av" style="background:${roleBg(u.role)};color:${roleCol(u.role)}">${ini(u.full_name)}</div><div class="card-info" style="min-width:0"><div class="card-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.full_name}</div><div style="font-size:10.5px;color:var(--g3);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.email}</div><span class="role-badge ${roleCls(u.role)}">${roleLabel(u.role)}</span> <span style="font-size:10px;color:${u.is_active!==false?'var(--teal)':'var(--red)'}">${u.is_active!==false?'Active':'Inactive'}</span></div>${u.id!==D.profile.id?`<div style="display:flex;flex-direction:column;gap:4px"><select class="role-sel" onchange="chRole('${u.id}',this.value)">${['admin','lead','coordinator','patroller'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${roleLabel(r)}</option>`).join('')}</select><button class="edit-btn" onclick="openEditUser('${u.id}')" title="Edit user" style="width:28px;height:28px"><i class="ti ti-edit"></i></button><button class="icon-btn" onclick="togActive('${u.id}',${u.is_active!==false})" title="${u.is_active!==false?'Deactivate':'Activate'}"><i class="ti ti-${u.is_active!==false?'user-off':'user-check'}"></i></button><button class="icon-btn" onclick="delUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button></div>`:'<span style="font-size:10px;color:var(--g3)">You</span>'}</div>`).join('')}</div>`;
+  <div class="card-grid">${D.users.map(u=>`<div class="card"><div class="card-av" style="background:${roleBg(u.role)};color:${roleCol(u.role)}">${ini(u.full_name)}</div><div class="card-info" style="min-width:0"><div class="card-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.full_name}</div><div style="font-size:10.5px;color:var(--g3);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.email}</div><span class="role-badge ${roleCls(u.role)}">${roleLabel(u.role)}</span> <span style="font-size:10px;color:${u.is_active!==false?'var(--teal)':'var(--red)'}">${u.is_active!==false?'Active':'Inactive'}</span></div>${u.id!==D.profile.id?`<div style="display:flex;flex-direction:column;gap:4px"><select class="role-sel" onchange="chRole('${u.id}',this.value)">${(D.customRoles&&D.customRoles.length?D.customRoles.map(r=>`<option value="cr:${r.id}" ${u.custom_role_id===r.id?'selected':''}>${r.name}</option>`).join(''):'<option value="" disabled>No roles</option>')}</select><button class="edit-btn" onclick="openEditUser('${u.id}')" title="Edit user" style="width:28px;height:28px"><i class="ti ti-edit"></i></button><button class="icon-btn" onclick="togActive('${u.id}',${u.is_active!==false})" title="${u.is_active!==false?'Deactivate':'Activate'}"><i class="ti ti-${u.is_active!==false?'user-off':'user-check'}"></i></button><button class="icon-btn" onclick="delUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button></div>`:'<span style="font-size:10px;color:var(--g3)">You</span>'}</div>`).join('')}</div>`;
 }
 
 function mySchedView(){
@@ -1378,14 +1381,16 @@ function render(){
 }
 function setTab(t){D.tab=t;D.ne=false;render();}
 
-async function chRole(uid,role){
-  await sb.from('profiles').update({role}).eq('id',uid);
-  if(role==='patroller'||role==='coordinator'){
-    // Sync user_type and keep active
-    await sb.from('patrollers').update({user_type:role,is_active:true}).eq('user_id',uid);
-  } else {
-    // admin/lead — hide from schedule by setting is_active false
-    await sb.from('patrollers').update({user_type:role,is_active:false}).eq('user_id',uid);
+async function chRole(uid,roleRaw){
+  const isCustom=roleRaw.startsWith('cr:');
+  const customRoleId=isCustom?roleRaw.replace('cr:',''):null;
+  const customRole=customRoleId?(D.customRoles||[]).find(r=>r.id===customRoleId):null;
+  const sysRole=customRole?(customRole.access_level==='admin'?'admin':customRole.access_level==='editor'?'lead':'patroller'):roleRaw;
+  await sb.from('profiles').update({role:sysRole,custom_role_id:customRoleId||null}).eq('id',uid);
+  if(sysRole==='patroller'||sysRole==='coordinator'){
+    await sb.from('patrollers').update({user_type:sysRole,is_active:true}).eq('user_id',uid);
+  } else if(sysRole==='admin'||sysRole==='lead'){
+    await sb.from('patrollers').update({is_active:false}).eq('user_id',uid);
   }
   await reload();
 }
