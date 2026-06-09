@@ -1286,6 +1286,24 @@ function mySchedView(){
 
 function renderTabs(){
   const role=D.profile.role;
+  // Check if user has a custom role with defined tabs
+  const customRole=D.profile.custom_role_id?(D.customRoles||[]).find(r=>r.id===D.profile.custom_role_id):null;
+  if(customRole&&customRole.visible_tabs){
+    let visTabs=[];
+    try{visTabs=JSON.parse(customRole.visible_tabs);}catch(e){}
+    const al=customRole.access_level||'viewer';
+    const canEditData=al==='editor'||al==='admin';
+    const isFullAdmin=al==='admin';
+    let tabs=[{id:'myschedule',icon:'ti-user',label:'My schedule'}];
+    if(visTabs.includes('Schedule')&&canEditData)tabs.push({id:'schedule',icon:'ti-calendar',label:'Schedule'});
+    if(visTabs.includes('Summary'))tabs.push({id:'summary',icon:'ti-chart-bar',label:'Summary'});
+    if(visTabs.includes('Attendance')){tabs.push({id:'myattendance',icon:'ti-clock-check',label:'My Attendance'});if(canEditData)tabs.push({id:'attendance',icon:'ti-users',label:'Team Attendance'});}
+    if(visTabs.includes('Time off & Tasks'))tabs.push({id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'});
+    if(visTabs.includes('Documents'))tabs.push({id:'documents',icon:'ti-files',label:'Documents'});
+    if(isFullAdmin){tabs.push({id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'});tabs.push({id:'access',icon:'ti-lock',label:'Access control'});}
+    document.getElementById('tabs').innerHTML=tabs.map(t=>`<button class="tab${D.tab===t.id?' active':''}" onclick="setTab('${t.id}')"><i class="ti ${t.icon}"></i>${t.label}</button>`).join('');
+    return;
+  }
   const tabs=(role==='patroller'||role==='coordinator')?[
     {id:'myschedule',icon:'ti-user',label:'My schedule'},
     {id:'myattendance',icon:'ti-clock-check',label:'Attendance'},
@@ -1470,7 +1488,7 @@ function renderModal(){
     box.innerHTML=`<div class="modal-title"><i class="ti ti-user-plus"></i>Create user account</div>
     <div class="info-box info-blue" style="font-size:12px">User logs in with their email only — no password needed. Patrollers &amp; Coordinators are automatically added to the schedule.</div>
     <div class="msg msg-err" id="cu-e"></div><div class="msg msg-ok" id="cu-ok"></div>
-    <div class="fg-row"><div class="fg"><label>Full name</label><input id="cu-name" placeholder="Name"></div><div class="fg"><label>Role</label><select id="cu-role" onchange="document.getElementById('cu-phone-row').style.display=(this.value==='patroller'||this.value==='coordinator')?'block':'none'">${['patroller','coordinator','lead','admin'].map(r=>`<option value="${r}">${roleLabel(r)}</option>`).join('')}</select></div></div>
+    <div class="fg-row"><div class="fg"><label>Full name</label><input id="cu-name" placeholder="Name"></div><div class="fg"><label>Role</label><select id="cu-role" onchange="document.getElementById('cu-phone-row').style.display=(this.value==='patroller'||this.value==='coordinator')?'block':'none'">${D.customRoles&&D.customRoles.length?D.customRoles.map(r=>`<option value="cr:${r.id}">${r.name} (${r.access_level==='admin'?'Admin':r.access_level==='editor'?'Editor':'Viewer'})</option>`).join(''):'<option value="" disabled>No roles yet — create roles in Zone and Shifts first</option>'}</select></div></div>
     <div class="fg"><label>Email</label><input type="email" id="cu-email" placeholder="email@talabat.com"></div>
     <div class="fg" id="cu-phone-row"><label>WhatsApp number <span style="font-weight:400;font-size:10px;color:var(--g3)">(with country code, e.g. +97333112233)</span></label><input type="tel" id="cu-phone" placeholder="+97333112233"></div>
     <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" id="cu-btn" onclick="doCreateUser()"><i class="ti ti-check"></i>Create user</button></div>`;return;
@@ -2641,7 +2659,12 @@ async function doCreateUser(){
   clearMsgs('cu-e','cu-ok');
   const name=document.getElementById('cu-name').value.trim();
   const email=document.getElementById('cu-email').value.trim().toLowerCase();
-  const role=document.getElementById('cu-role').value;
+  const roleRaw=document.getElementById('cu-role').value;
+  const isCustomRole=roleRaw.startsWith('cr:');
+  const customRoleId=isCustomRole?roleRaw.replace('cr:',''):null;
+  const customRole=customRoleId?(D.customRoles||[]).find(r=>r.id===customRoleId):null;
+  // Map custom role access level to system role for permissions
+  const role=customRole?(customRole.access_level==='admin'?'admin':customRole.access_level==='editor'?'lead':'patroller'):'patroller';
   const phone=(document.getElementById('cu-phone')?.value||'').trim();
   if(!name||!email){showErr('cu-e','Name and email required.');return;}
   const btn=document.getElementById('cu-btn');btn.disabled=true;btn.textContent='Creating...';
@@ -2654,7 +2677,7 @@ async function doCreateUser(){
     if(error)throw error;
     const uid=data?.user?.id;
     if(uid){
-      await sb.from('profiles').upsert({id:uid,email,full_name:name,role,is_active:true},{onConflict:'id'});
+      await sb.from('profiles').upsert({id:uid,email,full_name:name,role,is_active:true,department_id:D.currentDept||null,custom_role_id:customRoleId||null},{onConflict:'id'});
       if(role==='patroller'||role==='coordinator'){
         // Always create a patroller entry linked to this user
         const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null}).select().single();
