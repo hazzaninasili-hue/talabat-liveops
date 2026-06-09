@@ -398,9 +398,13 @@ function renderSuperDash(){
 async function enterDepartment(deptId){
   D.currentDept=deptId;
   D.superView=false;
-  const dept=D.departments.find(d=>d.id===deptId);
-  // Load profile for this dept context
   D.tab='schedule';
+  D.woff=0;
+  D.shifts=[];D.areas=[];D.patrollers=[];D.schedules=[];
+  D.users=[];D.timeoff=[];D.tasks=[];D.attendance=[];
+  D.customRoles=[];D.locPerms={};
+  const main=document.getElementById('main');
+  if(main)main.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:14px;color:#94A3B8"><div style="width:34px;height:34px;border:3px solid #E2E8F0;border-top-color:#FF5900;border-radius:50%;animation:spin .7s linear infinite"></div><div>Loading department...</div></div>';
   await loadAll();
   render();
 }
@@ -575,9 +579,10 @@ const gsh=id=>D.shifts.find(s=>s.id===id)||{name:'?',start_time:'?',end_time:'?'
 const fmt=d=>`${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()}`;
 const wNum=d=>{const j=new Date(d.getFullYear(),0,1);return Math.ceil(((d-j)/86400000+j.getDay()+1)/7);};
 const fmtT=t=>{if(!t||t==='?')return'?';const[h,m]=t.split(':');const hr=parseInt(h);return`${hr===0?12:hr>12?hr-12:hr}:${m} ${hr<12||hr===24?'AM':'PM'}`;};
-const isAdmin=()=>D.profile&&D.profile.role==='admin';
+const isAdmin=()=>D.profile&&(D.profile.role==='admin'||(isSuperAdmin()&&D.currentDept));
 const canEdit=()=>{
   if(!D.profile)return false;
+  if(isSuperAdmin()&&D.currentDept)return true;
   if(D.profile.role==='admin'||D.profile.role==='lead')return true;
   // Check custom role access level
   if(D.profile.role&&D.profile.role.startsWith('custom:')){
@@ -1319,7 +1324,8 @@ function getVisibleTabs(cr){
 }
 
 function renderTabs(){
-  const role=D.profile.role;
+  // Super admin entering a department gets full admin view
+  const role=isSuperAdmin()&&D.currentDept?'admin':D.profile.role;
   const cr=getCustomRole();
   const visTabs=getVisibleTabs(cr);
   const al=cr?.access_level||role;
