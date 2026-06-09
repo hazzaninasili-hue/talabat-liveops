@@ -351,47 +351,36 @@ async function doLogout(){
 function wt(p,ms=8000){return Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms))]);}
 
 async function loadAll(){
-  try{
-    const[sh,ar,zo,pt,sc]=await Promise.all([
-      wt(sb.from('shifts').select('*').order('created_at')),
-      wt(sb.from('areas').select('*').order('name')),
-      wt(sb.from('zones').select('*').order('name')),
-      wt(sb.from('patrollers').select('*').eq('is_active',true).order('name')),
-      wt(sb.from('schedules').select('*')),
-    ]);
-    D.shifts=sh.data||[];D.areas=ar.data||[];D.zones=zo.data||[];D.patrollers=pt.data||[];D.schedules=sc.data||[];
-  }catch(e){console.error('data:',e);}
-  try{const{data:notes}=await wt(sb.from('notes').select('*'),5000);
-    if(notes){
-      const nAll=notes.find(n=>n.audience==='all')||notes.find(n=>!n.audience)||notes[0];
-      const nPat=notes.find(n=>n.audience==='patroller');
-      const nCoo=notes.find(n=>n.audience==='coordinator');
-      D.notesAll={id:nAll?.id||null,content:nAll?.content||''};
-      D.notesPat={id:nPat?.id||null,content:nPat?.content||''};
-      D.notesCoo={id:nCoo?.id||null,content:nCoo?.content||''};
-    }
-  }catch(e){}
-  try{const{data:docs}=await wt(sb.from('documents').select('*').order('created_at',{ascending:false}),5000);D.docs=docs||[];}catch(e){}
-  try{const{data:hist}=await wt(sb.from('schedule_history').select('*,profiles(full_name)').order('changed_at',{ascending:false}).limit(300),5000);D.history=hist||[];}catch(e){}
-  try{const{data:tor}=await wt(sb.from('time_off_requests').select('*').order('created_at',{ascending:false}),5000);D.timeoff=tor||[];}catch(e){}
-  try{const crq=sb.from('custom_roles').select('*').order('name');const{data:cr}=await wt(crq,4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
-  if(D.profile?.role==='admin'||D.profile?.role==='lead'){
-    try{const{data:users}=await wt(sb.from('profiles').select('*').order('full_name'),5000);D.users=users||[];}catch(e){}
+  const safe=async(fn)=>{try{const r=await fn();return r;}catch(e){return null;}};
+  const[sh,ar,zo,pt,sc,notes,docs,tor,tk,cr,lp,att,users,tasks]=await Promise.all([
+    safe(()=>wt(sb.from('shifts').select('*').order('created_at'),4000)),
+    safe(()=>wt(sb.from('areas').select('*').order('name'),4000)),
+    safe(()=>wt(sb.from('zones').select('*').order('name'),4000)),
+    safe(()=>wt(sb.from('patrollers').select('*').eq('is_active',true).order('name'),4000)),
+    safe(()=>wt(sb.from('schedules').select('*'),4000)),
+    safe(()=>wt(sb.from('notes').select('*'),4000)),
+    safe(()=>wt(sb.from('documents').select('*').order('created_at',{ascending:false}),4000)),
+    safe(()=>wt(sb.from('time_off_requests').select('*').order('created_at',{ascending:false}),4000)),
+    safe(()=>wt(sb.from('custom_roles').select('*').order('name'),4000)),
+    safe(()=>wt(sb.from('custom_roles').select('*').order('name'),4000)),
+    safe(()=>wt(sb.from('location_permissions').select('*'),4000)),
+    safe(()=>wt(sb.from('attendance').select('*').order('date',{ascending:false}).limit(500),4000)),
+    safe(()=>wt(sb.from('profiles').select('*').order('full_name'),4000)),
+    safe(()=>wt(sb.from('task_requests').select('*').order('created_at',{ascending:false}),4000)),
+  ]);
+  D.shifts=sh?.data||[];D.areas=ar?.data||[];D.zones=zo?.data||[];
+  D.patrollers=pt?.data||[];D.schedules=sc?.data||[];
+  D.docs=docs?.data||[];D.timeoff=tor?.data||[];
+  D.customRoles=cr?.data||[];D.tasks=tasks?.data||[];
+  D.attendance=att?.data||[];D.users=users?.data||[];
+  D.locPerms={};(lp?.data||[]).forEach(r=>{D.locPerms[r.patroller_id]=r;});
+  D.biometricDevices=[];
+  if(notes?.data){
+    const nd=notes.data;
+    D.notesAll={id:nd.find(n=>n.audience==='all')?.id||null,content:nd.find(n=>n.audience==='all')?.content||''};
+    D.notesPat={id:nd.find(n=>n.audience==='patroller')?.id||null,content:nd.find(n=>n.audience==='patroller')?.content||''};
+    D.notesCoo={id:nd.find(n=>n.audience==='coordinator')?.id||null,content:nd.find(n=>n.audience==='coordinator')?.content||''};
   }
-  try{const{data:tk}=await wt(sb.from('task_requests').select('*').order('created_at',{ascending:false}),5000);D.tasks=tk||[];}catch(e){D.tasks=[];}
-  try{
-    const{data:lp}=await wt(sb.from('location_permissions').select('*'),5000);
-    D.locPerms={};(lp||[]).forEach(r=>{D.locPerms[r.patroller_id]=r;});
-  }catch(e){D.locPerms={};}
-  try{
-    const{data:bd}=await wt(sb.from('device_biometric').select('*').order('last_login',{ascending:false}),5000);
-    D.biometricDevices=bd||[];
-  }catch(e){D.biometricDevices=[];}
-  try{
-    const{data:att,error:atterr}=await wt(sb.from('attendance').select('*').order('date',{ascending:false}).limit(500),5000);
-    if(atterr){console.warn('Attendance table not ready:',atterr.message);D.attendance=[];}
-    else D.attendance=att||[];
-  }catch(e){D.attendance=[];console.warn('Attendance load failed:',e.message);}
 }
 async function reload(){await loadAll();render();}
 async function sendWebhook(event,data){
