@@ -547,11 +547,12 @@ function gDS(pid,di){const ws=wStart();const sc=D.schedules.find(s=>s.patroller_
 function getDayShift(pid,di){const ov=gDS(pid,di);if(ov)return D.shifts.find(s=>s.id===ov);const p=D.patrollers.find(x=>x.id===pid);return gsh(p?.shift_id);}
 function allZones(){return[...new Set([...D.zones.map(z=>z.name),...D.areas.map(a=>a.name)])].sort();}
 function activePats(){return D.patrollers.filter(p=>{
+  if(p.is_active===false)return false;
   const u=D.users.find(u=>u.id===p.user_id);
   if(u){
-    // Exclude admin/lead from schedule display
     if(u.role==='admin'||u.role==='lead')return false;
     if(u.is_active===false)return false;
+    if(u.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr&&cr.access_level==='admin')return false;}
   }
   return true;
 });}
@@ -682,9 +683,13 @@ function getRunningTasks(){
 
 function weekTable(ed){
   const dates=wDates();const fl=D.search.toLowerCase();const pts=activePats();
+  const{am,pm,off}=summ(pts);
+  // Group by custom role name
+  const getWRoleName=p=>{const u=D.users.find(u=>u.id===p.user_id);if(u&&u.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr)return cr.name;}return getUtype(p)==='coordinator'?'Coordinator':'Patroller';};
+  const filteredPts=pts.filter(p=>{if(!fl)return true;const u=D.users.find(u=>u.id===p.user_id);const cr=u?.custom_role_id?(D.customRoles||[]).find(r=>r.id===u.custom_role_id):null;return p.name.toLowerCase().includes(fl)||(cr&&cr.name.toLowerCase().includes(fl));});
+  const roleGroups={};filteredPts.forEach(p=>{const rn=getWRoleName(p);if(!roleGroups[rn])roleGroups[rn]=[];roleGroups[rn].push(p);});
   const patrollers=pts.filter(p=>getUtype(p)==='patroller'&&p.name.toLowerCase().includes(fl));
   const coordinators=pts.filter(p=>getUtype(p)==='coordinator'&&p.name.toLowerCase().includes(fl));
-  const{am,pm,off}=summ(pts);
   function renderRow(p){
     let row=`<tr><td class="lt">${p.name}${ed?`<button class="edit-btn" onclick="openEdit('${p.id}')"><i class="ti ti-edit"></i></button>`:''}</td>`;
     DAYS.forEach((_,i)=>{
@@ -706,15 +711,12 @@ function weekTable(ed){
     row+=ed?'<td></td></tr>':'</tr>';return row;
   }
   let h=`<div class="tcard"><div class="t-scroll"><table style="table-layout:auto;min-width:900px"><thead><tr><th class="lt" style="min-width:120px">Name</th>${dates.map((d,i)=>`<th style="min-width:88px">${SD[i]}<br><span style="font-family:monospace;font-size:9px;font-weight:400">${fmt(d)}</span></th>`).join('')}${ed?'<th></th>':''}</tr></thead><tbody>`;
-  if(patrollers.length){
-    h+=`<tr style="background:#F9EDEE"><td colspan="${8+(ed?1:0)}" style="padding:5px 14px;font-size:9.5px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-user" style="font-size:10px;margin-right:5px"></i>Patrollers</td></tr>`;
-    patrollers.forEach(p=>{h+=renderRow(p);});
-  }
-  if(coordinators.length){
-    h+=`<tr style="background:#CCFBF1"><td colspan="${8+(ed?1:0)}" style="padding:5px 14px;font-size:9.5px;font-weight:700;color:#134E4A;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-star" style="font-size:10px;margin-right:5px"></i>Coordinators</td></tr>`;
-    coordinators.forEach(p=>{h+=renderRow(p);});
-  }
-  if(!patrollers.length&&!coordinators.length){h+=`<tr><td colspan="${8+(ed?1:0)}" style="padding:30px;text-align:center;color:var(--g3)">No users on schedule yet.</td></tr>`;}
+  if(Object.keys(roleGroups).length){
+    Object.entries(roleGroups).forEach(([rname,rPats])=>{
+      h+=`<tr style="background:#F9EDEE"><td colspan="${8+(ed?1:0)}" style="padding:5px 14px;font-size:9.5px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-user" style="font-size:10px;margin-right:5px"></i>${rname} <span style="font-size:9px;font-weight:400;color:#A08070;text-transform:none">(${rPats.length})</span></td></tr>`;
+      rPats.forEach(p=>{h+=renderRow(p);});
+    });
+  } else {h+=`<tr><td colspan="${8+(ed?1:0)}" style="padding:30px;text-align:center;color:var(--g3)">No users on schedule yet.</td></tr>`;}
   h+=`<tr class="row-sum"><td class="row-lbl">AM on duty</td>${am.map(c=>`<td>${c}</td>`).join('')}<td colspan="${ed?2:1}"></td></tr>`;
   h+=`<tr class="row-sum"><td class="row-lbl">PM on duty</td>${pm.map(c=>`<td>${c}</td>`).join('')}<td colspan="${ed?2:1}"></td></tr>`;
   h+=`<tr class="row-off"><td class="row-lbl">Off day</td>${off.map(c=>`<td style="font-weight:700">${c}</td>`).join('')}<td colspan="${ed?2:1}"></td></tr>`;
@@ -761,12 +763,13 @@ function summaryView(){
   const ptot=patrollers.length;const ctot=coordinators.length;
 
   // Weekly attendance totals
-  const weekAttended=dates.reduce((t,d)=>{const ds=dateToStr(d);return t+(D.attendance||[]).filter(a=>a.date===ds&&a.status==='Attended').length;},0);
-  const weekAbsent=dates.reduce((t,d)=>{const ds=dateToStr(d);return t+(D.attendance||[]).filter(a=>a.date===ds&&a.status==='Absent').length;},0);
-  const weekVac=pts.filter(p=>dates.some(d=>{const ds=dateToStr(d);return D.timeoff.find(tf=>tf.patroller_id===p.id&&tf.status==='Approved'&&ds>=tf.start_date&&ds<=tf.end_date);})).length;
+  const ds2=d=>d.toISOString().split('T')[0];
+  const weekAttended=dates.reduce((t,d)=>{const ds=ds2(d);return t+(D.attendance||[]).filter(a=>a.date===ds&&a.status==='Attended').length;},0);
+  const weekAbsent=dates.reduce((t,d)=>{const ds=ds2(d);return t+(D.attendance||[]).filter(a=>a.date===ds&&a.status==='Absent').length;},0);
+  const weekVac=pts.filter(p=>dates.some(d=>{const ds=ds2(d);return D.timeoff.find(tf=>tf.patroller_id===p.id&&tf.status==='Approved'&&ds>=tf.start_date&&ds<=tf.end_date);})).length;
 
   const mkScheduleRow=(d,i,amV,pmV,offV,tot)=>{
-    const ds=dateToStr(d);
+    const ds=d.toISOString().split('T')[0];
     const attCount=(D.attendance||[]).filter(a=>a.date===ds&&a.status==='Attended').length;
     const absCount=(D.attendance||[]).filter(a=>a.date===ds&&a.status==='Absent').length;
     const vacCount=pts.filter(p=>D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds>=t.start_date&&ds<=t.end_date)).length;
@@ -1408,10 +1411,11 @@ function render(){
   const dates=wDates();const wn=wNum(dates[0]);
   document.getElementById('wk-chip').textContent=`Week ${wn} - ${dates[0].getFullYear()}`;
   const u=D.profile;
-  document.getElementById('user-chip').innerHTML=`<div class="user-av" style="background:${roleBg(u.role)};color:${roleCol(u.role)}">${ini(u.full_name)}</div><div><div class="user-nm">${u.full_name}</div><div class="user-rl">${roleLabel(u.role)}</div></div>`;
+  const userCR=u.custom_role_id?(D.customRoles||[]).find(r=>r.id===u.custom_role_id):null;
+  document.getElementById('user-chip').innerHTML=`<div class="user-av" style="background:${roleBg(u.role)};color:${roleCol(u.role)}">${ini(u.full_name)}</div><div><div class="user-nm">${u.full_name}</div><div class="user-rl">${userCR?userCR.name:roleLabel(u.role)}</div></div>`;
   renderTabs();
   const pts=activePats();const{am,pm,off}=summ(pts);
-  const nav=`<div class="toolbar"><div class="seg"><button class="seg-btn${D.view==='week'?' active':''}" onclick="D.view='week';render()"><i class="ti ti-calendar-week" style="font-size:12px;margin-right:3px"></i>Week</button><button class="seg-btn${D.view==='date'?' active':''}" onclick="D.view='date';render()"><i class="ti ti-layout-columns" style="font-size:12px;margin-right:3px"></i>Daily</button><button class="seg-btn${D.view==='hourly'?' active':''}" onclick="D.view='hourly';render()"><i class="ti ti-timeline" style="font-size:12px;margin-right:3px"></i>Hourly</button></div><button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button><span class="wk-range">Week ${wn} - ${fmt(dates[0])} to ${fmt(dates[6])}</span><button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button><div class="search-wrap"><i class="ti ti-search"></i><input class="search-input" type="text" placeholder="Search..." value="${D.search}" oninput="D.search=this.value;render()"></div>${canEdit()?`<button class="btn btn-primary" onclick="openCreateSchedule()"><i class="ti ti-calendar-plus"></i>Create schedule</button>`:''}<button class="btn" onclick="openM({type:'taskreq'})"><i class="ti ti-plus"></i>Task request</button></div>`;
+  const nav=`<div class="toolbar"><div class="seg"><button class="seg-btn${D.view==='week'?' active':''}" onclick="D.view='week';render()"><i class="ti ti-calendar-week" style="font-size:12px;margin-right:3px"></i>Week</button><button class="seg-btn${D.view==='date'?' active':''}" onclick="D.view='date';render()"><i class="ti ti-layout-columns" style="font-size:12px;margin-right:3px"></i>Daily</button><button class="seg-btn${D.view==='hourly'?' active':''}" onclick="D.view='hourly';render()"><i class="ti ti-timeline" style="font-size:12px;margin-right:3px"></i>Hourly</button></div><button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button><span class="wk-range">Week ${wn} - ${fmt(dates[0])} to ${fmt(dates[6])}</span><button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button>${D.woff!==0?`<button class="btn" onclick="D.woff=0;render()" style="padding:5px 10px;font-size:11px"><i class="ti ti-home" style="font-size:11px"></i>Today</button>`:''}<div class="search-wrap"><i class="ti ti-search"></i><input class="search-input" type="text" placeholder="Search..." value="${D.search}" oninput="D.search=this.value;render()"></div>${canEdit()?`<button class="btn btn-primary" onclick="openCreateSchedule()"><i class="ti ti-calendar-plus"></i>Create schedule</button>`:''}<button class="btn" onclick="openM({type:'taskreq'})"><i class="ti ti-plus"></i>Task request</button></div>`;
 
   const statBar=buildRoleLiveTable(D.woff===0);
   const wNav=`<div class="toolbar"><button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button><span class="wk-range">Week ${wn} - ${fmt(dates[0])} to ${fmt(dates[6])}</span><button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button></div>`;
@@ -1581,7 +1585,9 @@ function renderModal(){
   if(m.type==='taskreq'){
     const ed=canEdit();
     const pat=m.pid?D.patrollers.find(p=>p.id===m.pid):D.patrollers.find(p=>p.user_id===D.profile.id);
-    const patOpts=ed?D.patrollers.map(p=>`<option value="${p.id}" ${m.pid===p.id?'selected':''}>${p.name}</option>`).join('')
+    // Allow patrollers to submit for themselves
+    const canPickPat=ed;
+    const patOpts=canPickPat?D.patrollers.map(p=>`<option value="${p.id}" ${(m.pid===p.id||(!m.pid&&pat&&p.id===pat.id))?'selected':''}>${p.name}</option>`).join('')
       :pat?`<option value="${pat.id}" selected>${pat.name}</option>`:'';
     const defDate=m.pdate||todayStr();
     box.innerHTML=`<div class="modal-title"><i class="ti ti-checklist"></i>Start New Task</div>
