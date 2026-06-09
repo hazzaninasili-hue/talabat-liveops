@@ -251,7 +251,7 @@ let D={user:null,profile:null,tab:'schedule',view:'week',woff:0,search:'',modal:
   shifts:[],areas:[],zones:[],patrollers:[],schedules:[],users:[],
   notesAll:{id:null,content:''},notesPat:{id:null,content:''},notesCoo:{id:null,content:''},
   docs:[],history:[],timeoff:[],attendance:[],attDate:null,opsSub:'areas',locPerms:{},tasks:[],hourlyDay:null,
-  departments:[],currentDept:null,superView:false,customRoles:[]};
+  departments:[],currentDept:null,superView:false,customRoles:[],tofView:'timeoff'};
 
 const isSuperAdmin=()=>D.user?.email===SUPER_ADMIN;
 
@@ -954,12 +954,12 @@ function timeOffView(){
 // ── COMBINED TIME OFF & TASKS VIEW ──
 function timeOffTaskView(){
   if(!D.profile)return'';
-  const view=D.view||'timeoff';
+  const view=D.tofView||'timeoff';
   return `
     <div class="toolbar">
       <div class="seg">
-        <button class="seg-btn${view==='timeoff'?' active':''}" onclick="D.view='timeoff';render()"><i class="ti ti-calendar-off"></i>Time Off</button>
-        <button class="seg-btn${view==='tasks'?' active':''}" onclick="D.view='tasks';render()"><i class="ti ti-checklist"></i>Tasks</button>
+        <button class="seg-btn${view==='timeoff'?' active':''}" onclick="D.tofView='timeoff';render()"><i class="ti ti-calendar-off"></i>Time Off</button>
+        <button class="seg-btn${view==='tasks'?' active':''}" onclick="D.tofView='tasks';render()"><i class="ti ti-checklist"></i>Tasks</button>
       </div>
     </div>
     ${view==='timeoff'?timeOffView():tasksView()}
@@ -1429,17 +1429,17 @@ function render(){
   </div>`;
   const wNav=`<div class="toolbar"><button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button><span class="wk-range">Week ${wn} - ${fmt(dates[0])} to ${fmt(dates[6])}</span><button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button></div>`;
   let html='';
-  if(D.tab==='schedule')html=statBar+nav+getRunningTasks()+(D.view==='week'?weekTable(canEdit()):D.view==='hourly'?hourlyView():dateView())+notesBar();
-  else if(D.tab==='summary')html=wNav+summaryView();
-  else if(D.tab==='timeofftask')html=timeOffTaskView();
+  if(D.tab==='schedule')html=statBar+nav+getRunningTasks()+(D.view==='week'?weekTable(canEdit()):D.view==='hourly'?(()=>{try{return hourlyView();}catch(e){console.error('hourlyView:',e);return `<div style="padding:20px;color:var(--g3)">Hourly view error: ${e.message}</div>`;}})():dateView())+notesBar();
+  else if(D.tab==='summary'){try{html=wNav+summaryView();}catch(e){html=`<div style="padding:40px;text-align:center;color:var(--g3)"><div style="font-size:14px">Summary loading failed: ${e.message}</div></div>`;console.error('summaryView error:',e);}}
+  else if(D.tab==='timeofftask'){try{html=timeOffTaskView();}catch(e){html=`<div style="padding:40px;text-align:center;color:var(--g3)">Time off error: ${e.message}</div>`;console.error('timeOffTaskView:',e);}}
   else if(D.tab==='operations')html=operationsView();
   else if(D.tab==='areas')html=operationsView();
   else if(D.tab==='shifts')html=operationsView();
   else if(D.tab==='zonenshift')html=operationsView();
-  else if(D.tab==='documents')html=docsView();
+  else if(D.tab==='documents'){try{html=docsView();}catch(e){html=`<div style="padding:40px;text-align:center;color:var(--g3)">Documents error: ${e.message}</div>`;console.error('docsView:',e);}}
   else if(D.tab==='access')html=accessView();
   else if(D.tab==='myschedule')html=mySchedView();
-  else if(D.tab==='attendance')html=attendanceView();
+  else if(D.tab==='attendance'){try{html=attendanceView();}catch(e){html=`<div style="padding:40px;text-align:center;color:var(--g3)">Attendance loading failed: ${e.message}</div>`;console.error('attendanceView error:',e);}}
   else if(D.tab==='myattendance')html=myAttendanceView();
   document.getElementById('main').innerHTML=`<div class="fade-in">${html}</div>`;
 }
