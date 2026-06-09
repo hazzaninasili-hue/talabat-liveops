@@ -541,7 +541,17 @@ const fmt=d=>`${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()}`;
 const wNum=d=>{const j=new Date(d.getFullYear(),0,1);return Math.ceil(((d-j)/86400000+j.getDay()+1)/7);};
 const fmtT=t=>{if(!t||t==='?')return'?';const[h,m]=t.split(':');const hr=parseInt(h);return`${hr===0?12:hr>12?hr-12:hr}:${m} ${hr<12||hr===24?'AM':'PM'}`;};
 const isAdmin=()=>D.profile&&D.profile.role==='admin';
-const canEdit=()=>D.profile&&(D.profile.role==='admin'||D.profile.role==='lead');
+const canEdit=()=>{
+  if(!D.profile)return false;
+  if(D.profile.role==='admin'||D.profile.role==='lead')return true;
+  // Check custom role access level
+  if(D.profile.role&&D.profile.role.startsWith('custom:')){
+    const roleId=D.profile.role.replace('custom:','');
+    const cr=(D.customRoles||[]).find(r=>r.id===roleId);
+    return cr&&(cr.access_level==='editor'||cr.access_level==='admin');
+  }
+  return false;
+};
 const roleBg=r=>r==='admin'?'#EDE9FE':r==='lead'?'#EAF1FD':r==='coordinator'?'#CCFBF1':'#F1F5F9';
 const roleCol=r=>r==='admin'?'#4C1D95':r==='lead'?'#0C4FB3':r==='coordinator'?'#134E4A':'#475569';
 const roleLabel=r=>r==='admin'?'Admin':r==='lead'?'Team Lead':r==='coordinator'?'Coordinator':'Patroller';
@@ -1080,18 +1090,10 @@ function operationsView(){
         </div>
         <div style="font-size:10px;color:var(--g3)">Built-in</div>
       </div>`).join('');
-    const customCards=roles.length>0?roles.map(r=>`
-      <div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;padding:16px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(65,21,23,.06)">
-        <div style="width:44px;height:44px;border-radius:12px;background:#FFF0E6;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <i class="ti ti-user-check" style="font-size:20px;color:#FF5900"></i>
-        </div>
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:700;color:#2A0D0F">${r.name}</div>
-          ${r.description?`<div style="font-size:11px;color:var(--g3);margin-top:3px">${r.description}</div>`:''}
-          <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#FFF0E6;color:#FF5900;margin-top:5px;display:inline-block">Custom role</span>
-        </div>
-        ${ed?`<button class="icon-btn" onclick="delCustomRole('${r.id}','${r.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>`:''}
-      </div>`).join(''):'';
+    const accessBg={viewer:'#EAF1FD',editor:'#FFF0E6',admin:'#DCFCE7'};
+    const accessCol={viewer:'#0C4FB3',editor:'#FF5900',admin:'#166534'};
+    const accessLabel={viewer:'👁 Viewer',editor:'✏️ Editor',admin:'🔐 Admin'};
+    const customCards=roles.length>0?roles.map(r=>{const al=r.access_level||'viewer';return`<div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;padding:16px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(65,21,23,.06)"><div style="width:44px;height:44px;border-radius:12px;background:${accessBg[al]||'#FFF0E6'};display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-user-check" style="font-size:20px;color:${accessCol[al]||'#FF5900'}"></i></div><div style="flex:1"><div style="font-size:13px;font-weight:700;color:#2A0D0F">${r.name}</div>${r.description?`<div style="font-size:11px;color:var(--g3);margin-top:3px">${r.description}</div>`:''}<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap"><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#FFF0E6;color:#FF5900">Custom</span><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:${accessBg[al]};color:${accessCol[al]}">${accessLabel[al]||al}</span></div></div>${ed?`<button class="icon-btn" onclick="delCustomRole('${r.id}','${r.name.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button>`:''}</div>`;}).join(''):'';
     return header+`
       <div style="margin-bottom:12px;font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">System Roles</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:20px">${sysCards}</div>
@@ -1534,6 +1536,32 @@ function renderModal(){
     <div class="msg msg-err" id="role-e"></div>
     <div class="fg"><label>Role name</label><input id="role-name" placeholder="e.g. Senior Patroller, Zone Supervisor"></div>
     <div class="fg"><label>Description (optional)</label><input id="role-desc" placeholder="What does this role do?"></div>
+    <div class="fg"><label>Access level</label>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+        <label style="display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border:1.5px solid #E8DDD4;border-radius:10px;cursor:pointer;transition:border .13s" onclick="document.querySelectorAll('.al-opt').forEach(x=>x.style.borderColor='#E8DDD4');this.style.borderColor='#FF5900';document.getElementById('role-access').value='viewer'">
+          <input type="radio" name="role-access-radio" value="viewer" style="margin-top:2px;accent-color:#FF5900">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#2A0D0F">👁 Viewer</div>
+            <div style="font-size:11px;color:#A08070;margin-top:2px">View-only access — can see schedules, attendance, tasks and documents but cannot make any changes</div>
+          </div>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border:1.5px solid #E8DDD4;border-radius:10px;cursor:pointer;transition:border .13s" onclick="document.querySelectorAll('.al-opt').forEach(x=>x.style.borderColor='#E8DDD4');this.style.borderColor='#FF5900';document.getElementById('role-access').value='editor'">
+          <input type="radio" name="role-access-radio" value="editor" style="margin-top:2px;accent-color:#FF5900">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#2A0D0F">✏️ Editor</div>
+            <div style="font-size:11px;color:#A08070;margin-top:2px">Can edit zones, shifts, attendance, tasks and time-off requests — cannot manage users or access control</div>
+          </div>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border:1.5px solid #E8DDD4;border-radius:10px;cursor:pointer;transition:border .13s" onclick="document.querySelectorAll('.al-opt').forEach(x=>x.style.borderColor='#E8DDD4');this.style.borderColor='#FF5900';document.getElementById('role-access').value='admin'">
+          <input type="radio" name="role-access-radio" value="admin" style="margin-top:2px;accent-color:#FF5900">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#2A0D0F">🔐 Admin</div>
+            <div style="font-size:11px;color:#A08070;margin-top:2px">Full access within this department — manage users, schedules, attendance, tasks, documents and settings</div>
+          </div>
+        </label>
+      </div>
+      <input type="hidden" id="role-access" value="viewer">
+    </div>
     <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveCustomRole()"><i class="ti ti-check"></i>Add role</button></div>`;return;
   }
   if(m.type==='cell'){
@@ -2685,8 +2713,10 @@ async function saveCustomRole(){
   const e=document.getElementById('role-e');e.style.display='none';
   const name=(document.getElementById('role-name').value||'').trim();
   const desc=(document.getElementById('role-desc').value||'').trim();
+  const access=document.getElementById('role-access').value||'viewer';
   if(!name){e.textContent='Role name required.';e.style.display='block';return;}
-  const{error}=await sb.from('custom_roles').insert({name,description:desc||null,department_id:D.currentDept||null});
+  if(!document.querySelector('input[name="role-access-radio"]:checked')){e.textContent='Please select an access level.';e.style.display='block';return;}
+  const{error}=await sb.from('custom_roles').insert({name,description:desc||null,access_level:access,department_id:D.currentDept||null});
   if(error){e.textContent=error.message;e.style.display='block';return;}
   closeM();await reload();
 }
