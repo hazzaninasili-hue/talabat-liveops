@@ -340,6 +340,15 @@ async function doLogin(){
   }catch(e){btn.disabled=false;btn.textContent='Sign in';showErr('login-err',e.message||'Login failed. Try again.');}
 }
 
+async function loadDepartments(){
+  try{
+    const{data,error}=await wt(sb.from('departments').select('*').order('name'),5000);
+    if(error){console.warn('Dept load error:',error.message);D.departments=[];}
+    else D.departments=data||[];
+  }catch(e){D.departments=[];console.warn('Dept load failed:',e.message);}
+}
+
+
 async function afterLogin(user){
   D.user=user;showApp();
   document.getElementById('main').innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:14px;color:#94A3B8"><div style="width:34px;height:34px;border:3px solid #E2E8F0;border-top-color:#1A6FE8;border-radius:50%;animation:spin .7s linear infinite"></div><div>Loading...</div></div>';
@@ -389,52 +398,42 @@ async function afterLogin(user){
 function wt(p,ms=8000){return Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms))]);}
 
 async function loadAll(){
-  try{
-    const[sh,ar,zo,pt,sc]=await Promise.all([
-      wt(sb.from('shifts').select('*').order('created_at')),
-      wt(sb.from('areas').select('*').order('name')),
-      wt(sb.from('zones').select('*').order('name')),
-      wt(sb.from('patrollers').select('*').eq('is_active',true).order('name')),
-      wt(sb.from('schedules').select('*')),
-    ]);
-    D.shifts=sh.data||[];D.areas=ar.data||[];D.zones=zo.data||[];D.patrollers=pt.data||[];D.schedules=sc.data||[];
-  }catch(e){console.error('data:',e);}
-  try{const{data:notes}=await wt(sb.from('notes').select('*'),5000);
-    if(notes){
-      const nAll=notes.find(n=>n.audience==='all')||notes.find(n=>!n.audience)||notes[0];
-      const nPat=notes.find(n=>n.audience==='patroller');
-      const nCoo=notes.find(n=>n.audience==='coordinator');
-      D.notesAll={id:nAll?.id||null,content:nAll?.content||''};
-      D.notesPat={id:nPat?.id||null,content:nPat?.content||''};
-      D.notesCoo={id:nCoo?.id||null,content:nCoo?.content||''};
-    }
-  }catch(e){}
-  try{const{data:docs}=await wt(sb.from('documents').select('*').order('created_at',{ascending:false}),5000);D.docs=docs||[];}catch(e){}
-  try{const{data:hist}=await wt(sb.from('schedule_history').select('*,profiles(full_name)').order('changed_at',{ascending:false}).limit(300),5000);D.history=hist||[];}catch(e){}
-  try{const{data:tor}=await wt(sb.from('time_off_requests').select('*').order('created_at',{ascending:false}),5000);D.timeoff=tor||[];}catch(e){}
-  if(D.profile?.role==='admin'||D.profile?.role==='lead'){
-    try{
-      const deptFilter=D.currentDept;
-      const q=deptFilter?sb.from('profiles').select('*').eq('department_id',deptFilter).order('full_name'):sb.from('profiles').select('*').order('full_name');
-      const{data:users}=await wt(q,5000);D.users=users||[];
-    }catch(e){}
+  const df=D.currentDept;
+  const safe=async(fn)=>{try{const r=await fn();return r;}catch(e){return null;}};
+  const[sh,ar,zo,pt,sc,notes,docs,tor,tk,cr,lp,att,users]=await Promise.all([
+    safe(()=>wt(df?sb.from('shifts').select('*').eq('department_id',df).order('created_at'):sb.from('shifts').select('*').order('created_at'),4000)),
+    safe(()=>wt(df?sb.from('areas').select('*').eq('department_id',df).order('name'):sb.from('areas').select('*').order('name'),4000)),
+    safe(()=>wt(sb.from('zones').select('*').order('name'),4000)),
+    safe(()=>wt(df?sb.from('patrollers').select('*').eq('department_id',df).eq('is_active',true).order('name'):sb.from('patrollers').select('*').eq('is_active',true).order('name'),4000)),
+    safe(()=>wt(sb.from('schedules').select('*'),4000)),
+    safe(()=>wt(sb.from('notes').select('*'),4000)),
+    safe(()=>wt(sb.from('documents').select('*').order('created_at',{ascending:false}),4000)),
+    safe(()=>wt(sb.from('time_off_requests').select('*').order('created_at',{ascending:false}),4000)),
+    safe(()=>wt(sb.from('task_requests').select('*').order('created_at',{ascending:false}),4000)),
+    safe(()=>wt(df?sb.from('custom_roles').select('*').eq('department_id',df).order('name'):sb.from('custom_roles').select('*').order('name'),4000)),
+    safe(()=>wt(sb.from('location_permissions').select('*'),4000)),
+    safe(()=>wt(sb.from('attendance').select('*').order('date',{ascending:false}).limit(500),4000)),
+    safe(()=>wt(df?sb.from('profiles').select('*').eq('department_id',df).order('full_name'):sb.from('profiles').select('*').order('full_name'),4000)),
+  ]);
+  D.shifts=sh?.data||[];D.areas=ar?.data||[];D.zones=zo?.data||[];
+  D.patrollers=pt?.data||[];D.schedules=sc?.data||[];
+  D.docs=docs?.data||[];D.timeoff=tor?.data||[];
+  D.tasks=tk?.data||[];D.customRoles=cr?.data||[];
+  D.attendance=att?.data||[];
+  D.locPerms={};(lp?.data||[]).forEach(r=>{D.locPerms[r.patroller_id]=r;});
+  D.biometricDevices=[];
+  if(notes?.data){
+    const nd=notes.data;
+    const nAll=nd.find(n=>n.audience==='all')||nd[0];
+    const nPat=nd.find(n=>n.audience==='patroller');
+    const nCoo=nd.find(n=>n.audience==='coordinator');
+    D.notesAll={id:nAll?.id||null,content:nAll?.content||''};
+    D.notesPat={id:nPat?.id||null,content:nPat?.content||''};
+    D.notesCoo={id:nCoo?.id||null,content:nCoo?.content||''};
   }
-  try{const{data:tk}=await wt(sb.from('task_requests').select('*').order('created_at',{ascending:false}),5000);D.tasks=tk||[];}catch(e){D.tasks=[];}
-  try{const deptF=D.currentDept;const rq=deptF?sb.from('custom_roles').select('*').eq('department_id',deptF).order('name'):sb.from('custom_roles').select('*').order('name');const{data:cr}=await wt(rq,5000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
-  try{
-    const{data:lp}=await wt(sb.from('location_permissions').select('*'),5000);
-    D.locPerms={};(lp||[]).forEach(r=>{D.locPerms[r.patroller_id]=r;});
-  }catch(e){D.locPerms={};}
-  try{
-    const{data:bd}=await wt(sb.from('device_biometric').select('*').order('last_login',{ascending:false}),3000);
-    D.biometricDevices=bd||[];
-  }catch(e){D.biometricDevices=[];console.warn('Biometric table not ready');}
-  try{
-    const{data:att,error:atterr}=await wt(sb.from('attendance').select('*').order('date',{ascending:false}).limit(500),5000);
-    if(atterr){console.warn('Attendance table not ready:',atterr.message);D.attendance=[];}
-    else D.attendance=att||[];
-  }catch(e){D.attendance=[];console.warn('Attendance load failed:',e.message);}
+  D.users=users?.data||[];
 }
+
 async function reload(){await loadAll();render();}
 async function sendWebhook(event,data){
   try{await fetch(WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event,...data,sent_at:new Date().toISOString()})});}catch(e){}
@@ -490,7 +489,7 @@ function isAbsentToday(pid){return isAbsentOnDate(pid,todayStr());}
 function getUtype(p){const u=D.users.find(u=>u.id===p.user_id);if(u){return u.role==='coordinator'?'coordinator':'patroller';}return p.user_type||'patroller';}
 function summ(pts){const p=pts||activePats();const am=Array(7).fill(0),pm=Array(7).fill(0),off=Array(7).fill(0);
   p.forEach(pt=>{for(let i=0;i<7;i++){
-    const dates=wDates();const dayStr=dates[i]?dateToStr(dates[i]):'';
+    const dates=wDates();const dayStr=dates[i]?dates[i].toISOString().split('T')[0]:'';
     const onVacDay=dayStr?D.timeoff.find(t=>t.patroller_id===pt.id&&t.status==='Approved'&&dayStr>=t.start_date&&dayStr<=t.end_date):false;
     const isAbs=dayStr?isAbsentOnDate(pt.id,dayStr):false;
     if(onVacDay||isAbs){/* skip — vacation or absent */}
@@ -2592,13 +2591,6 @@ async function saveTaskReq(){
 
 
 // ── DEPARTMENT FUNCTIONS ──
-async function loadDepartments(){
-  try{
-    const{data,error}=await wt(sb.from('departments').select('*').order('name'),5000);
-    if(error){console.warn('Dept load error:',error.message);D.departments=[];}
-    else D.departments=data||[];
-  }catch(e){D.departments=[];console.warn('Dept load failed:',e.message);}
-}
 
 async function enterDepartment(deptId){
   D.currentDept=deptId;
