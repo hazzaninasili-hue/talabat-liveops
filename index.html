@@ -1347,31 +1347,129 @@ function mySchedView(){
   if(!p)return`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-user-off" style="font-size:40px;display:block;margin-bottom:10px"></i>Your account is not linked to a schedule record.<br><span style="font-size:12px">Contact your admin to link your account.</span></div>`;
   const dates=wDates();const sh=gsh(p.shift_id);const wn=wNum(dates[0]);
   const today=todayStr();
-  
-  // Get active running tasks for this patroller (any date, not just today)
-  const runningTasks=((D.tasks||[]).filter(t=>t.patroller_id===p.id&&t.status==='Running'))||[];
-  
-  const activeTasks=runningTasks.map(t=>{
-    const col=TASK_COLORS[t.task_type]||'#411517';
-    const bg=TASK_BG[t.task_type]||'#F4EDE3';
-    return`<div style="background:${bg};border:1.5px solid #E8DDD4;border-radius:12px;padding:14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px">
-      <div style="flex:1">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${bg};color:${col}">${t.task_type}</span>
-          <span style="font-size:10px;font-weight:700;color:#16A34A;background:#DCFCE7;padding:2px 8px;border-radius:8px"><i class="ti ti-circle-filled" style="font-size:6px;margin-right:3px;animation:pulse 1.5s infinite"></i>Running</span>
+  const todayIdx={6:0,0:1,1:2,2:3,3:4,4:5,5:6}[new Date().getDay()];
+  const todayZone=gDZ(p.id,todayIdx);
+  const todayOnVac=isOnVacationToday(p.id);
+  const todayAbsent=isAbsentToday(p.id);
+  const runningTasks=(D.tasks||[]).filter(t=>t.patroller_id===p.id&&t.status==='Running');
+
+  // ── Hero card: today status ──
+  const heroStatus=todayOnVac?{icon:'🌴',label:'On Vacation',color:'#7C3AED',bg:'linear-gradient(135deg,#7C3AED,#A855F7)'}
+    :todayAbsent?{icon:'✗',label:'Absent Today',color:'#DC2626',bg:'linear-gradient(135deg,#DC2626,#EF4444)'}
+    :!todayZone?{icon:'☕',label:'Off Today',color:'#A08070',bg:'linear-gradient(135deg,#6B4C4E,#A08070)'}
+    :sh.shift_type==='morning'?{icon:'☀️',label:'On Shift',color:'#FF5900',bg:'linear-gradient(135deg,#FF5900,#FF8C42)'}
+    :{icon:'🌙',label:'On Shift',color:'#D97706',bg:'linear-gradient(135deg,#D97706,#F59E0B)'};
+
+  const heroCard=`
+  <div style="background:${heroStatus.bg};border-radius:20px;padding:24px 20px;margin-bottom:16px;color:#fff;position:relative;overflow:hidden">
+    <div style="position:absolute;right:-20px;top:-20px;font-size:100px;opacity:.15">${heroStatus.icon}</div>
+    <div style="display:flex;align-items:center;gap:14px;position:relative">
+      <div style="width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0">${ini(p.name)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:18px;font-weight:700;margin-bottom:2px">${p.name}</div>
+        <div style="font-size:13px;opacity:.85;margin-bottom:6px">${D.profile.custom_role_id?(D.customRoles||[]).find(r=>r.id===D.profile.custom_role_id)?.name||'':sh.shift_type==='morning'?'Morning Shift':'Evening Shift'}</div>
+        <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.25);padding:5px 12px;border-radius:20px">
+          <span style="font-size:13px;font-weight:700">${heroStatus.icon} ${heroStatus.label}</span>
+          ${todayZone&&!todayOnVac&&!todayAbsent?`<span style="font-size:11px;opacity:.9">· ${todayZone}</span>`:''}
         </div>
-        <div style="font-size:13px;font-weight:600;color:#2A0D0F;margin-bottom:3px">${t.description||t.task_type}</div>
-        <div style="font-size:11px;color:var(--g3)">Started: ${t.start_time||'--'}</div>
       </div>
-      <button class="btn btn-primary" style="white-space:nowrap" onclick="endTaskPatroller('${t.id}')"><i class="ti ti-player-stop"></i>End Task</button>
-    </div>`;
-  }).join('');
-  
-  return`<div class="toolbar"><button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button><span class="wk-range">Week ${wn} - ${fmt(dates[0])} to ${fmt(dates[6])}</span><button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button><div class="seg"><button class="seg-btn${D.view==='week'?' active':''}" onclick="D.view='week';render()">Week</button><button class="seg-btn${D.view==='date'?' active':''}" onclick="D.view='date';render()">Daily</button></div></div>
-  <div class="my-card"><div class="my-av" style="background:${sh.shift_type==='morning'?'var(--blue-l)':'var(--amber-l)'};color:${sh.shift_type==='morning'?'var(--blue-d)':'var(--amber-d)'}">${ini(p.name)}</div><div><div class="my-name">${p.name}</div><div class="my-meta"><span class="shift-badge ${sh.shift_type==='morning'?'m':'e'}">${sh.name} - ${fmtT(sh.start_time)} to ${fmtT(sh.end_time)}</span>${p.cov_area?` - <span style="color:var(--g3)">${p.cov_area}</span>`:''}</div></div></div>
-  ${runningTasks.length>0?`<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:700;color:#16A34A;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-player-play" style="margin-right:4px"></i>Active Tasks</div><style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}</style>${activeTasks}</div>`:''}
-  ${D.view==='week'?`<div class="tcard"><div class="t-scroll"><table style="table-layout:auto;min-width:700px"><thead><tr>${dates.map((d,i)=>`<th style="min-width:88px">${SD[i]}<br><span style="font-family:monospace;font-size:9px;font-weight:400">${fmt(d)}</span></th>`).join('')}</tr></thead><tbody><tr>${DAYS.map((_,i)=>{const z=gDZ(p.id,i);const ds=gDS(p.id,i);const dsh=ds?D.shifts.find(s=>s.id===ds):sh;return z?`<td><span class="zone-chip">${z}</span><div style="font-size:8px;color:var(--g3);margin-top:2px">${dsh?.shift_type==='morning'?'☀️':'🌙'} ${fmtT(dsh?.start_time)}-${fmtT(dsh?.end_time)}</div></td>`:`<td><span class="off-badge">Off Day</span></td>`;}).join('')}</tr></tbody></table></div></div>`:`<div class="date-grid">${dates.map((d,i)=>{const z=gDZ(p.id,i);const io=!z;return`<div class="date-card"><div class="dc-head"${io?' style="background:var(--red-l)"':''}><div class="dc-day">${DAYS[i]}</div><div class="dc-date">${fmt(d)}</div></div><div style="padding:12px;text-align:center">${io?`<span class="off-badge" style="font-size:11px;padding:4px 12px">Off Day</span>`:`<span class="zone-chip">${z}</span>`}</div></div>`;}).join('')}</div>`}
-  ${notesBar()}`;
+    </div>
+    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;position:relative">
+      <div style="background:rgba(255,255,255,.2);border-radius:12px;padding:10px 14px">
+        <div style="font-size:10px;opacity:.75;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Shift time</div>
+        <div style="font-size:14px;font-weight:700">${sh.start_time&&sh.start_time!=='?'?fmtT(sh.start_time)+' – '+fmtT(sh.end_time):'Not set'}</div>
+      </div>
+      <div style="background:rgba(255,255,255,.2);border-radius:12px;padding:10px 14px">
+        <div style="font-size:10px;opacity:.75;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Today's zone</div>
+        <div style="font-size:14px;font-weight:700">${todayOnVac?'On vacation':todayAbsent?'Absent':todayZone||'Off day'}</div>
+      </div>
+    </div>
+  </div>`;
+
+  // ── Running tasks ──
+  const taskCards=runningTasks.length?`
+  <div style="margin-bottom:16px">
+    <div style="font-size:11px;font-weight:700;color:#16A34A;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-player-play" style="margin-right:4px"></i>Active Tasks</div>
+    ${runningTasks.map(t=>{
+      const col=TASK_COLORS[t.task_type]||'#411517';
+      const bg=TASK_BG[t.task_type]||'#F4EDE3';
+      return`<div style="background:${bg};border:1.5px solid ${col}33;border-radius:14px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${col}22;color:${col}">${t.task_type}</span>
+            <span style="font-size:10px;font-weight:700;color:#16A34A"><i class="ti ti-circle-filled" style="font-size:6px;margin-right:2px;animation:pulse 1.5s infinite"></i>Running</span>
+          </div>
+          <div style="font-size:13px;font-weight:600;color:#2A0D0F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.description||t.task_type}</div>
+          <div style="font-size:11px;color:#A08070;margin-top:2px">Started: ${t.start_time||'--'}</div>
+        </div>
+        <button class="btn btn-primary" style="white-space:nowrap;flex-shrink:0" onclick="endTaskPatroller('${t.id}')"><i class="ti ti-player-stop"></i>End</button>
+      </div>`;
+    }).join('')}
+  </div>`:'';
+
+  // ── Week view ──
+  const weekNav=`
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button>
+    <span style="font-size:13px;font-weight:600;color:#411517">Week ${wn} · ${fmt(dates[0])} – ${fmt(dates[6])}</span>
+    <button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button>
+  </div>
+  <div style="display:flex;background:#F4EDE3;border-radius:10px;padding:4px;gap:2px;margin-bottom:14px">
+    <button class="seg-btn${D.view==='week'?' active':''}" onclick="D.view='week';render()" style="flex:1">Week</button>
+    <button class="seg-btn${D.view==='date'?' active':''}" onclick="D.view='date';render()" style="flex:1">Daily</button>
+  </div>`;
+
+  const weekGrid=D.view==='week'?`
+  <div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:16px;overflow:hidden">
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <table style="width:100%;min-width:560px;border-collapse:collapse">
+        <thead><tr style="background:#F4EDE3">${dates.map((d,i)=>{
+          const isToday=d.toISOString().split('T')[0]===today;
+          return`<th style="padding:10px 8px;font-size:11px;font-weight:700;color:${isToday?'#FF5900':'#411517'};text-align:center;border-bottom:1.5px solid #E8DDD4;white-space:nowrap">
+            ${SD[i]}<br><span style="font-size:9px;font-weight:400;font-family:monospace;color:${isToday?'#FF5900':'#A08070'}">${fmt(d)}</span>
+          </th>`;
+        }).join('')}</tr></thead>
+        <tbody><tr>${DAYS.map((_,i)=>{
+          const z=gDZ(p.id,i);
+          const ds=gDS(p.id,i);
+          const dsh=ds?D.shifts.find(s=>s.id===ds):sh;
+          const isToday=dates[i].toISOString().split('T')[0]===today;
+          const onVacDay=D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&dates[i].toISOString().split('T')[0]>=t.start_date&&dates[i].toISOString().split('T')[0]<=t.end_date);
+          if(onVacDay)return`<td style="padding:12px 8px;text-align:center;background:${isToday?'#FFFBF5':''}"><span style="font-size:20px">🌴</span><div style="font-size:9px;color:#7C3AED;font-weight:600;margin-top:2px">Vacation</div></td>`;
+          if(!z)return`<td style="padding:12px 8px;text-align:center;background:${isToday?'#FFFBF5':''}"><span style="font-size:11px;color:#A08070;font-weight:500">Off</span></td>`;
+          return`<td style="padding:10px 8px;text-align:center;background:${isToday?'#FFFBF5':''}">
+            <div style="background:${dsh?.shift_type==='morning'?'#FFF0E6':'#FEF3C7'};border:1.5px solid ${dsh?.shift_type==='morning'?'#FF5900':'#D97706'}33;border-radius:10px;padding:6px 8px">
+              <div style="font-size:12px;font-weight:700;color:${dsh?.shift_type==='morning'?'#FF5900':'#D97706'}">${z}</div>
+              <div style="font-size:9px;color:#A08070;margin-top:2px">${dsh?.shift_type==='morning'?'☀️':'🌙'} ${fmtT(dsh?.start_time)}</div>
+            </div>
+          </td>`;
+        }).join('')}</tr></tbody>
+      </table>
+    </div>
+  </div>`:`
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+    ${dates.map((d,i)=>{
+      const z=gDZ(p.id,i);
+      const ds=d.toISOString().split('T')[0];
+      const isToday=ds===today;
+      const onVacDay=D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds>=t.start_date&&ds<=t.end_date);
+      const status=onVacDay?{label:'🌴 Vacation',color:'#7C3AED',bg:'#EDE9FE'}
+        :!z?{label:'☕ Off Day',color:'#A08070',bg:'#F4EDE3'}
+        :{label:z,color:sh.shift_type==='morning'?'#FF5900':'#D97706',bg:sh.shift_type==='morning'?'#FFF0E6':'#FEF3C7'};
+      return`<div style="background:${isToday?'#FFFBF5':'#fff'};border:${isToday?'2px solid #FF5900':'1.5px solid #E8DDD4'};border-radius:14px;overflow:hidden">
+        <div style="padding:8px 12px;background:${isToday?'#FF5900':'#F4EDE3'}">
+          <div style="font-size:13px;font-weight:700;color:${isToday?'#fff':'#411517'}">${DAYS[i]}</div>
+          <div style="font-size:10px;color:${isToday?'rgba(255,255,255,.8)':'#A08070'};font-family:monospace">${fmt(d)}</div>
+        </div>
+        <div style="padding:12px;text-align:center">
+          <div style="font-size:14px;font-weight:700;color:${status.color}">${status.label}</div>
+          ${!onVacDay&&z?`<div style="font-size:10px;color:#A08070;margin-top:3px">${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}–${fmtT(sh.end_time)}</div>`:''}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+
+  return heroCard+taskCards+weekNav+weekGrid+notesBar();
 }
 
 function renderTabs(){
