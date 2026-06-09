@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Talabat Live Ops</title>
+<title>Talabat Operations</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
@@ -185,7 +185,7 @@ table tr:hover td{background:rgba(26,111,232,.02)}
 
 <div id="s-login" class="auth-wrap">
   <div class="auth-box">
-    <div class="auth-brand"><div class="auth-brand-ico"><i class="ti ti-shield-check"></i></div><div><div class="auth-brand-name">Talabat Live Ops</div><div class="auth-brand-sub">Coordinator &amp; RQS Profile</div></div></div>
+    <div class="auth-brand"><div class="auth-brand-ico"><i class="ti ti-shield-check"></i></div><div><div class="auth-brand-name">Talabat Operations</div><div class="auth-brand-sub">Live Ops Management</div></div></div>
     <h2>Sign in</h2><div class="auth-sub">Enter your work email to continue.</div><div id="login-form-area">
     <div class="msg msg-err" id="login-err"></div>
     <div class="msg msg-ok" id="login-ok"></div>
@@ -201,7 +201,7 @@ table tr:hover td{background:rgba(26,111,232,.02)}
 
 <div id="s-newpw" class="auth-wrap" style="display:none">
   <div class="auth-box">
-    <div class="auth-brand"><div class="auth-brand-ico"><i class="ti ti-shield-check"></i></div><div><div class="auth-brand-name">Talabat Live Ops</div><div class="auth-brand-sub">Coordinator &amp; RQS Profile</div></div></div>
+    <div class="auth-brand"><div class="auth-brand-ico"><i class="ti ti-shield-check"></i></div><div><div class="auth-brand-name">Talabat Operations</div><div class="auth-brand-sub">Live Ops Management</div></div></div>
     <h2>Set new password</h2><div class="auth-sub">Choose a strong password.</div>
     <div class="msg msg-err" id="newpw-err"></div><div class="msg msg-ok" id="newpw-ok"></div>
     <div class="fg"><label>New password</label><div class="pw-wrap"><input type="password" id="newpw1" placeholder="Min 8 characters"><button class="pw-eye" onclick="togglePw('newpw1',this)"><i class="ti ti-eye"></i></button></div></div>
@@ -214,8 +214,12 @@ table tr:hover td{background:rgba(26,111,232,.02)}
   <div class="topbar">
     <div class="topbar-brand">
       <div class="topbar-ico"><i class="ti ti-shield-check"></i></div>
-      <div><div class="topbar-name">Talabat Live Ops</div><div class="topbar-sub">Coordinator &amp; RQS Profile</div></div>
-      <span class="wk-chip" id="wk-chip">--</span>
+      <div><div class="topbar-name">Talabat Operations</div><div class="topbar-sub">Live Ops Management</div></div>
+      <div id="wk-chip-wrap" style="position:relative;display:inline-block">
+        <span class="wk-chip" id="wk-chip" style="cursor:pointer" onclick="toggleDeptDropdown()">-- <i class="ti ti-chevron-down" style="font-size:9px"></i></span>
+        <div id="dept-dropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;background:#1E293B;border:1px solid rgba(255,255,255,.15);border-radius:10px;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:200;overflow:hidden">
+        </div>
+      </div>
     </div>
     <div class="topbar-right">
       <div class="user-chip" id="user-chip"></div>
@@ -259,6 +263,37 @@ let D={user:null,profile:null,tab:'schedule',view:'week',woff:0,search:'',modal:
   departments:[],currentDept:null,superView:false};
 
 const isSuperAdmin=()=>D.user?.email===SUPER_ADMIN;
+
+function toggleDeptDropdown(){
+  if(!isSuperAdmin())return;
+  const dd=document.getElementById('dept-dropdown');
+  if(!dd)return;
+  const isOpen=dd.style.display==='block';
+  if(isOpen){dd.style.display='none';return;}
+  // Build dropdown
+  const depts=D.departments||[];
+  let html='';
+  if(depts.length===0){
+    html=`<div style="padding:12px 14px;font-size:12px;color:rgba(255,255,255,.4)">No departments yet</div>`;
+  } else {
+    depts.forEach(d=>{
+      const isActive=D.currentDept===d.id;
+      html+=`<div onclick="enterDepartment('${d.id}');toggleDeptDropdown()" style="padding:10px 14px;font-size:12.5px;font-weight:${isActive?'700':'500'};color:${isActive?'#FF5900':'rgba(255,255,255,.85)'};cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='transparent'">
+        <div style="width:10px;height:10px;border-radius:50%;background:${d.color||'#FF5900'};flex-shrink:0"></div>
+        ${d.name}${isActive?' ✓':''}
+      </div>`;
+    });
+  }
+  html+=`<div style="border-top:1px solid rgba(255,255,255,.1);padding:8px 14px">
+    <div onclick="exitToDashboard();toggleDeptDropdown()" style="font-size:11.5px;color:rgba(255,255,255,.5);cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 0" onmouseover="this.style.color='#FF5900'" onmouseout="this.style.color='rgba(255,255,255,.5)'">
+      <i class="ti ti-layout-grid" style="font-size:12px"></i> All Departments
+    </div>
+  </div>`;
+  dd.innerHTML=html;
+  dd.style.display='block';
+  // Close on outside click
+  setTimeout(()=>document.addEventListener('click',function h(e){if(!dd.contains(e.target)&&e.target.id!=='wk-chip'){dd.style.display='none';document.removeEventListener('click',h);}},),50);
+}
 function showS(n){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display=n==='login'?'flex':'none';if(np)np.style.display=n==='newpw'?'flex':'none';document.getElementById('app').style.display='none';}
 function showApp(){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display='none';if(np)np.style.display='none';document.getElementById('app').style.display='block';}
 function showErr(id,m){const e=document.getElementById(id);if(e){e.textContent=m;e.style.display='block';}}
@@ -1207,7 +1242,16 @@ function render(){
   }
   const dates=wDates();const wn=wNum(dates[0]);
   const dept=D.currentDept?D.departments.find(d=>d.id===D.currentDept):null;
-  document.getElementById('wk-chip').textContent=dept?dept.name:`Week ${wn} - ${dates[0].getFullYear()}`;
+  const chipEl=document.getElementById('wk-chip');
+  if(chipEl){
+    if(isSuperAdmin()){
+      chipEl.innerHTML=`${dept?dept.name:'All Departments'} <i class="ti ti-chevron-down" style="font-size:9px"></i>`;
+      chipEl.style.cursor='pointer';
+    } else {
+      chipEl.textContent=dept?dept.name:`Week ${wn} - ${dates[0].getFullYear()}`;
+      chipEl.style.cursor='default';
+    }
+  }
   const u=D.profile;
   document.getElementById('user-chip').innerHTML=`<div class="user-av" style="background:${roleBg(u.role)};color:${roleCol(u.role)}">${ini(u.full_name)}</div><div><div class="user-nm">${u.full_name}</div><div class="user-rl">${roleLabel(u.role)}</div></div>`;
   renderTabs();
@@ -2476,7 +2520,8 @@ function renderSuperDash(){
   showApp();
   // Update topbar for super admin
   const u=D.profile;
-  document.getElementById('wk-chip').textContent='Super Admin';
+  const sc=document.getElementById('wk-chip');
+  if(sc){sc.innerHTML='All Departments <i class="ti ti-chevron-down" style="font-size:9px"></i>';sc.style.cursor='pointer';}
   document.getElementById('user-chip').innerHTML=`<div class="user-av" style="background:#FF5900;color:#fff">SA</div><div><div class="user-nm">${u.full_name}</div><div class="user-rl">Super Admin</div></div>`;
   document.getElementById('tabs').innerHTML='';
 
