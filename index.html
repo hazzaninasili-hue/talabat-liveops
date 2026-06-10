@@ -2563,7 +2563,7 @@ function showLocationWarning(){
   if(existing)return;
   const banner=document.createElement('div');
   banner.id='loc-warning-banner';
-  banner.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#DC2626;color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;box-shadow:0 -4px 16px rgba(0,0,0,.2)';
+  banner.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#DC2626;color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-family:sans-serif;font-size:13px;box-shadow:0 -4px 16px rgba(0,0,0,.2)';
   banner.innerHTML=`<div style="display:flex;align-items:center;gap:10px">
     <i class="ti ti-map-pin-off" style="font-size:20px;flex-shrink:0"></i>
     <div><strong>Location access denied</strong> — You must enable location permissions to clock in/out. Go to your browser settings and allow location for this site.</div>
@@ -3795,7 +3795,7 @@ function showToast(msg,type='info'){
   let toast=document.getElementById('toast-container');
   if(!toast){toast=document.createElement('div');toast.id='toast-container';toast.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:300px';document.body.appendChild(toast);}
   const t=document.createElement('div');
-  t.style.cssText=`background:${bgs[type]};border:1.5px solid ${cols[type]}33;border-radius:12px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);animation:slideIn .2s ease;font-family:'Plus Jakarta Sans',sans-serif`;
+  t.style.cssText=`background:${bgs[type]};border:1.5px solid ${cols[type]}33;border-radius:12px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);animation:slideIn .2s ease;font-family:inherit`;
   t.innerHTML=`<i class="ti ${icons[type]}" style="font-size:15px;color:${cols[type]};flex-shrink:0"></i><div style="flex:1;font-size:12px;color:#2A0D0F;line-height:1.4">${msg}</div><button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:#A08070;font-size:16px;line-height:1;padding:0">×</button>`;
   toast.appendChild(t);
   setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},4000);
