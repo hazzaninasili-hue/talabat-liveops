@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="build" content="APP_BUILD_1781100400">
+<title>Talabat Ops</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#411517">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Talabat Ops">
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1828/1828640.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8f8f8;color:#111;font-size:14px;-webkit-font-smoothing:antialiased}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── AUTH ── */
+.auth-wrap{min-height:100vh;background:#411517;display:flex;align-items:center;justify-content:center;padding:20px}
+.auth-box{background:#fff;border-radius:20px;padding:28px 24px;width:100%;max-width:380px}
+.auth-logo{width:48px;height:48px;background:#FF5900;border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.auth-logo i{font-size:24px;color:#fff}
+.auth-title{font-size:22px;font-weight:800;color:#411517;margin-bottom:4px}
+.auth-sub{font-size:13px;color:#999;margin-bottom:24px}
+.auth-label{font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.auth-input{width:100%;padding:13px 14px;border:1.5px solid #e0e0e0;border-radius:12px;font-size:16px;font-family:inherit;outline:none;transition:border .15s}
+.auth-input:focus{border-color:#FF5900}
+.auth-btn{width:100%;padding:14px;background:#FF5900;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;margin-top:14px;transition:background .15s}
+.auth-btn:active{background:#D94D00}
+.auth-err{color:#DC2626;font-size:13px;margin-top:10px;text-align:center}
+
+/* ── TOPBAR ── */
+.topbar{background:#411517;position:sticky;top:0;z-index:100;padding:10px 14px 0}
+.topbar-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.topbar-brand{display:flex;align-items:center;gap:8px}
+.topbar-logo{width:30px;height:30px;background:#FF5900;border-radius:9px;display:flex;align-items:center;justify-content:center}
+.topbar-logo i{font-size:15px;color:#fff}
+.topbar-title{font-size:14px;font-weight:800;color:#fff;letter-spacing:-.3px}
+.topbar-sub{font-size:10px;color:rgba(255,255,255,.4)}
+.topbar-right{display:flex;align-items:center;gap:7px}
+.signout-btn{background:rgba(255,255,255,.12);border:none;border-radius:8px;padding:5px 9px;color:rgba(255,255,255,.85);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:3px;font-family:inherit}
+.avatar{width:32px;height:32px;background:#FF5900;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;cursor:pointer;flex-shrink:0}
+.stats-row{display:flex;gap:5px;padding-bottom:12px}
+.stat-pill{background:rgba(255,255,255,.12);border-radius:8px;padding:6px 8px;flex:1;text-align:center}
+.stat-pill-v{font-size:15px;font-weight:800;line-height:1.1}
+.stat-pill-l{font-size:8px;color:rgba(255,255,255,.5);margin-top:1px;font-weight:600;letter-spacing:.03em}
+.tabs-row{background:#fff;display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;border-bottom:1px solid #eee}
+.tabs-row::-webkit-scrollbar{display:none}
+.tab-btn{padding:10px 14px;font-size:12px;font-weight:600;color:#bbb;white-space:nowrap;border:none;background:transparent;cursor:pointer;border-bottom:2.5px solid transparent;font-family:inherit;flex-shrink:0}
+.tab-btn.active{color:#411517;border-bottom-color:#FF5900}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:100;background:#fff;border-top:1px solid #eee;display:flex;justify-content:space-around;padding:5px 0;padding-bottom:max(5px,env(safe-area-inset-bottom))}
+.bn-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 8px;border:none;background:transparent;cursor:pointer;font-family:inherit;min-width:44px}
+.bn-btn i{font-size:20px;color:#ccc}
+.bn-btn span{font-size:9px;font-weight:600;color:#ccc}
+.bn-btn.active i,.bn-btn.active span{color:#411517}
+
+/* ── PAGE ── */
+.page{padding-bottom:80px;min-height:100vh;animation:fadeIn .2s ease}
+
+/* ── CARDS ── */
+.card{background:#fff;border-radius:14px;border:1px solid #f0e8e0;margin:8px 12px;padding:14px}
+.card-title{font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
+.section-lbl{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;padding:10px 14px 4px;background:#f8f8f8}
+
+/* ── LIST ROWS ── */
+.list-row{padding:11px 14px;border-bottom:1px solid #f5f5f5;display:flex;align-items:center;gap:10px;background:#fff}
+.list-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap}
+
+/* ── TODAY HIGHLIGHT ── */
+.today-row{background:#FFF7ED;padding:10px 14px;border-bottom:1px solid #FFD7B5;display:flex;align-items:center;gap:8px}
+.today-accent{width:4px;height:32px;background:#FF5900;border-radius:2px;flex-shrink:0}
+
+/* ── CLOCK WIDGET ── */
+.clock-card{background:#411517;border-radius:14px;margin:10px 12px;padding:20px;text-align:center}
+.clock-card-green{background:#14532D;border-radius:14px;margin:10px 12px;padding:20px;text-align:center}
+.clock-card-blue{background:#1e3a5f;border-radius:14px;margin:10px 12px;padding:20px;text-align:center}
+.clock-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.55;margin-bottom:3px}
+.clock-time{font-size:28px;font-weight:800;color:#fff;margin:4px 0}
+.clock-sub{font-size:12px;font-weight:600;color:#4ADE80;margin-bottom:16px}
+.clock-sub-late{font-size:12px;font-weight:600;color:#FCA5A5;margin-bottom:16px}
+.clock-btn{width:100%;background:#FF5900;color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px}
+.clock-btn:active{background:#D94D00}
+.clock-gps{font-size:11px;opacity:.35;margin-top:8px;color:#fff}
+.clock-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.clock-stat{background:rgba(255,255,255,.1);border-radius:8px;padding:8px;text-align:center}
+.clock-stat-lbl{font-size:9px;color:rgba(255,255,255,.5);font-weight:700;text-transform:uppercase;margin-bottom:2px}
+.clock-stat-val{font-size:14px;font-weight:800;color:#fff}
+
+/* ── PROGRESS BAR ── */
+.prog-bar{background:#f0f0f0;border-radius:4px;height:6px;overflow:hidden;margin:4px 0 2px}
+.prog-fill{height:6px;border-radius:4px}
+
+/* ── REQUEST CARDS ── */
+.req-card{background:#fff;border-radius:12px;border:1px solid #f0e8e0;padding:12px 14px;margin:0 12px 8px}
+.req-card-title{font-size:13px;font-weight:700;color:#111;margin-bottom:3px}
+.req-card-sub{font-size:11px;color:#888}
+.req-card-meta{font-size:11px;color:#999;margin-top:4px}
+
+/* ── ACTION BTN ── */
+.action-btn{width:calc(100% - 24px);margin:8px 12px;background:#411517;color:#fff;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
+
+/* ── MODAL ── */
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:flex-end}
+.modal-ov.open{display:flex}
+.modal-box{background:#fff;border-radius:22px 22px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px 18px 32px}
+.modal-title{font-size:16px;font-weight:800;color:#411517;margin-bottom:16px;display:flex;align-items:center;gap:7px}
+.modal-footer{display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid #f0e8e0}
+.fg{margin-bottom:12px}
+.fg label{font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px}
+.fg input,.fg select,.fg textarea{width:100%;padding:12px;border:1.5px solid #e8ddd4;border-radius:10px;font-family:inherit;font-size:16px;color:#111;background:#fff;outline:none}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:#FF5900}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:10px 16px;border-radius:10px;border:1.5px solid #e8ddd4;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;background:#fff;color:#411517}
+.btn-primary{background:#FF5900;color:#fff;border-color:#FF5900}
+.btn-danger{background:#FEE2E2;color:#DC2626;border-color:#fca5a5}
+.msg-err{color:#DC2626;font-size:12px;margin-bottom:10px;display:none}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="s-login" style="display:flex">
+  <div class="auth-wrap">
+    <div class="auth-box">
+      <div class="auth-logo"><i class="ti ti-shield-check"></i></div>
+      <div class="auth-title">Talabat Ops</div>
+      <div class="auth-sub">Sign in with your work email</div>
+      <div class="auth-label">Work email</div>
+      <input id="login-email" class="auth-input" type="email" placeholder="name@talabat.com" autocomplete="email">
+      <div id="login-err" class="auth-err"></div>
+      <button class="auth-btn" onclick="doLogin()">Sign in</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-top">
+      <div class="topbar-brand">
+        <div class="topbar-logo"><i class="ti ti-shield-check"></i></div>
+        <div>
+          <div class="topbar-title">Talabat Ops</div>
+          <div class="topbar-sub" id="week-lbl">Week 24 · 2026</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="signout-btn" onclick="doLogout()"><i class="ti ti-logout" style="font-size:12px"></i>Sign out</button>
+        <div class="avatar" id="avatar" onclick="openModal('changepw')">HN</div>
+      </div>
+    </div>
+    <div class="stats-row" id="stats-row"></div>
+    <div class="tabs-row" id="tabs-row"></div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div id="main" class="page"></div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav" id="bottom-nav"></div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-ov" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box" id="modal-box"></div>
+</div>
+
+<script>
+const SURL='https://mplkklrposicxeozinhh.supabase.co';
+const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbGtrbHJwb3NpY3hlb3ppbmhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5OTI2MDYsImV4cCI6MjA5NjU2ODYwNn0.i4VMxfDKHjepBy1Xd-pLGAiegrH5E9tY7G397scRb5g';
+const REDIRECT='https://hazzaninasili-hue.github.io/talabat-liveops/app.html';
+const DASHBOARD='https://hazzaninasili-hue.github.io/talabat-liveops/';
+const WEBHOOK='https://hook.eu1.make.com/d24akwrimt9ipf9go2ourjwalmodng98';
+const sb=supabase.createClient(SURL,SKEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}});
+
+// ── STATE ──
+let D={user:null,profile:null,tab:'schedule',woff:0,
+  shifts:[],patrollers:[],schedules:[],users:[],timeoff:[],attendance:[],
+  leaveBalances:[],docs:[],tasks:[],customRoles:[],
+  notesAll:{content:''},notesPat:{content:''}};
+
+// ── TABS CONFIG ──
+const TABS=[
+  {id:'schedule',label:'My Schedule',icon:'ti-calendar-user'},
+  {id:'attendance',label:'Attendance',icon:'ti-clock-check'},
+  {id:'tasks',label:'Tasks',icon:'ti-calendar-off'},
+  {id:'leave',label:'Leave',icon:'ti-calendar-stats'},
+  {id:'docs',label:'Docs',icon:'ti-files'},
+];
+
+// ── HELPERS ──
+function wt(p,ms=8000){return Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms))]);}
+function ini(n){return (n||'').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();}
+function fmtT(t){if(!t||t==='?')return'?';const[h,m]=t.split(':');const hr=parseInt(h);return(hr===0?12:hr>12?hr-12:hr)+':'+m+' '+(hr<12||hr===24?'AM':'PM');}
+function fmt(d){return d.getUTCDate()+'-'+(d.getUTCMonth()+1)+'-'+d.getUTCFullYear();}
+function getBahrainNow(){const n=new Date();return new Date(n.getTime()+3*3600000);}
+function todayStr(){const b=getBahrainNow();return b.getUTCFullYear()+'-'+String(b.getUTCMonth()+1).padStart(2,'0')+'-'+String(b.getUTCDate()).padStart(2,'0');}
+function todayDayIdx(){return getBahrainNow().getUTCDay();}
+function wNum(d){const j=new Date(Date.UTC(d.getUTCFullYear(),0,1));return Math.ceil(((d-j)/86400000+j.getUTCDay()+1)/7);}
+function wStart(){
+  const b=getBahrainNow();const day=b.getUTCDay();
+  const diff=day===0?0:-day;
+  const sun=new Date(b);sun.setUTCDate(sun.getUTCDate()+diff+D.woff*7);sun.setUTCHours(0,0,0,0);
+  return sun.toISOString().split('T')[0];
+}
+function wDates(){
+  const ws=wStart();const base=new Date(ws);
+  return Array.from({length:7},(_,i)=>{const d=new Date(base);d.setUTCDate(d.getUTCDate()+i);return d;});
+}
+function gsh(id){return D.shifts.find(s=>s.id===id)||{name:'?',start_time:'?',end_time:'?',shift_type:'morning'};}
+function gDZ(pid,di){const ws=wStart();const sc=D.schedules.find(s=>s.patroller_id===pid&&s.week_start===ws);return sc?sc['day_'+di]||'':'';}
+function getDayShift(pid,di){const ov=(()=>{const ws=wStart();const sc=D.schedules.find(s=>s.patroller_id===pid&&s.week_start===ws);return sc?sc['shift_'+di]||'':'';})();if(ov)return D.shifts.find(s=>s.id===ov);const p=D.patrollers.find(x=>x.id===pid);return gsh(p?.shift_id);}
+function isOnVacationToday(pid){const t=todayStr();return D.timeoff.find(x=>x.patroller_id===pid&&x.status==='Approved'&&t>=x.start_date&&t<=x.end_date);}
+function getMyAttRecord(){const today=todayStr();const pat=D.patrollers.find(p=>p.user_id===D.profile.id);if(!pat)return null;return(D.attendance||[]).find(a=>a.patroller_id===pat.id&&a.date===today);}
+function getShiftStartMins(sh){if(!sh||!sh.start_time||sh.start_time==='?')return null;const[h,m]=sh.start_time.split(':');return parseInt(h)*60+parseInt(m);}
+function getShiftEndMins(sh){if(!sh||!sh.end_time||sh.end_time==='?')return null;const[h,m]=sh.end_time.split(':');let e=parseInt(h)*60+parseInt(m);const s=getShiftStartMins(sh);if(s!==null&&e<=s)e+=1440;return e;}
+function getBahrainMinutes(){const b=getBahrainNow();return b.getUTCHours()*60+b.getUTCMinutes();}
+function getLocation(){return new Promise((res,rej)=>{if(!navigator.geolocation)return rej(new Error('Geolocation not supported'));navigator.geolocation.getCurrentPosition(p=>res({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy}),e=>rej(new Error('Location: '+e.message)),{enableHighAccuracy:true,timeout:15000,maximumAge:0});});}
+function mapsLink(lat,lng){return'https://www.google.com/maps?q='+lat+','+lng;}
+function addNotif(msg,type){console.log('['+type+']',msg);}
+
+// ── ROSTER DATA ──
+const ROSTER_DATA=[
+  {riderId:'38250',  email:'muhammad.zubair.2@talabat.com', carryFwd:71.093, historicalConsumed:27, sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'45193',  email:'nizam.moslem@talabat.com',      carryFwd:36.093, historicalConsumed:0,  sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'48090',  email:'bilal.dogar@talabat.com',       carryFwd:78.025, historicalConsumed:51, sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'48254',  email:'sayed.ridha@talabat.com',       carryFwd:18.210, historicalConsumed:0,  sickEnt:14, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'49851',  email:'muhammad.din@talabat.com',      carryFwd:32.093, historicalConsumed:0,  sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'63266',  email:'dulal.ali@talabat.com',         carryFwd:57.025, historicalConsumed:0,  sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'71199',  email:'asim.bilal@talabat.com',        carryFwd:0,      historicalConsumed:0,  sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'71266',  email:'habib.ullah.2@talabat.com',     carryFwd:40.025, historicalConsumed:16, sickEnt:14, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'81784',  email:'muhammad.raza@talabat.com',     carryFwd:33.093, historicalConsumed:0,  sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'311970', email:'muhammad.waqas@talabat.com',    carryFwd:0,      historicalConsumed:0,  sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'605117', email:'hamza.saeed@talabat.com',       carryFwd:16.558, historicalConsumed:3,  sickEnt:0,  sick50Ent:20, unpaidEnt:20, bereavEnt:0},
+  {riderId:'605119', email:'hasan.mansoor@talabat.com',     carryFwd:18.558, historicalConsumed:6,  sickEnt:13, sick50Ent:20, unpaidEnt:20, bereavEnt:2},
+  {riderId:'605128', email:'majeed.helal@talabat.com',      carryFwd:35.058, historicalConsumed:2,  sickEnt:9,  sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'605135', email:'ali.alsayyad@talabat.com',      carryFwd:56.558, historicalConsumed:0,  sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'605139', email:'hassan.khalil.2@talabat.com',   carryFwd:39.058, historicalConsumed:0,  sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'605150', email:'hussain.saeed@talabat.com',     carryFwd:60.558, historicalConsumed:7,  sickEnt:6,  sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'615233', email:'anowar.hossain@talabat.com',    carryFwd:47.093, historicalConsumed:34, sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'663396', email:'mohamed.gamal@talabat.com',     carryFwd:30.025, historicalConsumed:35, sickEnt:9,  sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'784315', email:'mohammed.numan@talabat.com',    carryFwd:49.210, historicalConsumed:34, sickEnt:14, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'892922', email:'mohammad.moyeen@talabat.com',   carryFwd:64.210, historicalConsumed:0,  sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'1245190',email:'hasmoth.moffazal@talabat.com',  carryFwd:27.210, historicalConsumed:0,  sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'1451195',email:'farouq.juuko@talabat.com',      carryFwd:20.210, historicalConsumed:0,  sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'1516499',email:'umair.muhammad@talabat.com',    carryFwd:15.670, historicalConsumed:23, sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+  {riderId:'1553175',email:'deo.ssentongo@talabat.com',     carryFwd:72.210, historicalConsumed:0,  sickEnt:15, sick50Ent:20, unpaidEnt:20, bereavEnt:5},
+];
+const ANNUAL_DAILY_RATE=30.295/365;
+function getRosterByEmail(email){return ROSTER_DATA.find(r=>r.email.toLowerCase()===(email||'').toLowerCase());}
+function getLeaveYear(){return new Date().getFullYear();}
+function calcAnnualAccrued(){const now=new Date();const jan1=new Date(now.getFullYear(),0,1);const days=Math.floor((now-jan1)/86400000);return Math.round(days*ANNUAL_DAILY_RATE*1000)/1000;}
+const LEAVE_TYPES=['Annual Leave','Sick Leave','Sick Leave 50%','Sick Leave Unpaid','Unpaid Leave','Death'];
+
+// ── AUTH ──
+window.addEventListener('load',async()=>{
+  document.getElementById('s-login').style.display='flex';
+  const{data:{session}}=await sb.auth.getSession();
+  if(session)afterLogin(session.user);
+});
+sb.auth.onAuthStateChange((ev,session)=>{
+  if(ev==='SIGNED_OUT'){document.getElementById('app').style.display='none';document.getElementById('s-login').style.display='flex';}
+  else if(ev==='SIGNED_IN'&&session)afterLogin(session.user);
+});
+
+async function doLogin(){
+  const email=document.getElementById('login-email').value.trim().toLowerCase();
+  if(!email){document.getElementById('login-err').textContent='Please enter your email.';return;}
+  const btn=document.querySelector('.auth-btn');btn.disabled=true;btn.textContent='Signing in...';
+  document.getElementById('login-err').textContent='';
+  try{
+    const{data,error}=await sb.auth.signInWithPassword({email,password:email+'_talabat_access'});
+    if(error)throw error;
+    await afterLogin(data.user);
+  }catch(e){
+    btn.disabled=false;btn.textContent='Sign in';
+    document.getElementById('login-err').textContent=e.message||'Login failed';
+  }
+}
+
+async function afterLogin(user){
+  D.user=user;
+  // Load profile
+  try{
+    let{data:prof}=await wt(sb.from('profiles').select('*,custom_roles(id,name,access_level,visible_tabs)').eq('id',user.id).single(),5000);
+    if(!prof){
+      const{data:byEmail}=await wt(sb.from('profiles').select('*').eq('email',user.email).maybeSingle(),5000);
+      if(byEmail){await sb.from('profiles').update({id:user.id}).eq('email',user.email);prof={...byEmail,id:user.id};}
+      else{await sb.from('profiles').upsert({id:user.id,email:user.email,full_name:user.user_metadata?.full_name||user.email.split('@')[0],role:'patroller',is_active:true},{onConflict:'id'});const{data:p2}=await wt(sb.from('profiles').select('*').eq('id',user.id).single(),5000);prof=p2;}
+    }
+    D.profile=prof||{id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller'};
+  }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller'};}
+
+  // Check if admin/lead → redirect to dashboard
+  const role=D.profile.role;
+  const crId=D.profile.custom_role_id;
+  let isAdmin=role==='admin'||role==='lead';
+  if(!isAdmin&&crId){
+    try{const{data:cr}=await sb.from('custom_roles').select('access_level').eq('id',crId).single();if(cr&&(cr.access_level==='admin'||cr.access_level==='editor'))isAdmin=true;}catch(e){}
+  }
+  if(isAdmin){window.location.href=DASHBOARD;return;}
+
+  // Patroller — load data and show app
+  document.getElementById('s-login').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('main').innerHTML='<div style="display:flex;align-items:center;justify-content:center;min-height:300px;gap:12px;color:#999"><div style="width:28px;height:28px;border:3px solid #eee;border-top-color:#FF5900;border-radius:50%;animation:spin .7s linear infinite"></div><div>Loading...</div></div>';
+  await loadAll();
+  // Auto-link patroller record
+  try{
+    const linked=D.patrollers.find(p=>p.user_id===D.profile.id);
+    if(!linked){const byName=D.patrollers.find(p=>p.name.toLowerCase()===D.profile.full_name.toLowerCase()&&!p.user_id);if(byName){await sb.from('patrollers').update({user_id:D.profile.id,user_type:'patroller'}).eq('id',byName.id);await loadAll();}}
+  }catch(e){}
+  render();
+}
+
+async function doLogout(){await sb.auth.signOut();}
+
+// ── DATA LOADING ──
+async function loadAll(){
+  try{
+    const[sh,pt,sc]=await Promise.all([
+      wt(sb.from('shifts').select('*').order('created_at')),
+      wt(sb.from('patrollers').select('*').eq('is_active',true).order('name')),
+      wt(sb.from('schedules').select('*')),
+    ]);
+    D.shifts=sh.data||[];D.patrollers=pt.data||[];D.schedules=sc.data||[];
+  }catch(e){}
+  try{const{data}=await wt(sb.from('profiles').select('*').order('full_name'),5000);D.users=data||[];}catch(e){}
+  try{const{data}=await wt(sb.from('time_off_requests').select('*').order('created_at',{ascending:false}),5000);D.timeoff=data||[];}catch(e){}
+  try{const{data}=await wt(sb.from('attendance').select('*').order('date',{ascending:false}).limit(200),5000);D.attendance=data||[];}catch(e){}
+  try{const{data}=await wt(sb.from('leave_balances').select('*'),4000);D.leaveBalances=data||[];}catch(e){}
+  try{const{data}=await wt(sb.from('documents').select('*').order('created_at',{ascending:false}),5000);D.docs=data||[];}catch(e){}
+  try{const{data}=await wt(sb.from('task_requests').select('*').order('created_at',{ascending:false}),5000);D.tasks=data||[];}catch(e){}
+  try{const{data}=await wt(sb.from('custom_roles').select('*'),4000);D.customRoles=data||[];}catch(e){}
+  try{const notes=await wt(sb.from('notes').select('*'),5000);const nd=notes.data||[];D.notesAll={content:(nd.find(n=>n.audience==='all')||{}).content||''};D.notesPat={content:(nd.find(n=>n.audience==='patroller')||{}).content||''};}catch(e){}
+}
+async function reload(){await loadAll();render();}
+
+// ── RENDER ──
+function render(){
+  if(!D.profile)return;
+  renderHeader();
+  renderBottomNav();
+  const main=document.getElementById('main');
+  if(D.tab==='schedule')main.innerHTML=renderSchedule();
+  else if(D.tab==='attendance')main.innerHTML=renderAttendance();
+  else if(D.tab==='tasks')main.innerHTML=renderTasks();
+  else if(D.tab==='leave')main.innerHTML=renderLeave();
+  else if(D.tab==='docs')main.innerHTML=renderDocs();
+}
+
+function setTab(t){D.tab=t;render();window.scrollTo(0,0);}
+
+function renderHeader(){
+  const u=D.profile;
+  document.getElementById('avatar').textContent=ini(u.full_name);
+  const dates=wDates();
+  document.getElementById('week-lbl').textContent='Week '+wNum(dates[0])+' \u00b7 '+dates[0].getFullYear();
+  // Stats: today zone + shift time
+  const pat=D.patrollers.find(p=>p.user_id===u.id);
+  const ti=todayDayIdx();
+  const zone=pat?gDZ(pat.id,ti):'';
+  const sh=pat?getDayShift(pat.id,ti):null;
+  const sr=document.getElementById('stats-row');
+  sr.innerHTML=
+    '<div class="stat-pill"><div class="stat-pill-v" style="color:#fff;font-size:12px">'+(zone||'Off today')+'</div><div class="stat-pill-l">TODAY\'S ZONE</div></div>'+
+    '<div class="stat-pill"><div class="stat-pill-v" style="color:#fff;font-size:12px">'+(sh&&sh.start_time!=='?'?fmtT(sh.start_time)+' \u2013 '+fmtT(sh.end_time):'--')+'</div><div class="stat-pill-l">SHIFT HOURS</div></div>';
+  // Tabs
+  const tr=document.getElementById('tabs-row');
+  tr.innerHTML=TABS.map(t=>'<button class="tab-btn'+(D.tab===t.id?' active':'')+'" onclick="setTab(\''+t.id+'\')">'+t.label+'</button>').join('');
+}
+
+function renderBottomNav(){
+  const bn=document.getElementById('bottom-nav');
+  bn.innerHTML=TABS.map(t=>'<button class="bn-btn'+(D.tab===t.id?' active':'')+'" onclick="setTab(\''+t.id+'\')"><i class="ti '+t.icon+'"></i><span>'+t.label.replace('My ','')+'</span></button>').join('');
+}
+
+// ── SCHEDULE VIEW ──
+function renderSchedule(){
+  const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
+  if(!pat)return '<div style="padding:40px;text-align:center;color:#999"><i class="ti ti-user-off" style="font-size:40px;display:block;margin-bottom:12px"></i>Not linked to a schedule. Contact admin.</div>';
+  const today=todayStr();
+  const ti=todayDayIdx();
+  const dates=wDates();
+  const wn=wNum(dates[0]);
+  const sh=getDayShift(pat.id,ti);
+  const onVac=isOnVacationToday(pat.id);
+  const todayZone=gDZ(pat.id,ti);
+  // Count shifts this week
+  const shifts=dates.filter((_,i)=>gDZ(pat.id,i)).length;
+  const offDays=7-shifts;
+
+  let html='';
+  // Hero card
+  html+='<div style="background:#411517;margin:10px 12px;border-radius:14px;padding:16px">';
+  html+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">';
+  html+='<div style="width:48px;height:48px;background:rgba(255,255,255,.15);border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff">'+ini(pat.name)+'</div>';
+  html+='<div><div style="font-size:16px;font-weight:800;color:#fff">'+pat.name+'</div><div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:1px">'+(sh&&sh.name?sh.name:'Morning Shift')+'</div></div></div>';
+  // Status pill
+  const rec=getMyAttRecord();
+  const inTime=rec&&rec.clock_in?new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'';
+  let statusColor='#FCD34D';let statusText='Scheduled';
+  if(onVac){statusColor='#C084FC';statusText='On Vacation';}
+  else if(!todayZone){statusColor='#888';statusText='Off Today';}
+  else if(rec&&rec.clock_out){statusColor='#60A5FA';statusText='Shift Complete';}
+  else if(rec&&rec.clock_in){statusColor='#4ADE80';statusText='On Shift \u2022 '+inTime;}
+  html+='<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.15);padding:5px 12px;border-radius:20px;margin-bottom:14px">';
+  html+='<div style="width:7px;height:7px;background:'+statusColor+';border-radius:50%"></div>';
+  html+='<span style="font-size:12px;font-weight:700;color:#fff">'+statusText+'</span>';
+  if(todayZone&&!onVac)html+='<span style="font-size:11px;color:rgba(255,255,255,.6)">\u00b7 '+todayZone+'</span>';
+  html+='</div>';
+  // Shift time grid
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  html+='<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px"><div style="font-size:9px;color:rgba(255,255,255,.5);font-weight:700;text-transform:uppercase;margin-bottom:3px">Shift time</div>';
+  html+='<div style="font-size:14px;font-weight:800;color:#fff">'+(sh&&sh.start_time!=='?'?fmtT(sh.start_time)+' \u2013 '+fmtT(sh.end_time):'Not set')+'</div></div>';
+  html+='<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px"><div style="font-size:9px;color:rgba(255,255,255,.5);font-weight:700;text-transform:uppercase;margin-bottom:3px">Zone</div>';
+  html+='<div style="font-size:14px;font-weight:800;color:#fff">'+(onVac?'Vacation':todayZone||'Off day')+'</div></div>';
+  html+='</div></div>';
+
+  // Week stats row
+  html+='<div style="display:flex;gap:8px;padding:10px 12px">';
+  html+='<div style="background:#fff;border-radius:10px;padding:10px 12px;flex:1;text-align:center;border:1px solid #f0e8e0"><div style="font-size:18px;font-weight:800;color:#FF5900">'+shifts+'</div><div style="font-size:9px;font-weight:700;color:#999;text-transform:uppercase;margin-top:2px">Shifts</div></div>';
+  html+='<div style="background:#fff;border-radius:10px;padding:10px 12px;flex:1;text-align:center;border:1px solid #f0e8e0"><div style="font-size:18px;font-weight:800;color:#7C3AED">'+offDays+'</div><div style="font-size:9px;font-weight:700;color:#999;text-transform:uppercase;margin-top:2px">Off Days</div></div>';
+  html+='<div style="background:#fff;border-radius:10px;padding:10px 12px;flex:1;text-align:center;border:1px solid #f0e8e0"><div style="font-size:18px;font-weight:800;color:#16A34A">'+(shifts*8)+'h</div><div style="font-size:9px;font-weight:700;color:#999;text-transform:uppercase;margin-top:2px">This Week</div></div>';
+  html+='</div>';
+
+  // Week nav
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:#fff;border-top:1px solid #f5f5f5;border-bottom:1px solid #f5f5f5">';
+  html+='<button onclick="D.woff--;render()" style="width:32px;height:32px;border:1px solid #eee;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center"><i class="ti ti-chevron-left" style="font-size:14px"></i></button>';
+  html+='<span style="font-size:12px;font-weight:600;color:#411517">Week '+wn+' \u00b7 '+fmt(dates[0])+' \u2013 '+fmt(dates[6])+'</span>';
+  html+='<button onclick="D.woff++;render()" style="width:32px;height:32px;border:1px solid #eee;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center"><i class="ti ti-chevron-right" style="font-size:14px"></i></button>';
+  html+='</div>';
+
+  // Day list
+  const DAYS_SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const todayFull=today;
+  // Today highlight first
+  const todayDate=dates[ti];
+  html+='<div style="background:#fff">';
+  if(dates.find(d=>d.toISOString().split('T')[0]===todayFull)){
+    html+='<div class="today-row"><div class="today-accent"></div><div style="flex:1"><div style="font-size:12px;font-weight:800;color:#C2410C">TODAY \u2014 '+DAYS_SHORT[ti].toUpperCase()+' '+todayDate.getUTCDate()+' '+['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][todayDate.getUTCMonth()]+'</div><div style="font-size:11px;color:#888;margin-top:2px">'+(todayZone?todayZone+' \u00b7 '+(sh&&sh.start_time!=='?'?fmtT(sh.start_time)+' \u2013 '+fmtT(sh.end_time):''):'Off today')+'</div></div><div class="badge" style="background:'+(todayZone?'#DCFCE7':'#f5f5f5')+';color:'+(todayZone?'#166534':'#999')+'">'+(todayZone?(rec&&rec.clock_out?'DONE':rec&&rec.clock_in?'ON SHIFT':'SCHEDULED'):'OFF')+'</div></div>';
+  }
+  dates.forEach((d,i)=>{
+    if(d.toISOString().split('T')[0]===todayFull)return;
+    const z=gDZ(pat.id,i);
+    const dsh=getDayShift(pat.id,i);
+    const vac=D.timeoff.find(t=>t.patroller_id===pat.id&&t.status==='Approved'&&d.toISOString().split('T')[0]>=t.start_date&&d.toISOString().split('T')[0]<=t.end_date);
+    html+='<div class="list-row"><div style="font-size:11px;font-weight:700;color:#999;width:28px;flex-shrink:0">'+DAYS_SHORT[i]+'</div>';
+    if(vac)html+='<div style="flex:1"><div style="font-size:13px;font-weight:600;color:#7C3AED">On Vacation</div></div><div class="badge" style="background:#EDE9FE;color:#4C1D95">VAC</div>';
+    else if(!z)html+='<div style="flex:1"><div style="font-size:13px;color:#bbb;font-style:italic">Off day</div></div><div class="badge" style="background:#f5f5f5;color:#999">OFF</div>';
+    else html+='<div style="flex:1"><div style="font-size:13px;font-weight:700;color:#111">'+z+'</div><div style="font-size:11px;color:#888;margin-top:1px">'+(dsh&&dsh.start_time!=='?'?fmtT(dsh.start_time)+' \u2013 '+fmtT(dsh.end_time):'')+'</div></div><div class="badge" style="background:#F0F9FF;color:#0369A1">'+(dsh&&dsh.shift_type==='morning'?'AM':'PM')+'</div>';
+    html+='</div>';
+  });
+  html+='</div>';
+
+  // Notes
+  if(D.notesAll.content)html+='<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;margin:8px 12px;padding:12px"><div style="font-size:10px;font-weight:700;color:#92400E;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">General Notes</div><div style="font-size:13px;color:#78350F">'+D.notesAll.content+'</div></div>';
+  if(D.notesPat.content)html+='<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;margin:8px 12px;padding:12px"><div style="font-size:10px;font-weight:700;color:#1E40AF;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Patrollers Only</div><div style="font-size:13px;color:#1E3A8A">'+D.notesPat.content+'</div></div>';
+
+  return html;
+}
+
+// ── ATTENDANCE VIEW ──
+function renderAttendance(){
+  const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
+  if(!pat)return '<div style="padding:40px;text-align:center;color:#999">Not linked to a schedule.</div>';
+  const today=todayStr();
+  const ti=todayDayIdx();
+  const zone=gDZ(pat.id,ti);
+  const onVac=isOnVacationToday(pat.id);
+  const rec=getMyAttRecord();
+  const sh=getDayShift(pat.id,ti);
+  let html='';
+
+  if(onVac){
+    html+='<div style="background:#7C3AED;margin:10px 12px;border-radius:14px;padding:24px;text-align:center;color:#fff"><i class="ti ti-beach" style="font-size:40px;display:block;margin-bottom:8px"></i><div style="font-size:18px;font-weight:800">On Vacation</div></div>';
+  } else if(!zone){
+    html+='<div style="background:#f5f5f5;margin:10px 12px;border-radius:14px;padding:24px;text-align:center"><i class="ti ti-calendar-off" style="font-size:40px;display:block;margin-bottom:8px;color:#ccc"></i><div style="font-size:16px;font-weight:700;color:#999">Day Off Today</div><div style="font-size:13px;color:#bbb;margin-top:4px">No attendance required</div></div>';
+  } else if(!rec||!rec.clock_in){
+    html+='<div class="clock-card"><div class="clock-lbl" style="color:rgba(255,255,255,.5)">TODAY \u2014 '+zone+' ZONE</div>';
+    html+='<div class="clock-time">--:--</div>';
+    html+='<div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:6px">'+(sh&&sh.start_time!=='?'?'Shift: '+fmtT(sh.start_time)+' \u2013 '+fmtT(sh.end_time):'')+'</div>';
+    html+='<div class="clock-grid"><div class="clock-stat"><div class="clock-stat-lbl">Shift Start</div><div class="clock-stat-val">'+(sh&&sh.start_time!=='?'?fmtT(sh.start_time):'--')+'</div></div><div class="clock-stat"><div class="clock-stat-lbl">Shift End</div><div class="clock-stat-val">'+(sh&&sh.end_time!=='?'?fmtT(sh.end_time):'--')+'</div></div></div>';
+    html+='<button id="clock-in-btn" class="clock-btn" onclick="doClockIn()"><i class="ti ti-clock-play" style="font-size:18px"></i>Clock In</button>';
+    html+='<div class="clock-gps"><i class="ti ti-map-pin" style="font-size:10px"></i> GPS location will be recorded</div></div>';
+  } else if(rec.clock_in&&!rec.clock_out){
+    const inT=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+    const lateMins=rec.late_mins||0;
+    html+='<div class="clock-card-green"><div class="clock-lbl" style="color:rgba(255,255,255,.5)">CLOCKED IN \u2014 '+zone+'</div>';
+    html+='<div class="clock-time">'+inT+'</div>';
+    html+=(lateMins>0?'<div class="clock-sub-late">'+Math.floor(lateMins/60)+'h '+(lateMins%60)+'m late</div>':'<div class="clock-sub">On time \u2714</div>');
+    html+='<div class="clock-grid"><div class="clock-stat"><div class="clock-stat-lbl">Shift End</div><div class="clock-stat-val">'+(sh&&sh.end_time!=='?'?fmtT(sh.end_time):'--')+'</div></div><div class="clock-stat"><div class="clock-stat-lbl">Zone</div><div class="clock-stat-val">'+zone+'</div></div></div>';
+    if(rec.clock_in_map)html+='<a href="'+rec.clock_in_map+'" target="_blank" style="color:#86efac;font-size:12px;display:block;margin-bottom:12px"><i class="ti ti-map-pin"></i> View clock-in location</a>';
+    html+='<button id="clock-out-btn" class="clock-btn" onclick="doClockOut()"><i class="ti ti-clock-stop" style="font-size:18px"></i>Clock Out</button>';
+    html+='<div class="clock-gps"><i class="ti ti-map-pin" style="font-size:10px"></i> GPS location will be recorded</div></div>';
+  } else {
+    const inT=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+    const outT=new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+    const mins=Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000);
+    const dur=Math.floor(mins/60)+'h '+(mins%60)+'m';
+    html+='<div class="clock-card-blue"><i class="ti ti-circle-check" style="font-size:36px;color:#60A5FA;display:block;margin-bottom:8px"></i>';
+    html+='<div style="font-size:18px;font-weight:800;color:#fff">Shift Complete</div>';
+    html+='<div style="font-size:13px;color:rgba(255,255,255,.7);margin-top:8px">'+inT+' \u2192 '+outT+' \u00b7 '+dur+'</div>';
+    html+='<div style="display:flex;gap:16px;justify-content:center;margin-top:10px">';
+    if(rec.clock_in_map)html+='<a href="'+rec.clock_in_map+'" target="_blank" style="color:#93C5FD;font-size:12px"><i class="ti ti-map-pin"></i> In</a>';
+    if(rec.clock_out_map)html+='<a href="'+rec.clock_out_map+'" target="_blank" style="color:#93C5FD;font-size:12px"><i class="ti ti-map-pin"></i> Out</a>';
+    html+='</div></div>';
+  }
+
+  // Attendance history
+  const myRecs=(D.attendance||[]).filter(a=>a.patroller_id===pat.id).slice(0,20);
+  if(myRecs.length>0){
+    html+='<div class="section-lbl">Attendance History</div>';
+    html+='<div style="background:#fff">';
+    myRecs.forEach(a=>{
+      const inT=a.clock_in?new Date(a.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
+      const outT=a.clock_out?new Date(a.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
+      const dur=a.clock_in&&a.clock_out?Math.floor(Math.round((new Date(a.clock_out)-new Date(a.clock_in))/60000)/60)+'h '+(Math.round((new Date(a.clock_out)-new Date(a.clock_in))/60000)%60)+'m':'--';
+      const isAtt=a.status==='Attended';
+      html+='<div class="list-row">';
+      html+='<div style="flex:1"><div style="font-size:12px;font-weight:700;color:#111">'+a.date+'</div><div style="font-size:11px;color:#888;margin-top:1px">'+inT+' \u2192 '+outT+(dur!=='--'?' \u00b7 '+dur:'')+'</div></div>';
+      html+='<div class="badge" style="background:'+(isAtt?'#DCFCE7':'#FEE2E2')+';color:'+(isAtt?'#166534':'#991B1B')+'">'+(a.status||'--')+'</div>';
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+  return html;
+}
+
+// ── CLOCK IN/OUT ──
+async function doClockIn(){
+  const btn=document.getElementById('clock-in-btn');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader" style="animation:spin .7s linear infinite"></i> Getting location...';}
+  try{
+    const loc=await getLocation();
+    const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
+    if(!pat)throw new Error('No schedule record found');
+    const today=todayStr();const ti=todayDayIdx();
+    const sh=getDayShift(pat.id,ti);
+    const mapUrl=mapsLink(loc.lat,loc.lng);
+    const now=new Date();const nowIso=now.toISOString();
+    const bhr=getBahrainNow();
+    const clockInMins=bhr.getUTCHours()*60+bhr.getUTCMinutes();
+    const startMins=sh?getShiftStartMins(sh):null;
+    const lateMins=startMins!==null?Math.max(0,clockInMins-startMins):0;
+    const adjEndMins=sh?getShiftEndMins(sh)+lateMins:null;
+    const adjEndTime=adjEndMins!==null?String(Math.floor(adjEndMins/60)%24).padStart(2,'0')+':'+String(adjEndMins%60).padStart(2,'0'):null;
+    const{error}=await sb.from('attendance').upsert({patroller_id:pat.id,patroller_name:pat.name,date:today,clock_in:nowIso,clock_in_lat:loc.lat,clock_in_lng:loc.lng,clock_in_map:mapUrl,late_mins:lateMins,adj_end_time:adjEndTime,status:'Attended',updated_at:nowIso},{onConflict:'patroller_id,date'});
+    if(error)throw error;
+    const clockInTimeStr=String(bhr.getUTCHours()).padStart(2,'0')+':'+String(bhr.getUTCMinutes()).padStart(2,'0');
+    try{fetch(WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:'clock_in',patroller_name:pat.name,date:today,clock_in_time:clockInTimeStr,late_mins:lateMins,clock_in_location:mapUrl,app_url:REDIRECT})});}catch(e){}
+    await reload();
+  }catch(e){if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-clock-play"></i> Clock In';}alert('Error: '+e.message);}
+}
+
+async function doClockOut(){
+  const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
+  if(!pat)return;
+  const rec=getMyAttRecord();
+  if(!rec||!rec.clock_in)return;
+  const ti=todayDayIdx();const sh=getDayShift(pat.id,ti);
+  if(sh&&sh.end_time){
+    const nowMins=getBahrainMinutes();
+    const lateMins=rec.late_mins||0;
+    const adjEndMins=getShiftEndMins(sh)+lateMins;
+    if(nowMins<adjEndMins-5){
+      const early=adjEndMins-nowMins;
+      const earlyLabel=Math.floor(early/60)>0?Math.floor(early/60)+'h '+(early%60)+'m':(early%60)+'m';
+      const adjEndStr=String(Math.floor(adjEndMins/60)%24).padStart(2,'0')+':'+String(adjEndMins%60).padStart(2,'0');
+      openModal('earlyClockOut',{earlyLabel,adjEndStr,patId:pat.id,attId:rec.id});
+      return;
+    }
+  }
+  await doNormalClockOut();
+}
+
+async function doNormalClockOut(){
+  const btn=document.getElementById('clock-out-btn');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader" style="animation:spin .7s linear infinite"></i> Getting location...';}
+  try{
+    const loc=await getLocation();
+    const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
+    if(!pat)throw new Error('No schedule record found');
+    const today=todayStr();const now=new Date().toISOString();
+    const existing=getMyAttRecord();
+    if(!existing)throw new Error('Please clock in first');
+    const mapUrl=mapsLink(loc.lat,loc.lng);
+    const{error}=await sb.from('attendance').update({clock_out:now,clock_out_lat:loc.lat,clock_out_lng:loc.lng,clock_out_map:mapUrl,updated_at:now}).eq('id',existing.id);
+    if(error)throw error;
+    const inT=new Date(existing.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+    const outT=new Date(now).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+    const mins=Math.round((new Date(now)-new Date(existing.clock_in))/60000);
+    const dur=Math.floor(mins/60)+'h '+(mins%60)+'m';
+    try{fetch(WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:'clock_out',patroller_name:pat.name,date:today,clock_in_time:inT,clock_out_time:outT,duration:dur,clock_out_location:mapUrl,app_url:REDIRECT})});}catch(e){}
+    await reload();
+  }catch(e){if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-clock-stop"></i> Clock Out';}alert('Error: '+e.message);}
+}
+
+// ── TASKS VIEW ──
+function renderTasks(){
+  const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
+  const myTasks=(D.tasks||[]).filter(t=>!pat||t.patroller_id===pat.id);
+  const myTO=(D.timeoff||[]).filter(t=>!pat||t.patroller_id===pat.id);
+  const pending=myTO.filter(t=>t.status==='Pending').length;
+  const approved=myTO.filter(t=>t.status==='Approved').length+myTasks.filter(t=>t.status==='Approved'||t.status==='Completed').length;
+  const rejected=myTO.filter(t=>t.status==='Rejected').length+myTasks.filter(t=>t.status==='Rejected').length;
+  let html='';
+  // Stats
+  html+='<div style="display:flex;gap:8px;padding:10px 12px">';
+  html+='<div style="background:#fff;border-radius:10px;padding:10px;flex:1;text-align:center;border:1px solid #f0e8e0"><div style="font-size:20px;font-weight:800;color:#D97706">'+pending+'</div><div style="font-size:9px;font-weight:700;color:#999;text-transform:uppercase;margin-top:2px">Pending</div></div>';
+  html+='<div style="background:#fff;border-radius:10px;padding:10px;flex:1;text-align:center;border:1px solid #f0e8e0"><div style="font-size:20px;font-weight:800;color:#16A34A">'+approved+'</div><div style="font-size:9px;font-weight:700;color:#999;text-transform:uppercase;margin-top:2px">Approved</div></div>';
+  html+='<div style="background:#fff;border-radius:10px;padding:10px;flex:1;text-align:center;border:1px solid #f0e8e0"><div style="font-size:20px;font-weight:800;color:#DC2626">'+rejected+'</div><div style="font-size:9px;font-weight:700;color:#999;text-transform:uppercase;margin-top:2px">Rejected</div></div>';
+  html+='</div>';
+  // New request btn
+  html+='<button class="action-btn" onclick="openModal(\'newrequest\')"><i class="ti ti-plus"></i>New Request</button>';
+  // Time off requests
+  if(myTO.length>0){
+    html+='<div class="section-lbl">Time Off Requests</div>';
+    myTO.forEach(t=>{
+      const isPending=t.status==='Pending';const isApproved=t.status==='Approved';
+      html+='<div class="req-card">';
+      html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">';
+      html+='<div class="req-card-title">'+t.request_type+'</div>';
+      html+='<div class="badge" style="background:'+(isPending?'#FEF3C7':isApproved?'#DCFCE7':'#FEE2E2')+';color:'+(isPending?'#92400E':isApproved?'#166534':'#991B1B')+'">'+t.status.toUpperCase()+'</div>';
+      html+='</div>';
+      html+='<div class="req-card-sub">'+t.start_date+' \u2013 '+t.end_date+'</div>';
+      if(isApproved)html+='<div class="req-card-meta" style="color:#16A34A">Approved</div>';
+      else if(t.status==='Rejected')html+='<div class="req-card-meta" style="color:#DC2626">Rejected</div>';
+      else html+='<div class="req-card-meta">Submitted \u00b7 Awaiting approval</div>';
+      html+='</div>';
+    });
+  }
+  // Task requests
+  if(myTasks.length>0){
+    html+='<div class="section-lbl">Task Requests</div>';
+    myTasks.forEach(t=>{
+      const isPending=t.status==='Pending';const isApproved=t.status==='Approved'||t.status==='Completed';
+      html+='<div class="req-card">';
+      html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">';
+      html+='<div class="req-card-title">'+(t.task_type||'Task Request')+'</div>';
+      html+='<div class="badge" style="background:'+(isPending?'#FEF3C7':isApproved?'#DCFCE7':'#FEE2E2')+';color:'+(isPending?'#92400E':isApproved?'#166534':'#991B1B')+'">'+t.status.toUpperCase()+'</div>';
+      html+='</div>';
+      html+='<div class="req-card-sub">'+(t.description||t.task_type||'')+'</div>';
+      if(t.date)html+='<div class="req-card-meta">'+t.date+(t.start_time?' \u00b7 '+t.start_time:'')+'</div>';
+      html+='</div>';
+    });
+  }
+  if(myTO.length===0&&myTasks.length===0)html+='<div style="padding:50px;text-align:center;color:#ccc"><i class="ti ti-calendar-off" style="font-size:48px;display:block;margin-bottom:12px"></i><div style="font-size:14px;font-weight:600">No requests yet</div></div>';
+  return html;
+}
+
+// ── LEAVE VIEW ──
+function renderLeave(){
+  const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
+  if(!pat)return '<div style="padding:40px;text-align:center;color:#999">Not linked to a schedule.</div>';
+  const lb=D.leaveBalances.find(b=>b.patroller_id===pat.id);
+  const roster=getRosterByEmail(D.profile.email);
+  const accrued=calcAnnualAccrued();
+  const carryFwd=(lb&&lb.annual_carry_forward>0)?lb.annual_carry_forward:(roster?roster.carryFwd:0);
+  const totalAnnual=carryFwd+accrued;
+  const yr=String(getLeaveYear());
+  const approved=(D.timeoff||[]).filter(t=>t.patroller_id===pat.id&&t.status==='Approved'&&(t.start_date||'').startsWith(yr));
+  const countDays=arr=>arr.reduce((s,t)=>{const d1=new Date(t.start_date),d2=new Date(t.end_date);return s+(isNaN(d1)||isNaN(d2)?1:Math.round((d2-d1)/86400000)+1);},0);
+  const hc=(lb&&lb.historical_consumed!=null)?lb.historical_consumed:(roster?roster.historicalConsumed||0:0);
+  const consumedAnnual=hc+countDays(approved.filter(t=>t.request_type==='Annual Leave'));
+  const annualLeft=Math.max(0,Math.round((totalAnnual-consumedAnnual)*100)/100);
+  const sickEnt=roster?roster.sickEnt:15;
+  const consumedSick=countDays(approved.filter(t=>t.request_type==='Sick Leave'));
+  const sickLeft=Math.max(0,sickEnt-consumedSick);
+  const taken=countDays(approved);
+  const annualPct=Math.round((annualLeft/Math.max(1,totalAnnual))*100);
+  const sickPct=Math.round((sickLeft/Math.max(1,sickEnt))*100);
+  const annualColor=annualLeft<3?'#DC2626':annualLeft<7?'#D97706':'#16A34A';
+  const sickColor=sickLeft<2?'#DC2626':'#7C3AED';
+
+  let html='';
+  // Stats
+  html+='<div style="display:flex;gap:8px;padding:10px 12px">';
+  html+='<div style="background:#fff;border-radius:10px;padding:10px;flex:1;text-align:center;border:1px solid #f0e8e0"><div style="font-size:20px;font-weight:800;color:'+annualColor+'">'+annualLeft+'</div><div style="font-size:9px;font-weight:700;color:#999;text-transform:uppercase;margin-top:2px">Annual Left</div></div>';
+  html+='<div style="background:#fff;border-radius:10px;padding:10px;flex:1;text-align:center;border:1px solid #f0e8e0"><div style="font-size:20px;font-weight:800;color:'+sickColor+'">'+sickLeft+'</div><div style="font-size:9px;font-weight:700;color:#999;text-transform:uppercase;margin-top:2px">Sick Left</div></div>';
+  html+='<div style="background:#fff;border-radius:10px;padding:10px;flex:1;text-align:center;border:1px solid #f0e8e0"><div style="font-size:20px;font-weight:800;color:#FCD34D">'+taken+'</div><div style="font-size:9px;font-weight:700;color:#999;text-transform:uppercase;margin-top:2px">Taken</div></div>';
+  html+='</div>';
+  // Annual leave bar
+  html+='<div style="background:#fff;padding:14px;margin:0 12px 8px;border-radius:12px;border:1px solid #f0e8e0">';
+  html+='<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Annual Leave</div>';
+  html+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px"><span style="font-size:22px;font-weight:800;color:'+annualColor+'">'+annualLeft+'<span style="font-size:13px;color:#999;font-weight:400"> days left</span></span><span style="font-size:12px;color:#999">of '+Math.round(totalAnnual*10)/10+'</span></div>';
+  html+='<div class="prog-bar"><div class="prog-fill" style="background:'+annualColor+';width:'+annualPct+'%"></div></div>';
+  html+='<div style="font-size:11px;color:#999;margin-top:4px">'+consumedAnnual+' days used \u00b7 '+accrued.toFixed(1)+' accrued this year</div></div>';
+  // Sick leave bar
+  html+='<div style="background:#fff;padding:14px;margin:0 12px 8px;border-radius:12px;border:1px solid #f0e8e0">';
+  html+='<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Sick Leave</div>';
+  html+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px"><span style="font-size:22px;font-weight:800;color:'+sickColor+'">'+sickLeft+'<span style="font-size:13px;color:#999;font-weight:400"> days left</span></span><span style="font-size:12px;color:#999">of '+sickEnt+'</span></div>';
+  html+='<div class="prog-bar"><div class="prog-fill" style="background:'+sickColor+';width:'+sickPct+'%"></div></div>';
+  html+='<div style="font-size:11px;color:#999;margin-top:4px">'+consumedSick+' days used</div></div>';
+  // Request button
+  html+='<button class="action-btn" onclick="openModal(\'timeoff\')"><i class="ti ti-plus"></i>Request Time Off</button>';
+  return html;
+}
+
+// ── DOCS VIEW ──
+function renderDocs(){
+  const uid=D.profile.id;const email=D.profile.email;
+  const visible=(D.docs||[]).filter(doc=>{
+    if(doc.audience==='all')return true;
+    if(doc.audience==='patroller')return true;
+    if(doc.audience==='specific'&&doc.specific_emails){return doc.specific_emails.toLowerCase().includes(email.toLowerCase());}
+    return false;
+  });
+  if(!visible.length)return '<div style="padding:50px;text-align:center;color:#ccc"><i class="ti ti-files" style="font-size:48px;display:block;margin-bottom:12px"></i><div style="font-size:14px;font-weight:600">No documents yet</div></div>';
+  const icons={'form':'ti-forms','sheet':'ti-table','dashboard':'ti-dashboard','map':'ti-map','doc':'ti-file-text','pdf':'ti-file-type-pdf','presentation':'ti-presentation','link':'ti-link','whatsapp':'ti-brand-whatsapp','video':'ti-video'};
+  let html='<div style="padding:8px 12px 0">';
+  visible.forEach(doc=>{
+    const ic=icons[doc.category]||'ti-link';
+    html+='<a href="'+doc.url+'" target="_blank" style="text-decoration:none">';
+    html+='<div style="background:#fff;border-radius:12px;border:1px solid #f0e8e0;padding:13px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px">';
+    html+='<div style="width:40px;height:40px;background:#FFF0E6;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti '+ic+'" style="font-size:20px;color:#FF5900"></i></div>';
+    html+='<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+doc.name+'</div><div style="font-size:11px;color:#888;margin-top:1px">'+(doc.category||'Document')+'</div></div>';
+    html+='<i class="ti ti-external-link" style="font-size:16px;color:#ccc;flex-shrink:0"></i>';
+    html+='</div></a>';
+  });
+  html+='</div>';
+  return html;
+}
+
+// ── MODALS ──
+function openModal(type,data){
+  const box=document.getElementById('modal-box');
+  const ov=document.getElementById('modal');
+  if(type==='changepw'){
+    box.innerHTML='<div class="modal-title"><i class="ti ti-key"></i>Change password</div><div id="cpw-e" class="msg-err"></div><div id="cpw-ok" style="color:#16A34A;font-size:12px;margin-bottom:10px;display:none"></div><div class="fg"><label>New password</label><input type="password" id="cpw1" placeholder="Min 8 characters"></div><div class="fg"><label>Confirm password</label><input type="password" id="cpw2"></div><div class="modal-footer"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="doChangePw()"><i class="ti ti-check"></i>Save</button></div>';
+  } else if(type==='newrequest'||type==='timeoff'){
+    const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
+    box.innerHTML='<div class="modal-title"><i class="ti ti-calendar-off"></i>New Request</div><div id="req-e" class="msg-err"></div><div class="fg"><label>Type</label><select id="req-type"><option value="">-- Select type --</option>'+LEAVE_TYPES.map(t=>'<option value="'+t+'">'+t+'</option>').join('')+'<option value="Task">Task Request</option></select></div><div class="fg"><label>Start date</label><input type="date" id="req-start"></div><div class="fg"><label>End date</label><input type="date" id="req-end"></div><div class="fg"><label>Notes (optional)</label><textarea id="req-note" rows="3" style="resize:none"></textarea></div><div class="modal-footer"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitRequest('+'+(pat?'\''+pat.id+'\'':"''")+')"><i class="ti ti-send"></i>Submit</button></div>';
+  } else if(type==='earlyClockOut'&&data){
+    box.innerHTML='<div class="modal-title"><i class="ti ti-clock-stop"></i>Early Clock Out</div><div style="background:#FEF3C7;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;color:#92400E"><strong>'+data.earlyLabel+'</strong> remaining on your shift (ends '+data.adjEndStr+'). Requires approval.</div><div class="fg"><label>Reason</label><textarea id="early-reason" rows="3" placeholder="Reason for early clock out..." style="resize:none"></textarea></div><div class="modal-footer"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitEarlyOut(\''+data.patId+'\',\''+data.attId+'\',\''+data.adjEndStr+'\')"><i class="ti ti-send"></i>Submit</button></div>';
+  }
+  ov.classList.add('open');
+}
+function closeModal(){document.getElementById('modal').classList.remove('open');}
+
+async function doChangePw(){
+  const p1=document.getElementById('cpw1').value;const p2=document.getElementById('cpw2').value;
+  const e=document.getElementById('cpw-e');const ok=document.getElementById('cpw-ok');
+  if(p1.length<8){e.textContent='Min 8 characters';e.style.display='block';return;}
+  if(p1!==p2){e.textContent='Passwords do not match';e.style.display='block';return;}
+  const{error}=await sb.auth.updateUser({password:p1});
+  if(error){e.textContent=error.message;e.style.display='block';}
+  else{ok.textContent='Password updated!';ok.style.display='block';setTimeout(closeModal,1500);}
+}
+
+async function submitRequest(patId){
+  const type=document.getElementById('req-type').value;
+  const start=document.getElementById('req-start').value;
+  const end=document.getElementById('req-end').value;
+  const note=document.getElementById('req-note').value;
+  const e=document.getElementById('req-e');
+  if(!type){e.textContent='Select a type';e.style.display='block';return;}
+  if(!start||!end){e.textContent='Select start and end dates';e.style.display='block';return;}
+  if(end<start){e.textContent='End date cannot be before start';e.style.display='block';return;}
+  const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
+  if(type==='Task'){
+    const{error}=await sb.from('task_requests').insert({patroller_id:patId,patroller_name:pat?.name||'',task_type:'Task',date:start,start_time:'',end_time:'',status:'Pending',description:note||'Task request'});
+    if(error){e.textContent=error.message;e.style.display='block';return;}
+  } else {
+    const{error}=await sb.from('time_off_requests').insert({patroller_id:patId,patroller_name:pat?.name||'',request_type:type,start_date:start,end_date:end,comment:note||null,status:'Pending',submitted_by:D.profile.id});
+    if(error){e.textContent=error.message;e.style.display='block';return;}
+  }
+  closeModal();await reload();
+}
+
+async function submitEarlyOut(patId,attId,adjEndStr){
+  const reason=document.getElementById('early-reason').value.trim()||'No reason provided';
+  const pat=D.patrollers.find(p=>p.id===patId);
+  const bhr=getBahrainNow();
+  const timeStr=String(bhr.getUTCHours()).padStart(2,'0')+':'+String(bhr.getUTCMinutes()).padStart(2,'0');
+  await sb.from('task_requests').insert({patroller_id:patId,patroller_name:pat?.name||'',task_type:'Early Clock Out',date:todayStr(),start_time:timeStr,end_time:adjEndStr,status:'Pending',description:'Early clock out. Reason: '+reason+'. Att ID: '+attId});
+  closeModal();await reload();
+}
+
+// ── SW ──
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js?app=1').then(reg=>{
+      setInterval(()=>reg.update(),60000);
+      reg.addEventListener('updatefound',()=>{
+        const nw=reg.installing;
+        nw.addEventListener('statechange',()=>{if(nw.state==='installed'&&navigator.serviceWorker.controller)nw.postMessage({type:'SKIP_WAITING'});});
+      });
+    }).catch(e=>console.log('SW failed',e));
+    navigator.serviceWorker.addEventListener('controllerchange',()=>window.location.reload());
+  });
+}
+</script>
+</body>
+</html>
