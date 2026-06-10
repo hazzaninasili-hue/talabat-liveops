@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781107723">
+<meta name="build" content="1781108142">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -3632,7 +3632,7 @@ function leaveBalanceCard(p, showFull=true){
       </div>`).join('')}
     </div>
 
-    ${canEdit()?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #F4EDE3;display:flex;gap:8px">
+    ${isAdmin()?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid #F4EDE3;display:flex;gap:8px">
       <button class="btn" style="flex:1;font-size:11px" onclick="openM({type:'editLeaveBalance',patrollerId:'${p.id}',patrollerName:'${p.name.replace(/'/g,"\'")}',balance:D.leaveBalances.find(b=>b.patroller_id==='${p.id}')})"><i class="ti ti-edit"></i>Edit balance</button>
     </div>`:''}
   </div>`;
@@ -3640,7 +3640,17 @@ function leaveBalanceCard(p, showFull=true){
 
 // ── LEAVE BALANCE VIEW (admin) ──
 function leaveBalanceView(){
-  const pts = activePats();
+  // Include ALL active staff (patrollers + leads) — exclude only admins
+  const pts = D.patrollers.filter(p=>{
+    if(p.is_active===false)return false;
+    const u=D.users.find(u=>u.id===p.user_id);
+    if(u){
+      if(u.is_active===false)return false;
+      if(u.role==='admin')return false;
+      if(u.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr&&cr.access_level==='admin')return false;}
+    }
+    return true;
+  });
   if(!pts.length) return `<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-calendar-off" style="font-size:40px;display:block;margin-bottom:10px;opacity:.3"></i><div style="font-weight:600">No users yet</div></div>`;
 
   // Summary stats
