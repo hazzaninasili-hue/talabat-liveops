@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781106976">
+<meta name="build" content="1781107275">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -2848,13 +2848,16 @@ function attendanceView(){
 }
 
 function getWeekStartForDate(dateStr){
-  // Parse date string as Bahrain local date (UTC+3) to get correct day-of-week
+  // Must match wStart()/getCurrentSaturday() exactly — week starts on Sunday
   const[y,m,d]=dateStr.split('-').map(Number);
-  const jsDay=new Date(Date.UTC(y,m-1,d,0,0,0)).getUTCDay();
-  const diff=jsDay===6?0:-(jsDay+1);
-  const sat=new Date(Date.UTC(y,m-1,d));
-  sat.setUTCDate(sat.getUTCDate()+diff);
-  return sat.toISOString().split('T')[0];
+  const jsDay=new Date(Date.UTC(y,m-1,d)).getUTCDay();
+  const diff=jsDay===0?0:-jsDay; // go back to Sunday
+  const sun=new Date(Date.UTC(y,m-1,d));
+  sun.setUTCDate(sun.getUTCDate()+diff);
+  const yy=sun.getUTCFullYear();
+  const mm=String(sun.getUTCMonth()+1).padStart(2,'0');
+  const dd=String(sun.getUTCDate()).padStart(2,'0');
+  return`${yy}-${mm}-${dd}`;
 }
 
 function dlAttendance(){
