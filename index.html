@@ -285,13 +285,13 @@ const sb=supabase.createClient(SURL,SKEY,{auth:{autoRefreshToken:true,persistSes
 const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const SD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function getCurrentSaturday(){
-  // Bahrain week starts Sunday (getDay()===0)
-  var now=new Date();
-  var day=now.getDay(); // 0=Sun,1=Mon,...,6=Sat
+  // Bahrain week starts Sunday, use UTC+3
+  var bhr=getBahrainNow();
+  var day=bhr.getUTCDay(); // 0=Sun,1=Mon,...,6=Sat
   var diff=day===0?0:-day; // go back to Sunday
-  var sun=new Date(now);
-  sun.setDate(sun.getDate()+diff);
-  sun.setHours(0,0,0,0);
+  var sun=new Date(bhr);
+  sun.setUTCDate(sun.getUTCDate()+diff);
+  sun.setUTCHours(0,0,0,0);
   return sun;
 }
 const BASE_DATE=getCurrentSaturday();
@@ -535,7 +535,7 @@ async function sendWebhook(event,data){
 
 const ini=n=>n.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
 const gsh=id=>D.shifts.find(s=>s.id===id)||{name:'?',start_time:'?',end_time:'?',shift_type:'morning'};
-const fmt=d=>`${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()}`;
+const fmt=d=>`${d.getUTCDate()}-${d.getUTCMonth()+1}-${d.getUTCFullYear()}`;
 const wNum=d=>{
   // Week number based on Bahrain week (starts Sunday)
   const jan1=new Date(d.getFullYear(),0,1);
@@ -550,8 +550,23 @@ const roleBg=r=>r==='admin'?'#EDE9FE':r==='lead'?'#EAF1FD':r==='coordinator'?'#C
 const roleCol=r=>r==='admin'?'#4C1D95':r==='lead'?'#0C4FB3':r==='coordinator'?'#134E4A':'#475569';
 const roleLabel=r=>r==='admin'?'Admin':r==='lead'?'Team Lead':r==='coordinator'?'Coordinator':'Patroller';
 const roleCls=r=>r==='admin'?'rb-admin':r==='lead'?'rb-lead':r==='coordinator'?'rb-coord':'rb-pat';
-function wDates(){const b=getCurrentSaturday();return DAYS.map((_,i)=>{const d=new Date(b);d.setDate(d.getDate()+D.woff*7+i);return d;});}
-function wStart(){const b=getCurrentSaturday();const d=new Date(b);d.setDate(d.getDate()+D.woff*7);return d.toISOString().split('T')[0];}
+function wDates(){
+  const b=getCurrentSaturday();
+  return DAYS.map((_,i)=>{
+    const d=new Date(b);
+    d.setUTCDate(d.getUTCDate()+D.woff*7+i);
+    return d;
+  });
+}
+function wStart(){
+  const b=getCurrentSaturday();
+  const d=new Date(b);
+  d.setUTCDate(d.getUTCDate()+D.woff*7);
+  const y=d.getUTCFullYear();
+  const m=String(d.getUTCMonth()+1).padStart(2,'0');
+  const dd=String(d.getUTCDate()).padStart(2,'0');
+  return`${y}-${m}-${dd}`;
+}
 function gDZ(pid,di){const ws=wStart();const sc=D.schedules.find(s=>s.patroller_id===pid&&s.week_start===ws);return sc?sc['day_'+di]||'':'';}
 function gDS(pid,di){const ws=wStart();const sc=D.schedules.find(s=>s.patroller_id===pid&&s.week_start===ws);return sc?sc['shift_'+di]||'':'';}
 function getDayShift(pid,di){const ov=gDS(pid,di);if(ov)return D.shifts.find(s=>s.id===ov);const p=D.patrollers.find(x=>x.id===pid);return gsh(p?.shift_id);}
@@ -1207,7 +1222,7 @@ function mySchedView(){
   if(!p)return`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-user-off" style="font-size:40px;display:block;margin-bottom:10px"></i>Your account is not linked to a schedule record.<br><span style="font-size:12px">Contact your admin to link your account.</span></div>`;
   const dates=wDates();const sh=gsh(p.shift_id);const wn=wNum(dates[0]);
   const today=todayStr();
-  const todayIdx=new Date().getDay(); // Sun=0,Mon=1,...,Sat=6 (Bahrain)
+  const todayIdx=todayDayIdx(); // Sun=0,Mon=1,...,Sat=6 (Bahrain UTC+3)
   const todayZone=gDZ(p.id,todayIdx);
   const todayOnVac=isOnVacationToday(p.id);
   const todayAbsent=isAbsentToday(p.id);
@@ -1318,7 +1333,99 @@ function mySchedView(){
     }).join('')}
   </div>`;
 
-  return heroCard+taskCards+weekNav+weekGrid+notesBar();
+  // ── Clock In/Out widget (inline in schedule) ──
+  const pat2=p; // alias
+  const todayIdxNow=todayDayIdx();
+  const zone=gDZ(pat2.id,todayIdxNow);
+  const onVac=isOnVacationToday(pat2.id);
+  const rec=getMyAttRecord();
+  const shNow=getDayShift(pat2.id,todayIdxNow);
+  const nowTimeStr=getBahrainNow().toUTCString().slice(17,22);
+
+  let clockWidget='';
+  if(D.woff===0){
+    if(onVac){
+      clockWidget=`<div style="background:linear-gradient(135deg,#7C3AED,#A855F7);border-radius:16px;padding:20px;text-align:center;color:#fff;margin-bottom:14px">
+        <i class="ti ti-beach" style="font-size:36px;display:block;margin-bottom:6px"></i>
+        <div style="font-size:16px;font-weight:700">You're on Vacation 🌴</div>
+        <div style="font-size:12px;opacity:.8;margin-top:4px">${onVac.start_date} → ${onVac.end_date}</div>
+      </div>`;
+    } else if(!zone){
+      clockWidget=`<div style="background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:16px;padding:20px;text-align:center;color:#92400E;margin-bottom:14px">
+        <i class="ti ti-coffee" style="font-size:36px;display:block;margin-bottom:6px"></i>
+        <div style="font-size:16px;font-weight:700">Day Off Today ☕</div>
+      </div>`;
+    } else if(!rec||!rec.clock_in){
+      clockWidget=`<div style="background:linear-gradient(135deg,#411517,#6B2D2F);border-radius:16px;padding:24px;text-align:center;color:#F4EDE3;margin-bottom:14px">
+        <div style="font-size:12px;opacity:.7;margin-bottom:4px">TODAY · ${zone} · ${shNow?`${fmtT(shNow.start_time)}–${fmtT(shNow.end_time)}`:''}</div>
+        <div style="font-size:14px;opacity:.6;margin-bottom:16px">${nowTimeStr} Bahrain time</div>
+        <button id="clock-in-btn" onclick="doClockIn()" style="background:#FF5900;color:#fff;border:none;padding:14px 40px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px">
+          <i class="ti ti-clock-play" style="font-size:18px"></i> Clock In
+        </button>
+        <div style="font-size:11px;opacity:.5;margin-top:10px">Your GPS location will be recorded</div>
+      </div>`;
+    } else if(rec.clock_in&&!rec.clock_out){
+      const inTime=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+      clockWidget=`<div style="background:linear-gradient(135deg,#14532D,#166534);border-radius:16px;padding:24px;text-align:center;color:#F0FDF4;margin-bottom:14px">
+        <div style="font-size:13px;opacity:.7;margin-bottom:4px">CLOCKED IN · ${zone}</div>
+        <div style="font-size:22px;font-weight:700;margin-bottom:4px">${inTime}</div>
+        <div style="margin-bottom:14px"><a href="${rec.clock_in_map}" target="_blank" style="color:#86efac;font-size:11px"><i class="ti ti-map-pin"></i> View location</a></div>
+        <button id="clock-out-btn" onclick="doClockOut()" style="background:#FF5900;color:#fff;border:none;padding:14px 40px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px">
+          <i class="ti ti-clock-stop" style="font-size:18px"></i> Clock Out
+        </button>
+      </div>`;
+    } else {
+      const inTime=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+      const outTime=new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+      const mins=Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000);
+      const dur=`${Math.floor(mins/60)}h ${mins%60}m`;
+      clockWidget=`<div style="background:linear-gradient(135deg,#1e3a5f,#1e40af);border-radius:16px;padding:20px;text-align:center;color:#EFF6FF;margin-bottom:14px">
+        <i class="ti ti-circle-check" style="font-size:32px;display:block;margin-bottom:6px;color:#60A5FA"></i>
+        <div style="font-size:16px;font-weight:700">Shift Complete ✓</div>
+        <div style="font-size:13px;margin-top:6px;opacity:.8">${inTime} → ${outTime} · <strong>${dur}</strong></div>
+        <div style="display:flex;justify-content:center;gap:14px;margin-top:8px">
+          <a href="${rec.clock_in_map}" target="_blank" style="color:#93C5FD;font-size:11px"><i class="ti ti-map-pin"></i> Clock-in</a>
+          ${rec.clock_out_map?`<a href="${rec.clock_out_map}" target="_blank" style="color:#93C5FD;font-size:11px"><i class="ti ti-map-pin"></i> Clock-out</a>`:''}
+        </div>
+      </div>`;
+    }
+  }
+
+  // ── My attendance history (last 14 records) ──
+  const myRecs=(D.attendance||[]).filter(a=>a.patroller_id===p.id).slice(0,14);
+  const attHistory=myRecs.length?`
+  <div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;overflow:hidden;margin-top:14px">
+    <div style="padding:10px 14px;background:#F4EDE3;border-bottom:1.5px solid #E8DDD4;font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">
+      <i class="ti ti-clock-check" style="margin-right:5px"></i>My Attendance History
+    </div>
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#F8FAFC">
+        <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;color:#A08070">Date</th>
+        <th style="padding:8px 8px;text-align:center;font-size:10px;font-weight:700;color:#A08070">Status</th>
+        <th style="padding:8px 8px;text-align:center;font-size:10px;font-weight:700;color:#A08070">In</th>
+        <th style="padding:8px 8px;text-align:center;font-size:10px;font-weight:700;color:#A08070">Out</th>
+        <th style="padding:8px 8px;text-align:center;font-size:10px;font-weight:700;color:#A08070">Duration</th>
+      </tr></thead>
+      <tbody>${myRecs.map(a=>{
+        const inT=a.clock_in?new Date(a.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
+        const outT=a.clock_out?new Date(a.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
+        const dur=a.clock_in&&a.clock_out?`${Math.floor(Math.round((new Date(a.clock_out)-new Date(a.clock_in))/60000)/60)}h ${Math.round((new Date(a.clock_out)-new Date(a.clock_in))/60000)%60}m`:'--';
+        const sc=a.status==='Attended'?'#DCFCE7;color:#166534':a.status==='Absent'?'#FEE2E2;color:#991B1B':'#F4EDE3;color:#411517';
+        return`<tr style="border-bottom:1px solid #F4EDE3">
+          <td style="padding:8px 12px;font-family:monospace;font-size:11px;color:#2A0D0F">${a.date}</td>
+          <td style="padding:8px;text-align:center"><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:${sc}">${a.status||'--'}</span></td>
+          <td style="padding:8px;text-align:center;font-size:11px">${inT}</td>
+          <td style="padding:8px;text-align:center;font-size:11px">${outT}</td>
+          <td style="padding:8px;text-align:center;font-size:11px;font-weight:600">${dur}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>
+    </div>
+  </div>`:
+  `<div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;padding:20px;text-align:center;color:#A08070;margin-top:14px;font-size:12px">No attendance records yet.</div>`;
+
+  return heroCard+clockWidget+taskCards+weekNav+weekGrid+notesBar()+attHistory;
 }
 
 function renderTabs(){
@@ -1363,7 +1470,7 @@ function renderTabs(){
 
 function buildRoleLiveTable(isToday){
   const pts=activePats();
-  const todayIdx=new Date().getDay(); // Sun=0,Mon=1,...,Sat=6 (Bahrain)
+  const todayIdx=todayDayIdx(); // Sun=0,Mon=1,...,Sat=6 (Bahrain UTC+3)
   const nowStr=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   // Group by custom role name
   const getRoleName=p=>{const u=D.users.find(u=>u.id===p.user_id);if(u&&u.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr)return cr.name;}return getUtype(p)==='coordinator'?'Coordinator':'Patroller';};
@@ -1999,14 +2106,23 @@ async function removeDevice(deviceId){
 }
 
 // ── ATTENDANCE HELPERS ──
+function getBahrainNow(){
+  // Bahrain is UTC+3, always (no DST)
+  const now=new Date();
+  const bhr=new Date(now.getTime()+(3*60*60*1000));
+  return bhr;
+}
 function todayStr(){
-  const today=new Date();
-  const y=today.getFullYear();
-  const m=String(today.getMonth()+1).padStart(2,'0');
-  const d=String(today.getDate()).padStart(2,'0');
+  const bhr=getBahrainNow();
+  const y=bhr.getUTCFullYear();
+  const m=String(bhr.getUTCMonth()+1).padStart(2,'0');
+  const d=String(bhr.getUTCDate()).padStart(2,'0');
   return`${y}-${m}-${d}`;
 }
-function todayDayIdx(){const jsDay=new Date().getDay();return{6:0,0:1,1:2,2:3,3:4,4:5,5:6}[jsDay];}
+function todayDayIdx(){
+  // Sun=0, Mon=1, ... Sat=6 (Bahrain week, UTC+3)
+  return getBahrainNow().getUTCDay();
+}
 function getMyAttRecord(){const today=todayStr();return(D.attendance||[]).find(a=>a.patroller_id===(D.patrollers.find(p=>p.user_id===D.profile.id)?.id)&&a.date===today);}
 function isOnVacationToday(pid){const today=todayStr();return D.timeoff.find(t=>t.patroller_id===pid&&t.status==='Approved'&&today>=t.start_date&&today<=t.end_date);}
 function fmtDateTime(ts){if(!ts)return'--';const d=new Date(ts);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
