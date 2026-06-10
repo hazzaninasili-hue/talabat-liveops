@@ -6,39 +6,74 @@
 <title>Talabat Operations</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#411517">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Talabat Ops">
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1828/1828640.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',sans-serif;background:#F4EDE3;color:#2A0D0F;font-size:14px}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @media(max-width:768px){
+  /* Layout */
   .page{padding:8px!important}
-  .topbar{padding:0 12px!important;height:52px!important}
-  .topbar-name{font-size:14px!important;font-weight:700!important}
-  .topbar-sub{font-size:11px!important}
-  .tabs{padding:4px 8px!important;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .topbar{padding:0 10px!important;height:50px!important}
+  .topbar-left{gap:8px!important}
+  .topbar-logo{width:28px!important;height:28px!important}
+  .topbar-name{font-size:13px!important;font-weight:700!important}
+  .topbar-sub{display:none!important}
+  .wk-chip{font-size:10px!important;padding:3px 7px!important}
+  /* Tabs */
+  .tabs{padding:2px 6px!important;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:2px!important}
   .tabs::-webkit-scrollbar{display:none}
-  .tab{padding:10px 12px!important;font-size:12px!important;white-space:nowrap;flex-shrink:0}
+  .tab{padding:8px 10px!important;font-size:11px!important;white-space:nowrap;flex-shrink:0}
+  .tab i{display:none!important}
+  /* Toolbar */
+  .toolbar{flex-wrap:wrap!important;gap:6px!important;padding:8px 0!important}
+  .search-wrap{order:10;width:100%!important}
+  .search-input{width:100%!important}
+  .btn{padding:8px 12px!important;font-size:11px!important}
+  .btn-primary{padding:9px 14px!important}
+  .seg{gap:2px!important}
+  .seg-btn{padding:6px 10px!important;font-size:11px!important}
+  /* Grid/cards */
   .card-grid{grid-template-columns:1fr!important}
   .fg-row{grid-template-columns:1fr!important}
-  .modal-box{padding:20px 16px!important;border-radius:16px!important;margin:12px!important;max-height:90vh;overflow-y:auto}
-  .toolbar{flex-wrap:wrap!important;gap:6px!important}
-  .btn{padding:8px 14px!important;font-size:12px!important}
-  .search-wrap{order:3;width:100%}
-  .search-input{width:100%!important}
-  .user-nm{font-size:12px!important;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .user-rl{font-size:10px!important}
-  .wk-chip{font-size:11px!important;padding:4px 8px!important}
-  table{font-size:11px!important}
-  table th,table td{padding:6px 6px!important}
-  .auth-wrap{padding:16px!important;align-items:flex-start!important;padding-top:40px!important}
-  .auth-box{padding:28px 20px!important;width:100%!important;border-radius:16px!important}
-  .auth-box h2{font-size:22px!important}
-  .auth-btn{padding:13px!important;font-size:15px!important}
-  .fg input,.fg select,.fg textarea{font-size:15px!important;padding:11px 12px!important}
-  .stat{padding:12px!important}
-  .stat-value{font-size:24px!important}
-  .stat-label{font-size:10px!important}
+  /* Tables */
+  .tcard{border-radius:10px!important}
+  .t-scroll{-webkit-overflow-scrolling:touch}
+  table{font-size:10px!important}
+  table th,table td{padding:5px 5px!important}
+  /* Modal */
+  .modal-ov{align-items:flex-end!important}
+  .modal-box{padding:20px 16px!important;border-radius:20px 20px 0 0!important;margin:0!important;max-height:92vh;width:100%!important;max-width:100%!important}
+  .modal-title{font-size:15px!important}
+  /* Auth */
+  .auth-wrap{padding:16px!important;align-items:flex-start!important;padding-top:30px!important}
+  .auth-box{padding:24px 18px!important;width:100%!important;border-radius:16px!important}
+  .auth-box h2{font-size:20px!important}
+  .auth-btn{padding:13px!important;font-size:15px!important;border-radius:12px!important}
+  .fg input,.fg select,.fg textarea{font-size:16px!important;padding:10px 12px!important}
+  /* User chip */
+  .user-chip{gap:6px!important}
+  .user-nm{font-size:11px!important;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .user-rl{font-size:9px!important}
+  .user-av{width:30px!important;height:30px!important;font-size:11px!important}
+  /* Stats */
+  .stat{padding:10px!important}
+  .stat-value{font-size:22px!important}
+  .stat-label{font-size:9px!important}
+  /* Top buttons */
+  .top-btn{padding:5px 8px!important;font-size:11px!important}
+  .top-btn span{display:none}
+}
+@media(max-width:480px){
+  .tab span{display:none}
+  .nav-btn{width:28px!important;height:28px!important}
+  .wk-range{font-size:10px!important}
 }
 :root{
   --blue:#411517;--blue-l:#F9EDEE;--blue-d:#2A0D0F;--blue-b:#C4888A;
@@ -266,7 +301,8 @@ table tr:hover td{background:rgba(26,111,232,.02)}
           <div id="notif-list" style="max-height:300px;overflow-y:auto;padding:8px 0"></div>
         </div>
       </div>
-      <button class="top-btn danger" onclick="doLogout()"><i class="ti ti-logout"></i>Sign out</button>
+      <button id="install-btn" onclick="installApp()" style="display:none;background:rgba(255,89,0,.15);border:1px solid rgba(255,89,0,.3);color:#FF5900;padding:5px 10px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;align-items:center;gap:4px;font-family:inherit"><i class="ti ti-download"></i><span>Install App</span></button>
+      <button class="top-btn danger" onclick="doLogout()"><i class="ti ti-logout"></i><span>Sign out</span></button>
     </div>
   </div>
   <div class="tabs" id="tabs"></div>
@@ -479,6 +515,20 @@ async function afterLogin(user){
     }
   }
   render();
+}
+
+// Targeted reloads for faster response
+async function reloadAttendance(){
+  try{const{data}=await wt(sb.from('attendance').select('*').order('date',{ascending:false}).limit(500),4000);D.attendance=data||[];}catch(e){}
+}
+async function reloadTasks(){
+  try{const{data}=await wt(sb.from('task_requests').select('*').order('created_at',{ascending:false}),4000);D.tasks=data||[];}catch(e){}
+}
+async function reloadTimeoff(){
+  try{const{data}=await wt(sb.from('time_off_requests').select('*').order('created_at',{ascending:false}),4000);D.timeoff=data||[];}catch(e){}
+}
+async function reloadLeaveBalances(){
+  try{const{data}=await wt(sb.from('leave_balances').select('*'),3000);D.leaveBalances=data||[];}catch(e){}
 }
 
 function wt(p,ms=8000){return Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms))]);}
@@ -2697,7 +2747,7 @@ function attendanceView(){
     return`<tr>
       <td class="lt" style="font-weight:600">${p.name}</td>
       <td style="font-size:11px">${zone}</td>
-      <td style="font-size:11px">${sh?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}-${fmtT(getEffectiveEndTime(p.id,sh,a.date)||sh.end_time)}${(a.late_mins||0)>0?` <span style="color:#D97706;font-size:9px">⚠+${a.late_mins}m</span>`:''}`:'-'}</td>
+      <td style="font-size:11px">${sh?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}-${fmtT(getEffectiveEndTime(p.id,sh,today)||sh.end_time)}${(rec?.late_mins||0)>0?` <span style="color:#D97706;font-size:9px">⚠+${rec.late_mins}m</span>`:''}`:'-'}</td>
       <td><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;${isAtt?'background:#DCFCE7;color:#166534':isAbs?'background:#FEE2E2;color:#991B1B':'background:#F4EDE3;color:#94A3B8'}">${status||'Pending'}</span></td>
       <td style="font-size:11px">${inT}${rec?.clock_in_map?` <a href="${rec.clock_in_map}" target="_blank" style="color:#FF5900"><i class="ti ti-map-pin" style="font-size:10px"></i></a>`:''}</td>
       <td style="font-size:11px">${outT}${rec?.clock_out_map?` <a href="${rec.clock_out_map}" target="_blank" style="color:#FF5900"><i class="ti ti-map-pin" style="font-size:10px"></i></a>`:''}</td>
@@ -3674,6 +3724,26 @@ function toggleNotifications(){
   if(!open){renderNotifications();setTimeout(()=>document.addEventListener('click',function h(e){if(!panel.contains(e.target)){panel.style.display='none';document.removeEventListener('click',h);}}),50);}
 }
 function clearNotifications(){D_notifs=[];renderNotifications();}
+
+// ── PWA Service Worker Registration ──
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').then(r=>{
+      console.log('SW registered');
+    }).catch(e=>console.log('SW failed',e));
+  });
+}
+
+// ── Install prompt ──
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt',(e)=>{
+  e.preventDefault();deferredPrompt=e;
+  const btn=document.getElementById('install-btn');
+  if(btn)btn.style.display='flex';
+});
+function installApp(){
+  if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.waitForOutcome().then(()=>{deferredPrompt=null;const btn=document.getElementById('install-btn');if(btn)btn.style.display='none';});}
+}
 </script>
 </body>
 </html>
