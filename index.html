@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781110388">
+<meta name="build" content="1781111076">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -948,10 +948,12 @@ function dateView(){
       rows+=`<div style="font-size:9px;font-weight:700;color:#0C4FB3;text-transform:uppercase;letter-spacing:.05em;padding:3px 7px;background:#EAF1FD;border-radius:4px;margin-bottom:3px">Patrollers</div>`;
       patrollers.forEach(p=>{const z=gDZ(p.id,di);const io=!z;const sh=getDayShift(p.id,di);
         const dayStr=d.toISOString().split('T')[0];
+        const isAbsD=isAbsentOnDate(p.id,dayStr);
         const effEndD=getEffectiveEndTime(p.id,sh,dayStr);
         const isAdjD=effEndD&&sh&&effEndD!==sh.end_time;
         const shTime=(!io&&sh)?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}–${fmtT(effEndD)}${isAdjD?' ⚠️':''}`:'';;
-        rows+=`<div class="dc-row${io?' off':''}"><div class="dc-av${sh?.shift_type==='evening'?' e':''}${io?' o':''}">${ini(p.name)}</div><div style="flex:1;min-width:0"><div class="dc-name">${p.name}</div><div class="dc-zone">${(()=>{const ds2=d.toISOString().split('T')[0];const ov2=D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds2>=t.start_date&&ds2<=t.end_date);return ov2?'🌴 On Vacation':io?'Off Day':z;})()}${shTime?` · <span style="font-size:9px;color:var(--g3)">${shTime}</span>`:''}</div></div></div>`;});
+        const rowBg=isAbsD?' style="background:#FEE2E2;border-color:#fca5a5"':'';
+        rows+=`<div class="dc-row${io?' off':''}"${rowBg}><div class="dc-av${sh?.shift_type==='evening'?' e':''}${io?' o':''}" style="${isAbsD?'background:#DC2626;color:#fff':''}"><${isAbsD?'span title="Absent"':'span'}>${ini(p.name)}</span></div><div style="flex:1;min-width:0"><div class="dc-name">${p.name}</div><div class="dc-zone">${(()=>{const ds2=d.toISOString().split('T')[0];const ov2=D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds2>=t.start_date&&ds2<=t.end_date);return ov2?'🌴 On Vacation':io?'Off Day':isAbsD?'<span style="color:#DC2626;font-weight:700">✗ Absent</span>':z;})()}${shTime&&!isAbsD?` · <span style="font-size:9px;color:var(--g3)">${shTime}</span>`:''}</div></div></div>`;});
     }
     // Coordinator rows
     if(coordinators.length){
@@ -963,7 +965,8 @@ function dateView(){
     const eOn=patrollers.filter(p=>getDayShift(p.id,di)?.shift_type==='evening'&&gDZ(p.id,di)).length;
     const cOn=coordinators.filter(p=>gDZ(p.id,di)).length;
     const offC=pts.filter(p=>!gDZ(p.id,di)).length;
-    h+=`<div class="date-card"><div class="dc-head"><div class="dc-day">${DAYS[di]}</div><div class="dc-date">${fmt(d)}</div></div><div class="dc-body">${rows}</div><div class="dc-foot"><span class="dc-badge m"><i class="ti ti-sun" style="font-size:10px;margin-right:2px"></i>${mOn}</span><span class="dc-badge e"><i class="ti ti-moon" style="font-size:10px;margin-right:2px"></i>${eOn}</span>${cOn?`<span class="dc-badge" style="background:var(--teal-l);color:var(--teal-d)"><i class="ti ti-star" style="font-size:10px;margin-right:2px"></i>${cOn}</span>`:''}<span class="dc-badge o"><i class="ti ti-x" style="font-size:10px;margin-right:2px"></i>${offC}</span></div></div>`;
+    const absC=patrollers.filter(p=>isAbsentOnDate(p.id,d.toISOString().split('T')[0])&&gDZ(p.id,di)).length;
+    h+=`<div class="date-card"><div class="dc-head"><div class="dc-day">${DAYS[di]}</div><div class="dc-date">${fmt(d)}</div></div><div class="dc-body">${rows}</div><div class="dc-foot"><span class="dc-badge m"><i class="ti ti-sun" style="font-size:10px;margin-right:2px"></i>${mOn}</span><span class="dc-badge e"><i class="ti ti-moon" style="font-size:10px;margin-right:2px"></i>${eOn}</span>${cOn?`<span class="dc-badge" style="background:var(--teal-l);color:var(--teal-d)"><i class="ti ti-star" style="font-size:10px;margin-right:2px"></i>${cOn}</span>`:''}<span class="dc-badge o"><i class="ti ti-x" style="font-size:10px;margin-right:2px"></i>${offC}</span>${absC?`<span class="dc-badge" style="background:#FEE2E2;color:#DC2626"><i class="ti ti-user-off" style="font-size:10px;margin-right:2px"></i>${absC}</span>`:''}</div></div>`;
   });
   return h+'</div>';
 }
@@ -1065,7 +1068,7 @@ function summaryView(){
         return`<td><span style="font-size:9px;color:var(--g3)">?</span></td>`;
       }).join('');
       const attW=dates.filter(d=>{const ds=d.toISOString().split('T')[0];const r=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);return r?.status==='Attended';}).length;
-      const absW=dates.filter(d=>{const ds=d.toISOString().split('T')[0];const r=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);return r?.status==='Absent';}).length;
+      const absW=dates.filter(d=>{const ds=d.toISOString().split('T')[0];const r=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);return r&&r.status&&r.status.startsWith('Absent');}).length;
       return`<tr><td class="lt">${p.name}</td><td><span class="role-badge ${getUtype(p)==='coordinator'?'rb-coord':'rb-pat'}">${getUtype(p)==='coordinator'?'Coord':'Pat'}</span></td>${cells}<td style="font-weight:700;color:#166534">${attW}</td><td style="font-weight:700;color:#DC2626">${absW}</td></tr>`;
     }).join('')}
     </tbody></table></div></div>
@@ -1140,6 +1143,8 @@ function getDocType(d){
   const url=(d.url||'').toLowerCase();
   const name=(d.name||'').toLowerCase();
   const cat=(d.category||'').toLowerCase();
+  if(cat==='gform'||url.includes('docs.google.com/forms'))
+    return{icon:'ti-brand-google',label:'Google Form',bg:'#FFF0E6',color:'#EA4335',border:'#FFB380'};
   if(cat==='form'||name.includes('form')||name.includes('request'))
     return{icon:'ti-forms',label:'Form',bg:'#FFF0E6',color:'#FF5900',border:'#FFB380'};
   if(cat==='sheet'||url.includes('docs.google.com/spreadsheets')||name.includes('sheet')||name.includes('roster')||name.includes('report'))
@@ -2782,7 +2787,7 @@ function attendanceView(){
   // Stats
   const todayRecs=(D.attendance||[]).filter(a=>a.date===today);
   const attended=todayRecs.filter(a=>a.status==='Attended').length;
-  const absent=todayRecs.filter(a=>a.status==='Absent').length;
+  const absent=todayRecs.filter(a=>a.status&&a.status.startsWith('Absent')).length;
   const onVacCount=pts.filter(p=>isOnVacationToday(p.id)).length;
   const todayIdx=todayDayIdx();
 
@@ -3408,14 +3413,31 @@ async function saveLeaveBalance(patrollerId){
   const rid=(document.getElementById('lb-rid').value||'').trim();
   const hc=parseFloat(document.getElementById('lb-hc').value)||0;
   const hs=parseFloat(document.getElementById('lb-hs').value)||0;
-  const existing=D.leaveBalances.find(b=>b.patroller_id===patrollerId);
   const year=getLeaveYear();
   const payload={annual_carry_forward:cf,rider_id:rid||null,year,historical_consumed:hc,historical_sick:hs,updated_at:new Date().toISOString()};
+
+  // Handle profile-based IDs (team leads with no patroller record)
+  let realPatrollerId=patrollerId;
+  if(patrollerId.startsWith('profile-')){
+    const userId=patrollerId.replace('profile-','');
+    // Find or create a patroller record for this lead
+    let pat=D.patrollers.find(p=>p.user_id===userId);
+    if(!pat){
+      const u=D.users.find(u=>u.id===userId);
+      if(!u){e.textContent='User not found';e.style.display='block';return;}
+      const{data:np,error:ne}=await sb.from('patrollers').insert({name:u.full_name,user_id:userId,is_active:true,user_type:'lead'}).select().single();
+      if(ne){e.textContent=ne.message;e.style.display='block';return;}
+      pat=np;await reload();
+    }
+    realPatrollerId=pat.id;
+  }
+
+  const existing=D.leaveBalances.find(b=>b.patroller_id===realPatrollerId);
   if(existing){
     const{error}=await sb.from('leave_balances').update(payload).eq('id',existing.id);
     if(error){e.textContent=error.message;e.style.display='block';return;}
   } else {
-    const{error}=await sb.from('leave_balances').insert({patroller_id:patrollerId,...payload});
+    const{error}=await sb.from('leave_balances').insert({patroller_id:realPatrollerId,...payload});
     if(error){e.textContent=error.message;e.style.display='block';return;}
   }
   closeM();await reload();
