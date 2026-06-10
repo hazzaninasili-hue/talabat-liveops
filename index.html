@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781111076">
+<meta name="build" content="1781111217">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -1279,7 +1279,8 @@ function operationsView(){
     var sHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">';
     D.shifts.forEach(function(sh){
       var isMorn = sh.shift_type === 'morning';
-      var col = isMorn ? '#FF5900' : '#D97706';
+      var isNight = sh.shift_type === 'night';
+      var col = isMorn ? '#FF5900' : isNight ? '#6366F1' : '#D97706';
       var bg = isMorn ? '#FFF0E6' : '#FEF3C7';
       var bdr = isMorn ? '#BAE6FD' : '#FDE68A';
       var cnt = D.patrollers.filter(function(p){return p.shift_id===sh.id;}).length;
