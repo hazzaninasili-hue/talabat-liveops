@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781094378">
+<meta name="build" content="1781094814">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -26,7 +26,7 @@
       for(const r of regs){
         const swUrl = r.active?.scriptURL || '';
         // If the SW URL does NOT contain our current build, unregister it
-        if(!swUrl.includes('1781094378')){
+        if(!swUrl.includes('1781094814')){
           await r.unregister();
           console.log('[Cache] Unregistered old SW:', swUrl);
         }
@@ -36,7 +36,7 @@
     if('caches' in window){
       const keys = await caches.keys();
       for(const k of keys){
-        if(k !== 'talabat-v1781094378'){
+        if(k !== 'talabat-v1781094814'){
           await caches.delete(k);
           console.log('[Cache] Deleted old cache:', k);
         }
@@ -50,7 +50,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#F4EDE3;color:#2A0D0F;font-size:14px}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-@media(max-width:768px){
+@media(max-width:900px){
   /* ── FONT RENDERING ── */
   body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
   /* ── HIDE DESKTOP TOPBAR & TABS — replaced by mobile header ── */
@@ -1910,10 +1910,9 @@ function buildRoleLiveTable(isToday){
   </div>`;
 }
 
-function isMobile(){return window.innerWidth<=768;}
+function isMobile(){return window.innerWidth<=900;}
 
 function renderMobileHeader(){
-  if(!isMobile())return;
   const u=D.profile;
   const pts=activePats();
   const todayIdx=todayDayIdx();
@@ -4026,7 +4025,7 @@ window.addEventListener('error', (e) => {
 });
 
 // ── PWA Service Worker Registration ──
-const APP_BUILD='1781094378';
+const APP_BUILD='1781094814';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('build-ts');if(el)el.textContent='v2.2.'+APP_BUILD.slice(-4);});
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
