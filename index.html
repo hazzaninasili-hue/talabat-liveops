@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781107275">
+<meta name="build" content="1781107443">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -2787,19 +2787,17 @@ function attendanceView(){
   const todayIdx=todayDayIdx();
 
   // Build rows — skip off-day and vacation patrollers
-  const todaySelIdx=D.attDate?
-    (()=>{const[sy,sm,sd]=D.attDate.split('-').map(Number);return new Date(Date.UTC(sy,sm-1,sd)).getUTCDay();})()
-    :todayDayIdx();
+  const todaySelIdx=todayDayIdx();
   const workingPats=pts.filter(p=>{
     const vac=isOnVacationToday(p.id);if(vac)return false;
-    const ws=getWeekStartForDate(today);
+    const ws=wStart();
     const sc=D.schedules.find(s=>s.patroller_id===p.id&&s.week_start===ws);
     return sc&&sc['day_'+todaySelIdx];
   });
   const vacPats=pts.filter(p=>isOnVacationToday(p.id));
   const offPats=pts.filter(p=>{
     if(isOnVacationToday(p.id))return false;
-    const ws=getWeekStartForDate(today);
+    const ws=wStart();
     const sc=D.schedules.find(s=>s.patroller_id===p.id&&s.week_start===ws);
     return!sc||!sc['day_'+todaySelIdx];
   });
@@ -2811,7 +2809,7 @@ function attendanceView(){
     const outT=rec?.clock_out?new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
     const dur=rec?.clock_in&&rec?.clock_out?`${Math.floor(Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000)/60)}h ${Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000)%60}m`:'--';
     const isAtt=status==='Attended';const isAbs=status==='Absent';
-    const ws=getWeekStartForDate(today);const sc=D.schedules.find(s=>s.patroller_id===p.id&&s.week_start===ws);
+    const ws=wStart();const sc=D.schedules.find(s=>s.patroller_id===p.id&&s.week_start===ws);
     const zone=sc?sc['day_'+todaySelIdx]||'--':'--';
     const sh=getDayShift(p.id,todaySelIdx);
     return`<tr>
