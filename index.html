@@ -2,28 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<script>
-(function(){
-  if(!('serviceWorker' in navigator)) return;
-  // On non-github domains, unregister all SWs and reload once to ensure clean fetch
-  if(!location.hostname.includes('github.io')){
-    var cleared = sessionStorage.getItem('sw_nuked');
-    if(!cleared){
-      sessionStorage.setItem('sw_nuked','1');
-      Promise.all([
-        navigator.serviceWorker.getRegistrations().then(function(regs){
-          return Promise.all(regs.map(function(r){return r.unregister();}));
-        }),
-        caches.keys().then(function(keys){
-          return Promise.all(keys.map(function(k){return caches.delete(k);}));
-        })
-      ]).then(function(){ window.location.reload(); });
-      // Stop page execution until reload
-      document.write('');
-    }
-  }
-})();
-</script>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3882,26 +3860,6 @@ window.addEventListener('error', (e) => {
     </div>`;
   }
 });
-
-// ── PWA Service Worker Registration ──
-if('serviceWorker' in navigator && location.hostname.includes('github.io')){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').then(r=>{
-      console.log('SW registered');
-    }).catch(e=>console.log('SW failed',e));
-  });
-}
-
-// ── Install prompt ──
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt',(e)=>{
-  e.preventDefault();deferredPrompt=e;
-  const btn=document.getElementById('install-btn');
-  if(btn)btn.style.display='flex';
-});
-function installApp(){
-  if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.waitForOutcome().then(()=>{deferredPrompt=null;const btn=document.getElementById('install-btn');if(btn)btn.style.display='none';});}
-}
 </script>
 </body>
 </html>

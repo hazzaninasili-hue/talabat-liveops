@@ -12,27 +12,6 @@
 <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1828/1828640.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
-<script>
-// Clear any old SW immediately and reload once if needed
-(function(){
-  if(!('serviceWorker' in navigator)) return;
-  // If we haven't cleared yet, clear and reload
-  if(location.hostname.includes('github.io') && !sessionStorage.getItem('sw-cleared')){
-    sessionStorage.setItem('sw-cleared','1');
-    navigator.serviceWorker.getRegistrations().then(function(regs){
-      var had = regs.length > 0;
-      var p = regs.map(function(r){return r.unregister();});
-      return Promise.all(p).then(function(){
-        return caches.keys();
-      }).then(function(keys){
-        return Promise.all(keys.map(function(k){return caches.delete(k);}));
-      }).then(function(){
-        if(had) window.location.reload();
-      });
-    });
-  }
-})();
-</script>
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
