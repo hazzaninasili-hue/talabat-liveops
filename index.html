@@ -359,7 +359,7 @@ table tr:hover td{background:rgba(26,111,232,.02)}
       <div class="topbar-ico"><i class="ti ti-shield-check"></i></div>
       <div><div class="topbar-name">Talabat Operations</div><div class="topbar-sub">Live Ops Management</div></div>
       <span class="wk-chip" id="wk-chip">--</span>
-      <span style="font-size:9px;color:rgba(255,255,255,.4);margin-left:2px" id="build-ts">v2.1.6707</span>
+      <span style="font-size:9px;color:rgba(255,255,255,.4);margin-left:2px" id="build-ts">v2.2</span>
     </div>
     <div class="topbar-right">
       <div class="user-chip" id="user-chip"></div>
@@ -4030,6 +4030,7 @@ window.addEventListener('error', (e) => {
 
 // ── PWA Service Worker Registration ──
 const APP_BUILD='1781093591';
+document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('build-ts');if(el)el.textContent='v2.2.'+APP_BUILD.slice(-4);});
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('sw.js?v='+APP_BUILD).then(reg=>{
