@@ -5,10 +5,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781090849">
+<meta name="build" content="1781093242">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <link rel="manifest" href="manifest.json">
@@ -27,7 +29,7 @@
       for(const r of regs){
         const swUrl = r.active?.scriptURL || '';
         // If the SW URL does NOT contain our current build, unregister it
-        if(!swUrl.includes('1781090849')){
+        if(!swUrl.includes('1781093242')){
           await r.unregister();
           console.log('[Cache] Unregistered old SW:', swUrl);
         }
@@ -37,7 +39,7 @@
     if('caches' in window){
       const keys = await caches.keys();
       for(const k of keys){
-        if(k !== 'talabat-v1781090849'){
+        if(k !== 'talabat-v1781093242'){
           await caches.delete(k);
           console.log('[Cache] Deleted old cache:', k);
         }
@@ -694,8 +696,21 @@ const wNum=d=>{
   return Math.ceil((dayOfYear+jan1Day+1)/7);
 };
 const fmtT=t=>{if(!t||t==='?')return'?';const[h,m]=t.split(':');const hr=parseInt(h);return`${hr===0?12:hr>12?hr-12:hr}:${m} ${hr<12||hr===24?'AM':'PM'}`;};
-const isAdmin=()=>D.profile&&D.profile.role==='admin';
-const canEdit=()=>D.profile&&(D.profile.role==='admin'||D.profile.role==='lead');
+const isAdmin=()=>{
+  if(!D.profile)return false;
+  if(D.profile.role==='admin')return true;
+  const crId=D.profile.custom_role_id;
+  if(crId){const cr=(D.customRoles||[]).find(r=>r.id===crId);if(cr&&cr.access_level==='admin')return true;}
+  return false;
+};
+const canEdit=()=>{
+  if(!D.profile)return false;
+  if(D.profile.role==='admin'||D.profile.role==='lead')return true;
+  // custom roles with editor or admin access level
+  const crId=D.profile.custom_role_id;
+  if(crId){const cr=(D.customRoles||[]).find(r=>r.id===crId);if(cr&&(cr.access_level==='editor'||cr.access_level==='admin'))return true;}
+  return false;
+};
 const roleBg=r=>r==='admin'?'#EDE9FE':r==='lead'?'#EAF1FD':r==='coordinator'?'#CCFBF1':'#F1F5F9';
 const roleCol=r=>r==='admin'?'#4C1D95':r==='lead'?'#0C4FB3':r==='coordinator'?'#134E4A':'#475569';
 const roleLabel=r=>r==='admin'?'Admin':r==='lead'?'Team Lead':r==='coordinator'?'Coordinator':'Patroller';
@@ -1805,14 +1820,30 @@ function renderTabs(){
     const al=cr.access_level||'viewer';
     const canEditData=al==='editor'||al==='admin';
     const isFullAdmin=al==='admin';
+    // editor & admin always get full ops tabs regardless of visible_tabs config
+    if(canEditData){
+      let tabs=[
+        {id:'schedule',icon:'ti-calendar',label:'Schedule'},
+        {id:'summary',icon:'ti-chart-bar',label:'Summary'},
+        {id:'myattendance',icon:'ti-clock-check',label:'My Attendance'},
+        {id:'attendance',icon:'ti-users',label:'Team Attendance'},
+        {id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'},
+        {id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'},
+        {id:'leavebalance',icon:'ti-calendar-stats',label:'Leave Balance'},
+        {id:'documents',icon:'ti-files',label:'Documents'},
+      ];
+      if(isFullAdmin)tabs.push({id:'access',icon:'ti-lock',label:'Access control'});
+      document.getElementById('tabs').innerHTML=tabs.map(t=>`<button class="tab${D.tab===t.id?' active':''}" onclick="setTab('${t.id}')"><i class="ti ${t.icon}"></i>${t.label}</button>`).join('');
+      return;
+    }
+    // viewer: respect visible_tabs config
     let tabs=[{id:'myschedule',icon:'ti-user',label:'My schedule'}];
-    if(visTabs.includes('Schedule')&&canEditData)tabs.push({id:'schedule',icon:'ti-calendar',label:'Schedule'});
+    if(visTabs.includes('Schedule'))tabs.push({id:'schedule',icon:'ti-calendar',label:'Schedule'});
     if(visTabs.includes('Summary'))tabs.push({id:'summary',icon:'ti-chart-bar',label:'Summary'});
-    if(visTabs.includes('Attendance')){tabs.push({id:'myattendance',icon:'ti-clock-check',label:'Attendance'});if(canEditData)tabs.push({id:'attendance',icon:'ti-users',label:'Team Attendance'});}
+    if(visTabs.includes('Attendance')){tabs.push({id:'myattendance',icon:'ti-clock-check',label:'Attendance'});}
     if(visTabs.includes('Time off & Tasks'))tabs.push({id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'});
     if(visTabs.includes('Leave Balance'))tabs.push({id:'myleavebalance',icon:'ti-calendar-stats',label:'Leave Balance'});
     if(visTabs.includes('Documents'))tabs.push({id:'documents',icon:'ti-files',label:'Documents'});
-    if(isFullAdmin){tabs.push({id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'});tabs.push({id:'access',icon:'ti-lock',label:'Access control'});}
     document.getElementById('tabs').innerHTML=tabs.map(t=>`<button class="tab${D.tab===t.id?' active':''}" onclick="setTab('${t.id}')"><i class="ti ${t.icon}"></i>${t.label}</button>`).join('');
     return;
   }
@@ -1937,14 +1968,27 @@ function renderMobileHeader(){
     const al=cr.access_level||'viewer';
     const canEditData=al==='editor'||al==='admin';
     const isFullAdmin=al==='admin';
-    tabs=[{id:'myschedule',label:'My Schedule'}];
-    if(visTabs.includes('Schedule')&&canEditData)tabs.push({id:'schedule',label:'Schedule'});
-    if(visTabs.includes('Summary'))tabs.push({id:'summary',label:'Summary'});
-    if(visTabs.includes('Attendance')){tabs.push({id:'myattendance',label:'Attendance'});if(canEditData)tabs.push({id:'attendance',label:'Team Attend.'});}
-    if(visTabs.includes('Time off & Tasks'))tabs.push({id:'timeofftask',label:'Tasks'});
-    if(visTabs.includes('Leave Balance'))tabs.push({id:'myleavebalance',label:'Leave'});
-    if(visTabs.includes('Documents'))tabs.push({id:'documents',label:'Docs'});
-    if(isFullAdmin){tabs.push({id:'zonenshift',label:'Shifts'});tabs.push({id:'access',label:'Access'});}
+    if(canEditData){
+      tabs=[
+        {id:'schedule',label:'Schedule'},
+        {id:'summary',label:'Summary'},
+        {id:'myattendance',label:'My Attend.'},
+        {id:'attendance',label:'Team Attend.'},
+        {id:'timeofftask',label:'Tasks'},
+        {id:'zonenshift',label:'Shifts'},
+        {id:'leavebalance',label:'Leave'},
+        {id:'documents',label:'Docs'},
+      ];
+      if(isFullAdmin)tabs.push({id:'access',label:'Access'});
+    } else {
+      tabs=[{id:'myschedule',label:'My Schedule'}];
+      if(visTabs.includes('Schedule'))tabs.push({id:'schedule',label:'Schedule'});
+      if(visTabs.includes('Summary'))tabs.push({id:'summary',label:'Summary'});
+      if(visTabs.includes('Attendance'))tabs.push({id:'myattendance',label:'Attendance'});
+      if(visTabs.includes('Time off & Tasks'))tabs.push({id:'timeofftask',label:'Tasks'});
+      if(visTabs.includes('Leave Balance'))tabs.push({id:'myleavebalance',label:'Leave'});
+      if(visTabs.includes('Documents'))tabs.push({id:'documents',label:'Docs'});
+    }
   } else if(role==='patroller'||role==='coordinator'){
     tabs=[{id:'myschedule',label:'My Schedule'},{id:'myattendance',label:'Attendance'},{id:'timeofftask',label:'Tasks'},{id:'myleavebalance',label:'Leave'},{id:'documents',label:'Docs'}];
   } else {
