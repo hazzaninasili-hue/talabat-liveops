@@ -5,11 +5,11 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781089238">
+<meta name="build" content="1781089547">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#411517">
@@ -20,35 +20,37 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',sans-serif;background:#F4EDE3;color:#2A0D0F;font-size:14px}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:#F4EDE3;color:#2A0D0F;font-size:14px}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @media(max-width:768px){
+  /* ── FONT RENDERING ── */
+  body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.01em}
   /* ── LAYOUT ── */
   .page{padding:6px 8px!important}
   /* ── TOPBAR ── */
   .topbar{padding:0 10px!important;height:48px!important;gap:8px!important}
   .topbar-brand{gap:6px!important}
   .topbar-ico{width:28px!important;height:28px!important;font-size:14px!important}
-  .topbar-name{font-size:12px!important;font-weight:700!important}
+  .topbar-name{font-size:13px!important;font-weight:800!important}
   .topbar-sub{display:none!important}
-  .wk-chip{font-size:10px!important;padding:3px 6px!important;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .wk-chip{font-size:11px!important;padding:3px 6px!important;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .topbar-right{gap:4px!important}
-  .top-btn{padding:5px 6px!important;font-size:11px!important;min-width:30px}
+  .top-btn{padding:5px 6px!important;font-size:12px!important;min-width:30px}
   /* ── TABS ── */
   .tabs{padding:0 6px!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:1px!important}
   .tabs::-webkit-scrollbar{display:none}
-  .tab{padding:9px 10px!important;font-size:11px!important;white-space:nowrap;flex-shrink:0;gap:4px!important}
+  .tab{padding:9px 10px!important;font-size:12px!important;white-space:nowrap;flex-shrink:0;gap:4px!important}
   .tab i{font-size:13px!important}
   /* ── TOOLBAR ── */
   .toolbar{flex-wrap:wrap!important;gap:5px!important;padding:6px 0!important}
   .search-wrap{width:100%!important;order:10}
   .search-input{width:100%!important;font-size:14px!important}
-  .btn{padding:8px 10px!important;font-size:11px!important;border-radius:8px!important}
+  .btn{padding:8px 10px!important;font-size:12px!important;border-radius:8px!important}
   .btn-primary{padding:9px 12px!important}
   .seg{gap:2px!important}
-  .seg-btn{padding:6px 10px!important;font-size:11px!important}
+  .seg-btn{padding:6px 10px!important;font-size:12px!important}
   .nav-btn{width:32px!important;height:32px!important}
-  .wk-range{font-size:10px!important;max-width:160px}
+  .wk-range{font-size:11px!important;max-width:170px}
   /* ── CARDS/GRIDS ── */
   .card-grid{grid-template-columns:1fr!important}
   .fg-row{grid-template-columns:1fr!important}
@@ -56,8 +58,8 @@ body{font-family:'Inter',sans-serif;background:#F4EDE3;color:#2A0D0F;font-size:1
   /* ── TABLES ── */
   .tcard{border-radius:10px!important}
   .t-scroll{-webkit-overflow-scrolling:touch}
-  table{font-size:10px!important}
-  table th,table td{padding:5px 4px!important}
+  table{font-size:12px!important}
+  table th,table td{padding:6px 5px!important}
   /* ── MODAL ── */
   .modal-ov{align-items:flex-end!important;padding:0!important}
   .modal-box{padding:20px 16px 28px!important;border-radius:20px 20px 0 0!important;margin:0!important;max-height:88vh!important;width:100%!important;max-width:100%!important;overflow-y:auto}
@@ -66,15 +68,15 @@ body{font-family:'Inter',sans-serif;background:#F4EDE3;color:#2A0D0F;font-size:1
   .auth-box{padding:24px 16px!important;width:100%!important;border-radius:16px!important}
   .auth-box h2{font-size:20px!important}
   .auth-btn{padding:14px!important;font-size:16px!important;border-radius:12px!important}
-  .fg label{font-size:11px!important}
+  .fg label{font-size:12px!important}
   .fg input,.fg select,.fg textarea{font-size:16px!important;padding:10px 12px!important}
   /* ── USER CHIP ── */
   .user-chip{gap:5px!important;padding:4px 8px!important}
   .user-av{width:28px!important;height:28px!important;font-size:11px!important}
-  .user-nm{font-size:11px!important;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .user-nm{font-size:12px!important;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .user-rl{font-size:9px!important;display:none}
   /* ── NOTES ── */
-  .info-box{font-size:11px!important}
+  .info-box{font-size:12px!important}
 }
 @media(max-width:400px){
   .tab span,.tab i{display:none!important}
@@ -2532,7 +2534,7 @@ function showLocationWarning(){
   if(existing)return;
   const banner=document.createElement('div');
   banner.id='loc-warning-banner';
-  banner.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#DC2626;color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-family:Inter,sans-serif;font-size:13px;box-shadow:0 -4px 16px rgba(0,0,0,.2)';
+  banner.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#DC2626;color:#fff;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;box-shadow:0 -4px 16px rgba(0,0,0,.2)';
   banner.innerHTML=`<div style="display:flex;align-items:center;gap:10px">
     <i class="ti ti-map-pin-off" style="font-size:20px;flex-shrink:0"></i>
     <div><strong>Location access denied</strong> — You must enable location permissions to clock in/out. Go to your browser settings and allow location for this site.</div>
@@ -3764,7 +3766,7 @@ function showToast(msg,type='info'){
   let toast=document.getElementById('toast-container');
   if(!toast){toast=document.createElement('div');toast.id='toast-container';toast.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:300px';document.body.appendChild(toast);}
   const t=document.createElement('div');
-  t.style.cssText=`background:${bgs[type]};border:1.5px solid ${cols[type]}33;border-radius:12px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);animation:slideIn .2s ease;font-family:Inter,sans-serif`;
+  t.style.cssText=`background:${bgs[type]};border:1.5px solid ${cols[type]}33;border-radius:12px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);animation:slideIn .2s ease;font-family:'Plus Jakarta Sans',sans-serif`;
   t.innerHTML=`<i class="ti ${icons[type]}" style="font-size:15px;color:${cols[type]};flex-shrink:0"></i><div style="flex:1;font-size:12px;color:#2A0D0F;line-height:1.4">${msg}</div><button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:#A08070;font-size:16px;line-height:1;padding:0">×</button>`;
   toast.appendChild(t);
   setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},4000);
@@ -3815,25 +3817,11 @@ window.addEventListener('error', (e) => {
 });
 
 // ── PWA Service Worker Registration ──
-const APP_BUILD='1781089238';
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js?v='+APP_BUILD).then(reg=>{
-      console.log('SW registered, build:'+APP_BUILD);
-      setInterval(()=>reg.update(),60000);
-      reg.addEventListener('updatefound',()=>{
-        const newSW=reg.installing;
-        newSW.addEventListener('statechange',()=>{
-          if(newSW.state==='installed'&&navigator.serviceWorker.controller){
-            console.log('New build available, reloading...');
-            newSW.postMessage({type:'SKIP_WAITING'});
-          }
-        });
-      });
+    navigator.serviceWorker.register('sw.js').then(r=>{
+      console.log('SW registered');
     }).catch(e=>console.log('SW failed',e));
-    navigator.serviceWorker.addEventListener('controllerchange',()=>{
-      window.location.reload();
-    });
   });
 }
 
