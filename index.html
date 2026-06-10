@@ -2,10 +2,32 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script>
+(function(){
+  if(!('serviceWorker' in navigator)) return;
+  // On non-github domains, unregister all SWs and reload once to ensure clean fetch
+  if(!location.hostname.includes('github.io')){
+    var cleared = sessionStorage.getItem('sw_nuked');
+    if(!cleared){
+      sessionStorage.setItem('sw_nuked','1');
+      Promise.all([
+        navigator.serviceWorker.getRegistrations().then(function(regs){
+          return Promise.all(regs.map(function(r){return r.unregister();}));
+        }),
+        caches.keys().then(function(keys){
+          return Promise.all(keys.map(function(k){return caches.delete(k);}));
+        })
+      ]).then(function(){ window.location.reload(); });
+      // Stop page execution until reload
+      document.write('');
+    }
+  }
+})();
+</script>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781111217">
+<meta name="build" content="1781112282">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -410,16 +432,27 @@ async function afterLogin(user){
     }
     D.profile=prof||{id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};
   }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};}
-  // Set default tab based on role
+  // ── REDIRECT PATROLLERS TO APP.HTML ──
   const patRoles=['patroller','coordinator'];
+  if(patRoles.includes(D.profile.role)){
+    // Load custom roles to check if they have editor/admin access
+    try{const{data:cr}=await wt(sb.from('custom_roles').select('*').order('name'),4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
+    const crId=D.profile.custom_role_id||(D.profile.custom_roles&&D.profile.custom_roles.id);
+    const cr=crId?(D.customRoles||[]).find(r=>r.id===crId):null;
+    const hasElevatedAccess=cr&&(cr.access_level==='editor'||cr.access_level==='admin');
+    if(!hasElevatedAccess){
+      window.location.href='app.html';
+      return;
+    }
+  }
+  // Set default tab based on role
   D.tab=patRoles.includes(D.profile.role)?'myschedule':'schedule';
-  // Also check custom role access level
   if(D.profile.custom_role_id&&D.customRoles.length){
     const cr=D.customRoles.find(r=>r.id===D.profile.custom_role_id);
     if(cr&&cr.access_level==='viewer')D.tab='myschedule';
   }
   // Load custom roles first so renderTabs can use them
-  try{const{data:cr}=await wt(sb.from('custom_roles').select('*').order('name'),4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
+  try{const{data:cr2}=await wt(sb.from('custom_roles').select('*').order('name'),4000);D.customRoles=cr2||[];}catch(e){D.customRoles=[];}
   try{const{data:lb}=await wt(sb.from('leave_balances').select('*'),4000);D.leaveBalances=lb||[];}catch(e){D.leaveBalances=[];}
   await loadAll();
   render();
@@ -3851,7 +3884,7 @@ window.addEventListener('error', (e) => {
 });
 
 // ── PWA Service Worker Registration ──
-if('serviceWorker' in navigator && location.hostname !== 'localhost' && !location.hostname.includes('claudeusercontent')){
+if('serviceWorker' in navigator && location.hostname.includes('github.io')){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('sw.js').then(r=>{
       console.log('SW registered');
