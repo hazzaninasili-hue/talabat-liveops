@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781098846">
+<meta name="build" content="1781099160">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -20,9 +20,14 @@
 <script>
 (function(){
   var ua=navigator.userAgent||'';
-  var mob=/Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(ua)||
-          (navigator.maxTouchPoints>1&&window.screen.width<768);
-  if(mob)document.documentElement.classList.add('is-mob');
+  // Strict mobile check - exclude desktop browsers explicitly
+  var isDesktop=/Windows NT|Macintosh|Linux x86_64/i.test(ua);
+  var isMobileUA=/Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  var isTablet=/iPad|Android(?!.*Mobile)/i.test(ua);
+  var mob=!isDesktop&&(isMobileUA||isTablet);
+  if(mob){
+    document.documentElement.classList.add('is-mob');
+  }
   window._isMob=mob;
 })();
 </script>
@@ -3793,7 +3798,7 @@ window.addEventListener('error', (e) => {
 });
 
 // ── PWA Service Worker Registration ──
-const APP_BUILD='1781098846';
+const APP_BUILD='1781099160';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('build-ts');if(el)el.textContent='v2.2.'+APP_BUILD.slice(-4);});
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
