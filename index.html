@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781089547">
+<meta name="build" content="1781090849">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -53,65 +53,54 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#F4EDE3;color:#2A0D0F
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @media(max-width:768px){
   /* ── FONT RENDERING ── */
-  body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.01em}
+  body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+  /* ── HIDE DESKTOP TOPBAR & TABS — replaced by mobile header ── */
+  .topbar{display:none!important}
+  .tabs{display:none!important}
+  /* ── MOBILE HEADER (injected by renderMobileHeader) ── */
+  #mobile-header{display:block!important}
   /* ── LAYOUT ── */
-  .page{padding:6px 8px!important}
-  /* ── TOPBAR ── */
-  .topbar{padding:0 10px!important;height:48px!important;gap:8px!important}
-  .topbar-brand{gap:6px!important}
-  .topbar-ico{width:28px!important;height:28px!important;font-size:14px!important}
-  .topbar-name{font-size:13px!important;font-weight:800!important}
-  .topbar-sub{display:none!important}
-  .wk-chip{font-size:11px!important;padding:3px 6px!important;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .topbar-right{gap:4px!important}
-  .top-btn{padding:5px 6px!important;font-size:12px!important;min-width:30px}
-  /* ── TABS ── */
-  .tabs{padding:0 6px!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:1px!important}
-  .tabs::-webkit-scrollbar{display:none}
-  .tab{padding:9px 10px!important;font-size:12px!important;white-space:nowrap;flex-shrink:0;gap:4px!important}
-  .tab i{font-size:13px!important}
+  .page{padding:0 0 80px 0!important;background:#f8f8f8!important}
   /* ── TOOLBAR ── */
-  .toolbar{flex-wrap:wrap!important;gap:5px!important;padding:6px 0!important}
+  .toolbar{flex-wrap:wrap!important;gap:6px!important;padding:10px 12px 6px!important;background:#fff;border-bottom:1px solid #f0f0f0}
   .search-wrap{width:100%!important;order:10}
   .search-input{width:100%!important;font-size:14px!important}
-  .btn{padding:8px 10px!important;font-size:12px!important;border-radius:8px!important}
-  .btn-primary{padding:9px 12px!important}
-  .seg{gap:2px!important}
-  .seg-btn{padding:6px 10px!important;font-size:12px!important}
-  .nav-btn{width:32px!important;height:32px!important}
-  .wk-range{font-size:11px!important;max-width:170px}
+  .btn{padding:9px 12px!important;font-size:12px!important;border-radius:10px!important;font-weight:600!important}
+  .btn-primary{padding:10px 14px!important}
+  .seg{gap:3px!important}
+  .seg-btn{padding:7px 12px!important;font-size:12px!important;font-weight:600!important}
+  .nav-btn{width:34px!important;height:34px!important}
+  .wk-range{font-size:11px!important;max-width:180px;font-weight:600}
   /* ── CARDS/GRIDS ── */
   .card-grid{grid-template-columns:1fr!important}
   .fg-row{grid-template-columns:1fr!important}
   .date-grid{grid-template-columns:1fr 1fr!important}
+  /* ── STATS ── */
+  .stats{grid-template-columns:repeat(2,1fr)!important;gap:8px!important;padding:10px 12px!important;background:#fff;margin-bottom:0!important}
+  .stat{border-radius:12px!important;padding:12px!important}
+  .stat-value{font-size:22px!important}
   /* ── TABLES ── */
-  .tcard{border-radius:10px!important}
+  .tcard{border-radius:12px!important;margin:8px 12px!important;border:1px solid #f0e8e0!important}
   .t-scroll{-webkit-overflow-scrolling:touch}
   table{font-size:12px!important}
-  table th,table td{padding:6px 5px!important}
+  table th,table td{padding:8px 6px!important}
   /* ── MODAL ── */
   .modal-ov{align-items:flex-end!important;padding:0!important}
-  .modal-box{padding:20px 16px 28px!important;border-radius:20px 20px 0 0!important;margin:0!important;max-height:88vh!important;width:100%!important;max-width:100%!important;overflow-y:auto}
+  .modal-box{padding:20px 16px 32px!important;border-radius:24px 24px 0 0!important;margin:0!important;max-height:90vh!important;width:100%!important;max-width:100%!important;overflow-y:auto}
   /* ── AUTH ── */
   .auth-wrap{padding:12px!important;align-items:flex-start!important;padding-top:24px!important}
   .auth-box{padding:24px 16px!important;width:100%!important;border-radius:16px!important}
   .auth-box h2{font-size:20px!important}
   .auth-btn{padding:14px!important;font-size:16px!important;border-radius:12px!important}
-  .fg label{font-size:12px!important}
-  .fg input,.fg select,.fg textarea{font-size:16px!important;padding:10px 12px!important}
-  /* ── USER CHIP ── */
-  .user-chip{gap:5px!important;padding:4px 8px!important}
-  .user-av{width:28px!important;height:28px!important;font-size:11px!important}
-  .user-nm{font-size:12px!important;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .user-rl{font-size:9px!important;display:none}
+  .fg label{font-size:12px!important;font-weight:600!important}
+  .fg input,.fg select,.fg textarea{font-size:16px!important;padding:12px!important;border-radius:10px!important}
   /* ── NOTES ── */
   .info-box{font-size:12px!important}
+  /* ── MOBILE BOTTOM NAV ── */
+  #mobile-bottom-nav{display:flex!important}
 }
 @media(max-width:400px){
-  .tab span,.tab i{display:none!important}
-  .tab::after{content:attr(data-label)}
-  .wk-range{font-size:9px!important}
-  .user-nm{max-width:55px!important}
+  .wk-range{font-size:10px!important}
   .btn span{display:none}
 }
 :root{
@@ -127,6 +116,37 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#F4EDE3;color:#2A0D0F
   --sh:0 1px 3px rgba(65,21,23,.08);--sh2:0 4px 16px rgba(65,21,23,.12);--sh3:0 20px 60px rgba(65,21,23,.18);
 }
 .auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#411517;padding:20px}
+/* ── MOBILE HEADER & BOTTOM NAV ── */
+#mobile-header{display:none;position:sticky;top:0;z-index:200;background:#411517}
+#mobile-header .mh-top{padding:10px 14px 0;display:flex;align-items:center;justify-content:space-between}
+#mobile-header .mh-brand{display:flex;align-items:center;gap:8px}
+#mobile-header .mh-logo{width:30px;height:30px;background:#FF5900;border-radius:9px;display:flex;align-items:center;justify-content:center}
+#mobile-header .mh-logo i{font-size:15px;color:#fff}
+#mobile-header .mh-title{font-size:14px;font-weight:800;color:#fff;letter-spacing:-.3px}
+#mobile-header .mh-sub{font-size:10px;color:rgba(255,255,255,.45);margin-top:0px}
+#mobile-header .mh-avatar{width:32px;height:32px;background:#FF5900;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;cursor:pointer;flex-shrink:0}
+#mobile-header .mh-stats{display:flex;gap:5px;padding:10px 14px 12px}
+#mobile-header .mh-stat{background:rgba(255,255,255,.12);border-radius:9px;padding:6px 8px;flex:1;text-align:center}
+#mobile-header .mh-stat-val{font-size:16px;font-weight:800;line-height:1.1}
+#mobile-header .mh-stat-lbl{font-size:9px;color:rgba(255,255,255,.5);margin-top:2px;font-weight:600;letter-spacing:.03em}
+#mobile-header .mh-tabs{background:#fff;display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;border-bottom:1px solid #f0f0f0}
+#mobile-header .mh-tabs::-webkit-scrollbar{display:none}
+#mobile-header .mh-tab{padding:10px 14px;font-size:12px;font-weight:600;color:#aaa;white-space:nowrap;border:none;background:transparent;cursor:pointer;border-bottom:2.5px solid transparent;flex-shrink:0;font-family:inherit}
+#mobile-header .mh-tab.active{color:#411517;border-bottom-color:#FF5900}
+#mobile-bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:#fff;border-top:1px solid #eee;padding:6px 0 max(6px, env(safe-area-inset-bottom));justify-content:space-around}
+#mobile-bottom-nav .bn-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 10px;border:none;background:transparent;cursor:pointer;font-family:inherit;min-width:44px}
+#mobile-bottom-nav .bn-item i{font-size:20px;color:#bbb}
+#mobile-bottom-nav .bn-item span{font-size:9px;font-weight:600;color:#bbb}
+#mobile-bottom-nav .bn-item.active i{color:#411517}
+#mobile-bottom-nav .bn-item.active span{color:#411517}
+.mobile-list-row{padding:12px 14px;border-bottom:1px solid #f5f5f5;display:flex;align-items:center;gap:10px;background:#fff}
+.mobile-list-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.mobile-status-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap}
+.mobile-today-highlight{background:#FFF7ED;padding:10px 14px;border-bottom:1px solid #FFD7B5;display:flex;align-items:center;gap:8px}
+.mobile-section-header{padding:10px 14px 5px;font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;background:#f8f8f8}
+.mobile-progress-bar{background:#f0f0f0;border-radius:4px;height:6px;overflow:hidden;margin:4px 0 2px}
+.mobile-progress-fill{height:6px;border-radius:4px}
+.mobile-action-btn{width:100%;background:#411517;border-radius:12px;padding:14px;font-size:14px;font-weight:700;color:#fff;text-align:center;border:none;cursor:pointer;font-family:inherit;margin-top:4px}
 .auth-box{background:var(--sur);border-radius:var(--r20);padding:36px;width:400px;max-width:100%;box-shadow:var(--sh3)}
 .auth-brand{display:flex;align-items:center;gap:10px;margin-bottom:28px}
 .auth-brand-ico{width:44px;height:44px;background:#F4EDE3;border-radius:12px;display:flex;align-items:center;justify-content:center}
@@ -315,6 +335,23 @@ table tr:hover td{background:rgba(26,111,232,.02)}
 </div>
 
 <div id="app" style="display:none">
+<!-- ── MOBILE HEADER ── -->
+<div id="mobile-header">
+  <div class="mh-top">
+    <div class="mh-brand">
+      <div class="mh-logo"><i class="ti ti-shield-check"></i></div>
+      <div><div class="mh-title">Talabat Ops</div><div class="mh-sub" id="mh-week-label">Week 24 · 2026</div></div>
+    </div>
+    <div class="mh-avatar" id="mh-avatar" onclick="openM({type:'changepw'})">HN</div>
+  </div>
+  <div class="mh-stats" id="mh-stats">
+    <div class="mh-stat"><div class="mh-stat-val" style="color:#4ADE80" id="mhs-on">—</div><div class="mh-stat-lbl">ON SHIFT</div></div>
+    <div class="mh-stat"><div class="mh-stat-val" style="color:#F87171" id="mhs-abs">—</div><div class="mh-stat-lbl">ABSENT</div></div>
+    <div class="mh-stat"><div class="mh-stat-val" style="color:#C084FC" id="mhs-vac">—</div><div class="mh-stat-lbl">VACATION</div></div>
+    <div class="mh-stat"><div class="mh-stat-val" style="color:#FCD34D" id="mhs-task">—</div><div class="mh-stat-lbl">ON TASK</div></div>
+  </div>
+  <div class="mh-tabs" id="mh-tabs"></div>
+</div>
   <div class="topbar">
     <div class="topbar-brand">
       <div class="topbar-ico"><i class="ti ti-shield-check"></i></div>
@@ -1522,7 +1559,7 @@ function mySchedView(){
     :sh.shift_type==='morning'?{icon:'☀️',label:'Scheduled',bg:'linear-gradient(135deg,#FF5900,#FF8C42)'}
     :{icon:'🌙',label:'Scheduled',bg:'linear-gradient(135deg,#D97706,#F59E0B)'};
 
-  const heroCard=`<div style="background:${heroStatus.bg};border-radius:20px;padding:24px 20px;margin-bottom:16px;color:#fff;position:relative;overflow:hidden">
+  const heroCard=`<div style="background:#411517;border-radius:16px;padding:20px 16px;margin-bottom:12px;color:#fff;position:relative;overflow:hidden">
     <div style="position:absolute;right:-20px;top:-20px;font-size:100px;opacity:.15">${heroStatus.icon}</div>
     <div style="display:flex;align-items:center;gap:14px;position:relative">
       <div style="width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0">${ini(p.name)}</div>
@@ -1845,6 +1882,84 @@ function buildRoleLiveTable(isToday){
   </div>`;
 }
 
+function isMobile(){return window.innerWidth<=768;}
+
+function renderMobileHeader(){
+  if(!isMobile())return;
+  const u=D.profile;
+  const pts=activePats();
+  const todayIdx=todayDayIdx();
+  const onShift=pts.filter(p=>gDZ(p.id,todayIdx)&&!isOnVacationToday(p.id)&&!isAbsentToday(p.id)).length;
+  const absent=pts.filter(p=>isAbsentToday(p.id)).length;
+  const onVac=pts.filter(p=>isOnVacationToday(p.id)).length;
+  const onTask=(D.tasks||[]).filter(t=>t.date===todayStr()&&(t.status==='Running'||t.status==='Approved')).length;
+
+  // Avatar initials
+  const av=document.getElementById('mh-avatar');
+  if(av){av.textContent=ini(u.full_name);}
+
+  // Week label
+  const dates=wDates();const wn=wNum(dates[0]);
+  const wl=document.getElementById('mh-week-label');
+  if(wl)wl.textContent='Week '+wn+' · '+dates[0].getFullYear();
+
+  // Stats — show for admin/lead; for patroller show personal stats
+  const isAdmin=canEdit();
+  const statsEl=document.getElementById('mh-stats');
+  if(statsEl){
+    if(isAdmin){
+      const s1=document.getElementById('mhs-on');const s2=document.getElementById('mhs-abs');
+      const s3=document.getElementById('mhs-vac');const s4=document.getElementById('mhs-task');
+      if(s1)s1.textContent=onShift;if(s2)s2.textContent=absent;
+      if(s3)s3.textContent=onVac;if(s4)s4.textContent=onTask;
+      statsEl.style.display='flex';
+    } else {
+      // Patroller: show their personal today info
+      const pat=D.patrollers.find(p=>p.user_id===u.id);
+      const todayZone=pat?gDZ(pat.id,todayIdx):'';
+      const sh=pat?getDayShift(pat.id,todayIdx):null;
+      statsEl.innerHTML=pat?
+        '<div class="mh-stat" style="flex:2"><div class="mh-stat-val" style="color:#fff;font-size:13px">'+(todayZone||'Off today')+'</div><div class="mh-stat-lbl">TODAY'S ZONE</div></div>'+
+        '<div class="mh-stat" style="flex:2"><div class="mh-stat-val" style="color:#fff;font-size:13px">'+(sh?fmtT(sh.start_time)+' – '+fmtT(sh.end_time):'—')+'</div><div class="mh-stat-lbl">SHIFT HOURS</div></div>':
+        '<div class="mh-stat" style="flex:1"><div class="mh-stat-val" style="color:#fff;font-size:12px">Welcome</div><div class="mh-stat-lbl">'+u.full_name+'</div></div>';
+    }
+  }
+
+  // Tabs — mirror renderTabs() but for mobile header
+  const tabsEl=document.getElementById('mh-tabs');
+  if(!tabsEl)return;
+  const role=u.role;
+  const crId=u.custom_role_id||(u.custom_roles?.id);
+  const cr=crId?(D.customRoles||[]).find(r=>r.id===crId)||u.custom_roles||null:null;
+  let tabs=[];
+  if(cr&&cr.visible_tabs){
+    let visTabs=[];try{visTabs=JSON.parse(cr.visible_tabs);}catch(e){}
+    const al=cr.access_level||'viewer';
+    const canEditData=al==='editor'||al==='admin';
+    const isFullAdmin=al==='admin';
+    tabs=[{id:'myschedule',label:'My Schedule'}];
+    if(visTabs.includes('Schedule')&&canEditData)tabs.push({id:'schedule',label:'Schedule'});
+    if(visTabs.includes('Summary'))tabs.push({id:'summary',label:'Summary'});
+    if(visTabs.includes('Attendance')){tabs.push({id:'myattendance',label:'Attendance'});if(canEditData)tabs.push({id:'attendance',label:'Team Attend.'});}
+    if(visTabs.includes('Time off & Tasks'))tabs.push({id:'timeofftask',label:'Tasks'});
+    if(visTabs.includes('Leave Balance'))tabs.push({id:'myleavebalance',label:'Leave'});
+    if(visTabs.includes('Documents'))tabs.push({id:'documents',label:'Docs'});
+    if(isFullAdmin){tabs.push({id:'zonenshift',label:'Shifts'});tabs.push({id:'access',label:'Access'});}
+  } else if(role==='patroller'||role==='coordinator'){
+    tabs=[{id:'myschedule',label:'My Schedule'},{id:'myattendance',label:'Attendance'},{id:'timeofftask',label:'Tasks'},{id:'myleavebalance',label:'Leave'},{id:'documents',label:'Docs'}];
+  } else {
+    tabs=[{id:'schedule',label:'Schedule'},{id:'summary',label:'Summary'},{id:'attendance',label:'Attendance'},{id:'timeofftask',label:'Tasks'},{id:'zonenshift',label:'Shifts'},{id:'leavebalance',label:'Leave'},{id:'documents',label:'Docs'},...(role==='admin'?[{id:'access',label:'Access'}]:[])];
+  }
+  tabsEl.innerHTML=tabs.map(t=>'<button class="mh-tab'+(D.tab===t.id?' active':'')+'" onclick="setTab(''+t.id+'')">'+t.label+'</button>').join('');
+
+  // Bottom nav — show top 5 most important tabs
+  const bnEl=document.getElementById('mobile-bottom-nav');
+  if(!bnEl)return;
+  const bnTabs=tabs.slice(0,5);
+  const icons={schedule:'ti-calendar',myschedule:'ti-calendar-user',summary:'ti-chart-bar',attendance:'ti-clock-check',myattendance:'ti-clock-check',timeofftask:'ti-calendar-off',zonenshift:'ti-map-pin',leavebalance:'ti-calendar-stats',myleavebalance:'ti-calendar-stats',documents:'ti-files',access:'ti-lock'};
+  bnEl.innerHTML=bnTabs.map(t=>'<button class="bn-item'+(D.tab===t.id?' active':'')+'" onclick="setTab(''+t.id+'')"><i class="ti '+( icons[t.id]||'ti-grid')+'"></i><span>'+t.label.replace('My ','').replace(' Balance','').replace(' Attend.','')+'</span></button>').join('');
+}
+
 function render(){
   if(!D.profile)return;
   // Initialize hourlyDay to today on first load or when week changes
@@ -1863,6 +1978,7 @@ function render(){
   const userCR=u.custom_role_id?(D.customRoles||[]).find(r=>r.id===u.custom_role_id):null;
   document.getElementById('user-chip').innerHTML=`<div class="user-av" style="background:${roleBg(u.role)};color:${roleCol(u.role)}">${ini(u.full_name)}</div><div><div class="user-nm">${u.full_name}</div><div class="user-rl">${userCR?userCR.name:roleLabel(u.role)}</div></div>`;
   renderTabs();
+  renderMobileHeader();
   const pts=activePats();const{am,pm,off}=summ(pts);
   const nav=`<div class="toolbar"><div class="seg"><button class="seg-btn${D.view==='week'?' active':''}" onclick="D.view='week';render()"><i class="ti ti-calendar-week" style="font-size:12px;margin-right:3px"></i>Week</button><button class="seg-btn${D.view==='date'?' active':''}" onclick="D.view='date';render()"><i class="ti ti-layout-columns" style="font-size:12px;margin-right:3px"></i>Daily</button><button class="seg-btn${D.view==='hourly'?' active':''}" onclick="D.view='hourly';render()"><i class="ti ti-timeline" style="font-size:12px;margin-right:3px"></i>Hourly</button></div><button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button><span class="wk-range">Week ${wn} - ${fmt(dates[0])} to ${fmt(dates[6])}</span><button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button>${D.woff!==0?`<button class="btn" onclick="D.woff=0;render()" style="padding:5px 10px;font-size:11px"><i class="ti ti-home" style="font-size:11px"></i>Today</button>`:''}<div class="search-wrap"><i class="ti ti-search"></i><input class="search-input" type="text" placeholder="Search..." value="${D.search}" oninput="D.search=this.value;render()"></div>${canEdit()?`<button class="btn btn-primary" onclick="openCreateSchedule()"><i class="ti ti-calendar-plus"></i>Create schedule</button>`:''}<button class="btn" onclick="openM({type:'taskreq'})"><i class="ti ti-plus"></i>Task request</button></div>`;
 
@@ -2744,26 +2860,26 @@ function myAttendanceView(){
       <div style="font-size:13px;opacity:.7;margin-top:4px">No attendance required</div>
     </div>`;
   } else if(!rec||!rec.clock_in){
-    clockWidget=`<div style="background:linear-gradient(135deg,#411517,#6B2D2F);border-radius:16px;padding:28px;text-align:center;color:#F4EDE3;margin-bottom:20px">
-      <div style="font-size:13px;opacity:.7;margin-bottom:6px">TODAY · ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',timeZone:'Asia/Bahrain'})}</div>
-      <div style="font-size:16px;font-weight:600;margin-bottom:4px">${zone}</div>
-      <div style="font-size:12px;opacity:.6;margin-bottom:20px">${sh?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)} - ${fmtT(sh.end_time)}`:''}</div>
-      <button id="clock-in-btn" onclick="doClockIn()" style="background:#FF5900;color:#fff;border:none;padding:14px 36px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px;transition:background .15s" onmouseover="this.style.background='#D94D00'" onmouseout="this.style.background='#FF5900'">
-        <i class="ti ti-clock-play" style="font-size:18px"></i> Clock In
+    clockWidget=`<div style="background:#411517;border-radius:16px;padding:22px;text-align:center;color:#F4EDE3;margin-bottom:16px">
+      <div style="font-size:11px;opacity:.6;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">TODAY · ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',timeZone:'Asia/Bahrain'})}</div>
+      <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:2px">${zone||'No zone assigned'}</div>
+      <div style="font-size:13px;opacity:.6;margin-bottom:20px">${sh?(sh.shift_type==='morning'?'☀️':'🌙')+' '+fmtT(sh.start_time)+' – '+fmtT(sh.end_time):''}</div>
+      <button id="clock-in-btn" onclick="doClockIn()" style="background:#FF5900;color:#fff;border:none;padding:16px 40px;border-radius:14px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px;width:100%;justify-content:center">
+        <i class="ti ti-clock-play" style="font-size:20px"></i> Clock In
       </button>
-      <div style="font-size:11px;opacity:.5;margin-top:12px">Your location will be recorded</div>
+      <div style="font-size:11px;opacity:.4;margin-top:10px"><i class="ti ti-map-pin" style="font-size:11px"></i> GPS location will be recorded</div>
     </div>`;
   } else if(rec.clock_in&&!rec.clock_out){
     const inTime=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
-    clockWidget=`<div style="background:linear-gradient(135deg,#14532D,#166534);border-radius:16px;padding:28px;text-align:center;color:#F0FDF4;margin-bottom:20px">
-      <div style="font-size:13px;opacity:.7;margin-bottom:6px">CLOCKED IN AT ${inTime}</div>
-      <div style="font-size:16px;font-weight:600;margin-bottom:4px">${zone}</div>
-      <div style="margin-bottom:6px"><a href="${rec.clock_in_map}" target="_blank" style="color:#86efac;font-size:11px"><i class="ti ti-map-pin" style="font-size:11px"></i> View clock-in location</a></div>
-      <div style="font-size:12px;opacity:.6;margin-bottom:20px">Shift: ${sh?`${fmtT(sh.start_time)} - ${fmtT(sh.end_time)}`:''}</div>
-      <button id="clock-out-btn" onclick="doClockOut()" style="background:#FF5900;color:#fff;border:none;padding:14px 36px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px" onmouseover="this.style.background='#D94D00'" onmouseout="this.style.background='#FF5900'">
-        <i class="ti ti-clock-stop" style="font-size:18px"></i> Clock Out
+    clockWidget=`<div style="background:#14532D;border-radius:16px;padding:22px;text-align:center;color:#F0FDF4;margin-bottom:16px">
+      <div style="font-size:11px;opacity:.6;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">CLOCKED IN AT ${inTime}</div>
+      <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:2px">${zone}</div>
+      <div style="font-size:13px;opacity:.6;margin-bottom:4px">${sh?fmtT(sh.start_time)+' – '+fmtT(sh.end_time):''}</div>
+      <div style="margin-bottom:20px"><a href="${rec.clock_in_map}" target="_blank" style="color:#86efac;font-size:11px"><i class="ti ti-map-pin" style="font-size:11px"></i> View clock-in location</a></div>
+      <button id="clock-out-btn" onclick="doClockOut()" style="background:#FF5900;color:#fff;border:none;padding:16px 40px;border-radius:14px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px;width:100%;justify-content:center">
+        <i class="ti ti-clock-stop" style="font-size:20px"></i> Clock Out
       </button>
-      <div style="font-size:11px;opacity:.5;margin-top:12px">Your location will be recorded</div>
+      <div style="font-size:11px;opacity:.4;margin-top:10px"><i class="ti ti-map-pin" style="font-size:11px"></i> GPS location will be recorded</div>
     </div>`;
   } else {
     const inTime=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
@@ -2800,7 +2916,7 @@ function myAttendanceView(){
   }).join('');
 
   return`${clockWidget}
-  <div style="font-size:13px;font-weight:700;color:#411517;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">My Attendance History</div>
+  <div style="font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;padding:10px 0 5px;margin-bottom:4px">Attendance History</div>
   ${myRecs.length===0?`<div style="padding:30px;text-align:center;color:var(--g3)">No attendance records yet.</div>`:`
   <div class="tcard"><div class="t-scroll"><table><thead><tr><th class="lt">Date</th><th>Status</th><th>Clock In</th><th>Clock Out</th><th>Duration</th><th>In Location</th><th>Out Location</th></tr></thead><tbody>${histRows}</tbody></table></div></div>`}`;
 }
@@ -2870,7 +2986,7 @@ function attendanceView(){
     <div class="stat green"><div class="stat-label">Attended</div><div class="stat-value">${attended}</div><div class="stat-sub">${today}</div></div>
     <div class="stat red"><div class="stat-label">Absent</div><div class="stat-value">${absent}</div></div>
     <div class="stat" style="--c:#7C3AED"><div class="stat-label">On Vacation</div><div class="stat-value" style="color:#7C3AED">${onVacCount}</div></div>
-    <div class="stat amber"><div class="stat-label">Scheduled today</div><div class="stat-value">${workingPats.length}</div></div>
+    <div class="stat amber"><div class="stat-label">Scheduled</div><div class="stat-value">${workingPats.length}</div></div>
   </div>
   <div class="toolbar">
     <input type="date" value="${today}" onchange="D.attDate=this.value;render()" style="padding:7px 11px;border-radius:var(--r8);border:1.5px solid var(--g2);font-family:inherit;font-size:12.5px">
@@ -3695,7 +3811,7 @@ function leaveBalanceView(){
       <button class="btn" onclick="downloadReport('leave')" style="font-size:11px"><i class="ti ti-download"></i>Export</button>
     </div>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;padding:0 0 8px">
     ${pts.map(p => leaveBalanceCard(p)).join('')}
   </div>`;
 }
@@ -3704,7 +3820,30 @@ function leaveBalanceView(){
 function myLeaveBalanceView(){
   const p = D.patrollers.find(pt => pt.user_id === D.profile.id);
   if(!p) return `<div style="padding:40px;text-align:center;color:var(--g3)">Your account is not linked to a schedule record.</div>`;
-  return `<div style="max-width:480px;margin:0 auto">${leaveBalanceCard(p, true)}</div>`;
+  const b = getLeaveBalance(p.id);
+  const annualPct = Math.round((b.annualRemaining / Math.max(1, b.annualTotal)) * 100);
+  const sickPct = Math.round((b.sickRemaining / Math.max(1, b.sickTotal)) * 100);
+  const annualColor = b.annualRemaining < 3 ? '#DC2626' : b.annualRemaining < 7 ? '#D97706' : '#16A34A';
+  const sickColor = b.sickRemaining < 2 ? '#DC2626' : '#7C3AED';
+  const mobileExtra = `
+  <div style="background:#fff;border-radius:14px;border:1px solid #f0e8e0;padding:16px;margin-bottom:10px">
+    <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Annual Leave</div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+      <span style="font-size:22px;font-weight:800;color:${annualColor}">${b.annualRemaining}<span style="font-size:13px;color:#999;font-weight:400"> days left</span></span>
+      <span style="font-size:12px;color:#999">${b.consumedAnnual} used of ${b.annualTotal}</span>
+    </div>
+    <div class="mobile-progress-bar"><div class="mobile-progress-fill" style="background:${annualColor};width:${annualPct}%"></div></div>
+  </div>
+  <div style="background:#fff;border-radius:14px;border:1px solid #f0e8e0;padding:16px;margin-bottom:10px">
+    <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Sick Leave</div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+      <span style="font-size:22px;font-weight:800;color:${sickColor}">${b.sickRemaining}<span style="font-size:13px;color:#999;font-weight:400"> days left</span></span>
+      <span style="font-size:12px;color:#999">${b.consumedSick} used of ${b.sickTotal}</span>
+    </div>
+    <div class="mobile-progress-bar"><div class="mobile-progress-fill" style="background:${sickColor};width:${sickPct}%"></div></div>
+  </div>
+  <button class="mobile-action-btn" onclick="openM({type:'timeoff'})"><i class="ti ti-plus" style="margin-right:6px"></i>Request Time Off</button>`;
+  return `<div style="padding:0 0 8px">${mobileExtra}<div style="margin-top:10px">${leaveBalanceCard(p, true)}</div></div>`;
 }
 
 // ── EARLY CLOCK OUT ──
@@ -3865,5 +4004,7 @@ function installApp(){
   if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.waitForOutcome().then(()=>{deferredPrompt=null;const btn=document.getElementById('install-btn');if(btn)btn.style.display='none';});}
 }
 </script>
+<!-- ── MOBILE BOTTOM NAV ── -->
+<div id="mobile-bottom-nav"></div>
 </body>
 </html>
