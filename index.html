@@ -1919,7 +1919,7 @@ function renderMobileHeader(){
       const todayZone=pat?gDZ(pat.id,todayIdx):'';
       const sh=pat?getDayShift(pat.id,todayIdx):null;
       statsEl.innerHTML=pat?
-        '<div class="mh-stat" style="flex:2"><div class="mh-stat-val" style="color:#fff;font-size:13px">'+(todayZone||'Off today')+'</div><div class="mh-stat-lbl">TODAY'S ZONE</div></div>'+
+        '<div class="mh-stat" style="flex:2"><div class="mh-stat-val" style="color:#fff;font-size:13px">'+(todayZone||'Off today')+'</div><div class="mh-stat-lbl">TODAY&#39;S ZONE</div></div>'+
         '<div class="mh-stat" style="flex:2"><div class="mh-stat-val" style="color:#fff;font-size:13px">'+(sh?fmtT(sh.start_time)+' – '+fmtT(sh.end_time):'—')+'</div><div class="mh-stat-lbl">SHIFT HOURS</div></div>':
         '<div class="mh-stat" style="flex:1"><div class="mh-stat-val" style="color:#fff;font-size:12px">Welcome</div><div class="mh-stat-lbl">'+u.full_name+'</div></div>';
     }
@@ -1950,14 +1950,14 @@ function renderMobileHeader(){
   } else {
     tabs=[{id:'schedule',label:'Schedule'},{id:'summary',label:'Summary'},{id:'attendance',label:'Attendance'},{id:'timeofftask',label:'Tasks'},{id:'zonenshift',label:'Shifts'},{id:'leavebalance',label:'Leave'},{id:'documents',label:'Docs'},...(role==='admin'?[{id:'access',label:'Access'}]:[])];
   }
-  tabsEl.innerHTML=tabs.map(t=>'<button class="mh-tab'+(D.tab===t.id?' active':'')+'" onclick="setTab(''+t.id+'')">'+t.label+'</button>').join('');
+  tabsEl.innerHTML=tabs.map(t=>'<button class="mh-tab'+(D.tab===t.id?' active':'')+'" onclick="setTab(\''+t.id+'\')">' +t.label+'</button>').join('');
 
   // Bottom nav — show top 5 most important tabs
   const bnEl=document.getElementById('mobile-bottom-nav');
   if(!bnEl)return;
   const bnTabs=tabs.slice(0,5);
   const icons={schedule:'ti-calendar',myschedule:'ti-calendar-user',summary:'ti-chart-bar',attendance:'ti-clock-check',myattendance:'ti-clock-check',timeofftask:'ti-calendar-off',zonenshift:'ti-map-pin',leavebalance:'ti-calendar-stats',myleavebalance:'ti-calendar-stats',documents:'ti-files',access:'ti-lock'};
-  bnEl.innerHTML=bnTabs.map(t=>'<button class="bn-item'+(D.tab===t.id?' active':'')+'" onclick="setTab(''+t.id+'')"><i class="ti '+( icons[t.id]||'ti-grid')+'"></i><span>'+t.label.replace('My ','').replace(' Balance','').replace(' Attend.','')+'</span></button>').join('');
+  bnEl.innerHTML=bnTabs.map(t=>'<button class="bn-item'+(D.tab===t.id?' active':'')+'" onclick="setTab(\''+t.id+'\')"><i class="ti '+( icons[t.id]||'ti-grid')+'"></i><span>'+t.label.replace('My ','').replace(' Balance','').replace(' Attend.','')+'</span></button>').join('');
 }
 
 function render(){
