@@ -510,9 +510,7 @@ async function loadAll(){
   try{const{data:cr}=await wt(sb.from('custom_roles').select('*').order('name'),4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
   try{const{data:lb}=await wt(sb.from('leave_balances').select('*'),4000);D.leaveBalances=lb||[];}catch(e){D.leaveBalances=[];}
 
-  if(D.profile?.role==='admin'||D.profile?.role==='lead'){
-    try{const{data:users}=await wt(sb.from('profiles').select('*').order('full_name'),5000);D.users=users||[];}catch(e){}
-  }
+  try{const{data:users}=await wt(sb.from('profiles').select('*').order('full_name'),5000);D.users=users||[];}catch(e){}
   try{const{data:tk}=await wt(sb.from('task_requests').select('*').order('created_at',{ascending:false}),5000);D.tasks=tk||[];}catch(e){D.tasks=[];}
   try{
     const{data:lp}=await wt(sb.from('location_permissions').select('*'),5000);
@@ -537,9 +535,9 @@ const ini=n=>n.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
 const gsh=id=>D.shifts.find(s=>s.id===id)||{name:'?',start_time:'?',end_time:'?',shift_type:'morning'};
 const fmt=d=>`${d.getUTCDate()}-${d.getUTCMonth()+1}-${d.getUTCFullYear()}`;
 const wNum=d=>{
-  // Week number based on Bahrain week (starts Sunday)
-  const jan1=new Date(d.getFullYear(),0,1);
-  const jan1Day=jan1.getDay(); // 0=Sun
+  // Week number based on Bahrain week (starts Sunday), UTC
+  const jan1=new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  const jan1Day=jan1.getUTCDay(); // 0=Sun
   const dayOfYear=Math.floor((d-jan1)/86400000);
   return Math.ceil((dayOfYear+jan1Day+1)/7);
 };
@@ -606,7 +604,7 @@ function summ(pts){const p=pts||activePats();const am=Array(7).fill(0),pm=Array(
 function getActiveNow(){
   // Get today's day index (0=Sat, 1=Sun, ... 6=Fri)
   const now=new Date();
-  const jsDay=now.getDay(); // 0=Sun,1=Mon,...,6=Sat
+  const jsDay=getBahrainNow().getUTCDay(); // 0=Sun,1=Mon,...,6=Sat (Bahrain UTC+3)
   const dayMap={0:0,1:1,2:2,3:3,4:4,5:5,6:6}; // Sun=0,Mon=1,...,Sat=6 (Bahrain week)
   const todayIdx=dayMap[jsDay];
   const nowMins=now.getHours()*60+now.getMinutes();
@@ -868,7 +866,7 @@ function historyView(){
   const weeks=[...new Set(hist.map(h=>h.week_start))].sort().reverse();
   const sel=D.hweek||ws;const filtered=hist.filter(h=>h.week_start===sel);
   const wsel=weeks.length>1?`<select style="padding:6px 10px;border-radius:var(--r8);border:1.5px solid var(--g2);font-family:inherit;font-size:12.5px" onchange="D.hweek=this.value;render()">${weeks.map(w=>`<option value="${w}" ${w===sel?'selected':''}>${w}</option>`).join('')}</select>`:'';
-  const rows=filtered.map(h=>{const p=D.patrollers.find(x=>x.id===h.patroller_id);const dt=new Date(h.changed_at);const t=dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const rows=filtered.map(h=>{const p=D.patrollers.find(x=>x.id===h.patroller_id);const dt=new Date(h.changed_at);const t=dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
     return`<tr><td class="lt">${p?.name||'?'}</td><td style="white-space:nowrap">${DAYS[h.day_index]||'?'}</td><td><span style="font-size:10.5px;background:var(--red-l);color:var(--red-d);padding:2px 7px;border-radius:4px">${h.old_zone||'Off Day'}</span></td><td><span class="zone-chip">${h.new_zone||'Off Day'}</span></td><td style="font-size:10.5px">${h.profiles?.full_name||'?'}</td><td style="font-family:monospace;font-size:10.5px;white-space:nowrap">${t}</td></tr>`;
   }).join('');
   return`<div class="toolbar">${wsel}<span style="font-size:12px;color:var(--g3)">${filtered.length} changes</span><button class="btn" onclick="dlHistory()"><i class="ti ti-download"></i>Download CSV</button></div>
@@ -1451,7 +1449,6 @@ function renderTabs(){
   }
   const tabs=(role==='patroller'||role==='coordinator')?[
     {id:'myschedule',icon:'ti-user',label:'My schedule'},
-    {id:'myattendance',icon:'ti-clock-check',label:'Attendance'},
     {id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'},
     {id:'myleavebalance',icon:'ti-calendar-stats',label:'Leave Balance'},
     {id:'documents',icon:'ti-files',label:'Documents'},
@@ -1471,7 +1468,7 @@ function renderTabs(){
 function buildRoleLiveTable(isToday){
   const pts=activePats();
   const todayIdx=todayDayIdx(); // Sun=0,Mon=1,...,Sat=6 (Bahrain UTC+3)
-  const nowStr=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const nowStr=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
   // Group by custom role name
   const getRoleName=p=>{const u=D.users.find(u=>u.id===p.user_id);if(u&&u.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr)return cr.name;}return getUtype(p)==='coordinator'?'Coordinator':'Patroller';};
   const groups={};
@@ -2125,7 +2122,7 @@ function todayDayIdx(){
 }
 function getMyAttRecord(){const today=todayStr();return(D.attendance||[]).find(a=>a.patroller_id===(D.patrollers.find(p=>p.user_id===D.profile.id)?.id)&&a.date===today);}
 function isOnVacationToday(pid){const today=todayStr();return D.timeoff.find(t=>t.patroller_id===pid&&t.status==='Approved'&&today>=t.start_date&&today<=t.end_date);}
-function fmtDateTime(ts){if(!ts)return'--';const d=new Date(ts);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
+function fmtDateTime(ts){if(!ts)return'--';const d=new Date(ts);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});}
 function mapsLink(lat,lng){return`https://www.google.com/maps?q=${lat},${lng}`;}
 
 // ── GET LOCATION ──
@@ -2221,7 +2218,7 @@ async function doClockIn(){
     },{onConflict:'patroller_id,date'}).select().single();
     if(error)throw error;
     // Webhook to Make.com (backlog to Google Sheet)
-    sendWebhook('clock_in',{patroller_name:pat.name,patroller_id:pat.id,date:today,clock_in_time:new Date(now).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),clock_in_location:mapUrl,accuracy_meters:Math.round(loc.accuracy),app_url:REDIRECT});
+    sendWebhook('clock_in',{patroller_name:pat.name,patroller_id:pat.id,date:today,clock_in_time:new Date(now).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}),clock_in_location:mapUrl,accuracy_meters:Math.round(loc.accuracy),app_url:REDIRECT});
     await reload();
   }catch(e){
     if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-clock-play"></i> Clock In';}
@@ -2249,7 +2246,7 @@ async function doClockOut(){
     const mins=Math.round((outTime-inTime)/60000);
     const hrs=Math.floor(mins/60);const remMins=mins%60;
     const duration=`${hrs}h ${remMins}m`;
-    sendWebhook('clock_out',{patroller_name:pat.name,patroller_id:pat.id,date:today,clock_in_time:new Date(existing.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),clock_out_time:new Date(now).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),duration,clock_in_location:existing.clock_in_map,clock_out_location:mapUrl,app_url:REDIRECT});
+    sendWebhook('clock_out',{patroller_name:pat.name,patroller_id:pat.id,date:today,clock_in_time:new Date(existing.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}),clock_out_time:new Date(now).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}),duration,clock_in_location:existing.clock_in_map,clock_out_location:mapUrl,app_url:REDIRECT});
     await reload();
   }catch(e){
     if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-clock-stop"></i> Clock Out';}
@@ -2311,7 +2308,7 @@ function myAttendanceView(){
     </div>`;
   } else if(!rec||!rec.clock_in){
     clockWidget=`<div style="background:linear-gradient(135deg,#411517,#6B2D2F);border-radius:16px;padding:28px;text-align:center;color:#F4EDE3;margin-bottom:20px">
-      <div style="font-size:13px;opacity:.7;margin-bottom:6px">TODAY · ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</div>
+      <div style="font-size:13px;opacity:.7;margin-bottom:6px">TODAY · ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',timeZone:'Asia/Bahrain'})}</div>
       <div style="font-size:16px;font-weight:600;margin-bottom:4px">${zone}</div>
       <div style="font-size:12px;opacity:.6;margin-bottom:20px">${sh?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)} - ${fmtT(sh.end_time)}`:''}</div>
       <button id="clock-in-btn" onclick="doClockIn()" style="background:#FF5900;color:#fff;border:none;padding:14px 36px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px;transition:background .15s" onmouseover="this.style.background='#D94D00'" onmouseout="this.style.background='#FF5900'">
@@ -2320,7 +2317,7 @@ function myAttendanceView(){
       <div style="font-size:11px;opacity:.5;margin-top:12px">Your location will be recorded</div>
     </div>`;
   } else if(rec.clock_in&&!rec.clock_out){
-    const inTime=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    const inTime=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
     clockWidget=`<div style="background:linear-gradient(135deg,#14532D,#166534);border-radius:16px;padding:28px;text-align:center;color:#F0FDF4;margin-bottom:20px">
       <div style="font-size:13px;opacity:.7;margin-bottom:6px">CLOCKED IN AT ${inTime}</div>
       <div style="font-size:16px;font-weight:600;margin-bottom:4px">${zone}</div>
@@ -2332,8 +2329,8 @@ function myAttendanceView(){
       <div style="font-size:11px;opacity:.5;margin-top:12px">Your location will be recorded</div>
     </div>`;
   } else {
-    const inTime=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-    const outTime=new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    const inTime=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+    const outTime=new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
     const mins=Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000);
     const duration=`${Math.floor(mins/60)}h ${mins%60}m`;
     clockWidget=`<div style="background:linear-gradient(135deg,#1e3a5f,#1e40af);border-radius:16px;padding:24px;text-align:center;color:#EFF6FF;margin-bottom:20px">
@@ -2350,8 +2347,8 @@ function myAttendanceView(){
   // History
   const myRecs=(D.attendance||[]).filter(a=>a.patroller_id===pat.id).slice(0,30);
   const histRows=myRecs.map(a=>{
-    const inT=a.clock_in?new Date(a.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'--';
-    const outT=a.clock_out?new Date(a.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'--';
+    const inT=a.clock_in?new Date(a.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
+    const outT=a.clock_out?new Date(a.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
     const dur=a.clock_in&&a.clock_out?`${Math.floor(Math.round((new Date(a.clock_out)-new Date(a.clock_in))/60000)/60)}h ${Math.round((new Date(a.clock_out)-new Date(a.clock_in))/60000)%60}m`:'--';
     const sc=a.status==='Attended'?'background:#DCFCE7;color:#166534':a.status==='Absent'?'background:#FEE2E2;color:#991B1B':'background:#F4EDE3;color:#411517';
     return`<tr>
@@ -2388,8 +2385,8 @@ function attendanceView(){
     const vac=isOnVacationToday(p.id);if(vac)return false;
     const selectedDate=today;
     // Find day index for selected date
-    const selDate=new Date(selectedDate);const selJsDay=selDate.getDay();
-    const selIdx={6:0,0:1,1:2,2:3,3:4,4:5,5:6}[selJsDay];
+    const selDate=new Date(selectedDate);const selJsDay=selDate.getUTCDay();
+    const selIdx=selJsDay;
     // Check if they have a zone on that day
     const ws=getWeekStartForDate(selectedDate);
     const sc=D.schedules.find(s=>s.patroller_id===p.id&&s.week_start===ws);
@@ -2398,8 +2395,8 @@ function attendanceView(){
   const vacPats=pts.filter(p=>isOnVacationToday(p.id));
   const offPats=pts.filter(p=>{
     if(isOnVacationToday(p.id))return false;
-    const selDate=new Date(today);const selJsDay=selDate.getDay();
-    const selIdx={6:0,0:1,1:2,2:3,3:4,4:5,5:6}[selJsDay];
+    const selDate=new Date(today);const selJsDay=selDate.getUTCDay();
+    const selIdx=selJsDay;
     const ws=getWeekStartForDate(today);
     const sc=D.schedules.find(s=>s.patroller_id===p.id&&s.week_start===ws);
     return!sc||!sc['day_'+selIdx];
@@ -2408,11 +2405,11 @@ function attendanceView(){
   const mkRow=p=>{
     const rec=todayRecs.find(a=>a.patroller_id===p.id);
     const status=rec?.status||'';
-    const inT=rec?.clock_in?new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'--';
-    const outT=rec?.clock_out?new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'--';
+    const inT=rec?.clock_in?new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
+    const outT=rec?.clock_out?new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
     const dur=rec?.clock_in&&rec?.clock_out?`${Math.floor(Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000)/60)}h ${Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000)%60}m`:'--';
     const isAtt=status==='Attended';const isAbs=status==='Absent';
-    const selJsDay=new Date(today).getDay();const selIdx={6:0,0:1,1:2,2:3,3:4,4:5,5:6}[selJsDay];
+    const selJsDay=getBahrainNow().getUTCDay();const selIdx=selJsDay;
     const ws=getWeekStartForDate(today);const sc=D.schedules.find(s=>s.patroller_id===p.id&&s.week_start===ws);
     const zone=sc?sc['day_'+selIdx]||'--':'--';
     const sh=getDayShift(p.id,selIdx);
@@ -2450,7 +2447,7 @@ function attendanceView(){
 }
 
 function getWeekStartForDate(dateStr){
-  const d=new Date(dateStr);const jsDay=d.getDay();
+  const d=new Date(dateStr);const jsDay=d.getUTCDay();
   const diff=jsDay===6?0:-(jsDay+1);
   const sat=new Date(d);sat.setDate(sat.getDate()+diff);sat.setHours(0,0,0,0);
   return sat.toISOString().split('T')[0];
@@ -2461,8 +2458,8 @@ function dlAttendance(){
   (D.attendance||[]).forEach(a=>{
     const dur=a.clock_in&&a.clock_out?`${Math.floor(Math.round((new Date(a.clock_out)-new Date(a.clock_in))/60000)/60)}h ${Math.round((new Date(a.clock_out)-new Date(a.clock_in))/60000)%60}m`:'';
     rows.push([a.patroller_name||'',a.date,a.status||'',
-      a.clock_in?new Date(a.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'',
-      a.clock_out?new Date(a.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'',
+      a.clock_in?new Date(a.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'',
+      a.clock_out?new Date(a.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'',
       dur,a.clock_in_map||'',a.clock_out_map||'']);
   });
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.map(csvRow).join('\n')],{type:'text/csv'}));a.download='attendance.csv';a.click();
@@ -2498,8 +2495,8 @@ function hourlyView(){
   }
   const[y,m,d]=selDay.split('-').map(Number);
   const selDate=new Date(y,m-1,d);
-  const selJsDay=selDate.getDay();
-  const selIdx={6:0,0:1,1:2,2:3,3:4,4:5,5:6}[selJsDay];
+  const selJsDay=selDate.getUTCDay();
+  const selIdx=selJsDay;
 
   // Day selector tabs
   const dayTabs=dates.map((d,i)=>{
@@ -2776,7 +2773,7 @@ async function startTask(){
   
   const pat=D.patrollers.find(p=>p.id===pid);
   const now=new Date().toISOString();
-  const startTime=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const startTime=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
   
   const{error}=await sb.from('task_requests').insert({
     patroller_id:pid,
@@ -2784,7 +2781,7 @@ async function startTask(){
     task_type:type,
     date:selectedDate,
     start_time:startTime,
-    end_time:(()=>{const ed=new Date();ed.setHours(ed.getHours()+1);return ed.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});})(),
+    end_time:(()=>{const ed=new Date();ed.setHours(ed.getHours()+1);return ed.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});})(),
     description:desc||null,
     status:'Running',
     submitted_by:D.profile.id,
@@ -2799,7 +2796,7 @@ async function startTask(){
 
 async function endTask(taskId,patrollerName){
   const now=new Date().toISOString();
-  const endTime=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const endTime=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
   
   const{error}=await sb.from('task_requests').update({
     end_time:endTime,
@@ -3194,11 +3191,13 @@ function leaveBalanceView(){
   const lowBalance = allBalances.filter(b => b.annualRemaining < 5).length;
   const totalAnnualUsed = allBalances.reduce((s,b) => s + b.consumedAnnual, 0);
 
+  const isJan1=getBahrainNow().getUTCMonth()===0&&getBahrainNow().getUTCDate()===1;
   return`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
     <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">${pts.length} staff · ${getLeaveYear()}</div>
-    <div style="display:flex;gap:8px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
       ${lowBalance>0?`<span style="font-size:11px;background:#FEE2E2;color:#DC2626;padding:4px 10px;border-radius:8px;font-weight:600">⚠ ${lowBalance} low balance</span>`:''}
-      <span style="font-size:11px;background:#F4EDE3;color:#411517;padding:4px 10px;border-radius:8px">Total used this year: ${totalAnnualUsed} days</span>
+      <span style="font-size:11px;background:#F4EDE3;color:#411517;padding:4px 10px;border-radius:8px">Used this year: ${totalAnnualUsed}d</span>
+      ${isJan1?`<button class="btn btn-primary" onclick="runYearEndCarryForward()" style="font-size:11px"><i class="ti ti-calendar-stats"></i>Run Year-End</button>`:''}
       <button class="btn" onclick="downloadReport('leave')" style="font-size:11px"><i class="ti ti-download"></i>Export</button>
     </div>
   </div>
@@ -3212,6 +3211,28 @@ function myLeaveBalanceView(){
   const p = D.patrollers.find(pt => pt.user_id === D.profile.id);
   if(!p) return `<div style="padding:40px;text-align:center;color:var(--g3)">Your account is not linked to a schedule record.</div>`;
   return `<div style="max-width:480px;margin:0 auto">${leaveBalanceCard(p, true)}</div>`;
+}
+
+// ── YEAR END LEAVE CARRY FORWARD ──
+async function runYearEndCarryForward(){
+  // Call this manually on Jan 1 to lock annual remaining as new carry forward
+  const confirm=window.confirm('This will update all annual leave carry forwards to remaining balances. Run only on Jan 1. Continue?');
+  if(!confirm)return;
+  const pts=activePats();
+  let updated=0;
+  for(const p of pts){
+    const b=getLeaveBalance(p.id);
+    const existing=D.leaveBalances.find(lb=>lb.patroller_id===p.id);
+    const newCF=Math.max(0,b.annualRemaining);
+    if(existing){
+      await sb.from('leave_balances').update({annual_carry_forward:newCF,historical_consumed:0,historical_sick:0,year:new Date().getFullYear(),updated_at:new Date().toISOString()}).eq('id',existing.id);
+    } else {
+      await sb.from('leave_balances').insert({patroller_id:p.id,annual_carry_forward:newCF,historical_consumed:0,historical_sick:0,year:new Date().getFullYear()});
+    }
+    updated++;
+  }
+  await reload();
+  addNotification(`Year-end carry forward updated for ${updated} staff`,'success');
 }
 
 // ── NOTIFICATIONS ──
@@ -3270,7 +3291,7 @@ function renderNotifications(){
   if(!D_notifs.length){list.innerHTML='<div style="padding:20px;text-align:center;color:#A08070;font-size:12px">No notifications</div>';return;}
   const icons={info:'ti-info-circle',success:'ti-circle-check',warning:'ti-alert-triangle',error:'ti-circle-x'};
   const cols={info:'#1565C0',success:'#166534',warning:'#D97706',error:'#DC2626'};
-  list.innerHTML=D_notifs.map(n=>`<div style="padding:10px 14px;border-bottom:1px solid #F4EDE3;display:flex;gap:10px;background:${n.read?'#fff':'#FFFBF5'}"><i class="ti ${icons[n.type]||icons.info}" style="font-size:14px;color:${cols[n.type]||cols.info};margin-top:1px;flex-shrink:0"></i><div style="flex:1"><div style="font-size:12px;color:#2A0D0F;line-height:1.4">${n.msg}</div><div style="font-size:10px;color:#A08070;margin-top:2px">${n.time.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div></div></div>`).join('');
+  list.innerHTML=D_notifs.map(n=>`<div style="padding:10px 14px;border-bottom:1px solid #F4EDE3;display:flex;gap:10px;background:${n.read?'#fff':'#FFFBF5'}"><i class="ti ${icons[n.type]||icons.info}" style="font-size:14px;color:${cols[n.type]||cols.info};margin-top:1px;flex-shrink:0"></i><div style="flex:1"><div style="font-size:12px;color:#2A0D0F;line-height:1.4">${n.msg}</div><div style="font-size:10px;color:#A08070;margin-top:2px">${n.time.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'})}</div></div></div>`).join('');
   D_notifs.forEach(n=>n.read=true);
 }
 
