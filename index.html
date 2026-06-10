@@ -404,7 +404,14 @@ async function afterLogin(user){
     }
     D.profile=prof||{id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};
   }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};}
-  D.tab=(D.profile.role==='patroller'||D.profile.role==='coordinator')?'myschedule':'schedule';
+  // Set default tab based on role
+  const patRoles=['patroller','coordinator'];
+  D.tab=patRoles.includes(D.profile.role)?'myschedule':'schedule';
+  // Also check custom role access level
+  if(D.profile.custom_role_id&&D.customRoles.length){
+    const cr=D.customRoles.find(r=>r.id===D.profile.custom_role_id);
+    if(cr&&cr.access_level==='viewer')D.tab='myschedule';
+  }
   // Load custom roles first so renderTabs can use them
   try{const{data:cr}=await wt(sb.from('custom_roles').select('*').order('name'),4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
   try{const{data:lb}=await wt(sb.from('leave_balances').select('*'),4000);D.leaveBalances=lb||[];}catch(e){D.leaveBalances=[];}
@@ -498,7 +505,14 @@ async function afterLogin(user){
     }
     D.profile=prof||{id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};
   }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};}
-  D.tab=(D.profile.role==='patroller'||D.profile.role==='coordinator')?'myschedule':'schedule';
+  // Set default tab based on role
+  const patRoles=['patroller','coordinator'];
+  D.tab=patRoles.includes(D.profile.role)?'myschedule':'schedule';
+  // Also check custom role access level
+  if(D.profile.custom_role_id&&D.customRoles.length){
+    const cr=D.customRoles.find(r=>r.id===D.profile.custom_role_id);
+    if(cr&&cr.access_level==='viewer')D.tab='myschedule';
+  }
   // Load custom roles first so renderTabs can use them
   try{const{data:cr}=await wt(sb.from('custom_roles').select('*').order('name'),4000);D.customRoles=cr||[];}catch(e){D.customRoles=[];}
   try{const{data:lb}=await wt(sb.from('leave_balances').select('*'),4000);D.leaveBalances=lb||[];}catch(e){D.leaveBalances=[];}
@@ -1801,20 +1815,18 @@ function render(){
   const statBar=buildRoleLiveTable(D.woff===0);
   const wNav=`<div class="toolbar"><button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button><span class="wk-range">Week ${wn} - ${fmt(dates[0])} to ${fmt(dates[6])}</span><button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button></div>`;
   let html='';
-  if(D.tab==='schedule')html=statBar+nav+getRunningTasks()+(D.view==='week'?weekTable(canEdit()):D.view==='hourly'?hourlyView():dateView())+notesBar();
-  else if(D.tab==='summary')html=wNav+summaryView();
-  else if(D.tab==='timeofftask')html=timeOffTaskView();
-  else if(D.tab==='operations')html=operationsView();
-  else if(D.tab==='areas')html=operationsView();
-  else if(D.tab==='shifts')html=operationsView();
-  else if(D.tab==='zonenshift')html=operationsView();
-  else if(D.tab==='documents')html=docsView();
-  else if(D.tab==='access')html=accessView();
-  else if(D.tab==='leavebalance')html=leaveBalanceView();
-  else if(D.tab==='myleavebalance')html=myLeaveBalanceView();
-  else if(D.tab==='myschedule')html=mySchedView();
-  else if(D.tab==='attendance')html=attendanceView();
-  else if(D.tab==='myattendance')html=myAttendanceView();
+  const safeRender=(fn,name)=>{try{return fn();}catch(e){console.error('Tab error ['+name+']:',e);return`<div style="padding:40px;text-align:center"><div style="font-size:40px;margin-bottom:12px">⚠️</div><div style="font-size:15px;font-weight:700;color:#DC2626;margin-bottom:8px">${name} failed to load</div><div style="font-size:12px;color:#A08070;margin-bottom:16px">${e.message}</div><button class="btn btn-primary" onclick="doRefresh()"><i class="ti ti-refresh"></i>Refresh</button></div>`;}};
+  if(D.tab==='schedule')html=safeRender(()=>statBar+nav+getRunningTasks()+(D.view==='week'?weekTable(canEdit()):D.view==='hourly'?hourlyView():dateView())+notesBar(),'Schedule');
+  else if(D.tab==='summary')html=safeRender(()=>wNav+summaryView(),'Summary');
+  else if(D.tab==='timeofftask')html=safeRender(()=>timeOffTaskView(),'Time off & Tasks');
+  else if(D.tab==='zonenshift'||D.tab==='operations'||D.tab==='areas'||D.tab==='shifts')html=safeRender(()=>operationsView(),'Zone & Shifts');
+  else if(D.tab==='documents')html=safeRender(()=>docsView(),'Documents');
+  else if(D.tab==='access')html=safeRender(()=>accessView(),'Access Control');
+  else if(D.tab==='leavebalance')html=safeRender(()=>leaveBalanceView(),'Leave Balance');
+  else if(D.tab==='myleavebalance')html=safeRender(()=>myLeaveBalanceView(),'My Leave Balance');
+  else if(D.tab==='myschedule')html=safeRender(()=>mySchedView(),'My Schedule');
+  else if(D.tab==='attendance')html=safeRender(()=>attendanceView(),'Attendance');
+  else if(D.tab==='myattendance')html=safeRender(()=>myAttendanceView(),'My Attendance');
   document.getElementById('main').innerHTML=`<div class="fade-in">${html}</div>`;
 }
 function setTab(t){D.tab=t;D.ne=false;render();}
@@ -3764,6 +3776,20 @@ function toggleNotifications(){
   if(!open){renderNotifications();setTimeout(()=>document.addEventListener('click',function h(e){if(!panel.contains(e.target)){panel.style.display='none';document.removeEventListener('click',h);}}),50);}
 }
 function clearNotifications(){D_notifs=[];renderNotifications();}
+
+// ── GLOBAL ERROR HANDLER ──
+window.addEventListener('error', (e) => {
+  console.error('Global error:', e.message, e.filename, e.lineno);
+  const main = document.getElementById('main');
+  if(main && (!main.innerHTML || main.innerHTML.trim() === '' || main.innerHTML === '<div class="fade-in"></div>')) {
+    main.innerHTML = `<div style="padding:40px;text-align:center">
+      <div style="font-size:40px;margin-bottom:12px">⚠️</div>
+      <div style="font-size:15px;font-weight:700;color:#DC2626;margin-bottom:8px">Something went wrong</div>
+      <div style="font-size:12px;color:#A08070;margin-bottom:16px;font-family:monospace">${e.message}</div>
+      <button class="btn btn-primary" onclick="doRefresh()"><i class="ti ti-refresh"></i>Tap to refresh</button>
+    </div>`;
+  }
+});
 
 // ── PWA Service Worker Registration ──
 if('serviceWorker' in navigator){
