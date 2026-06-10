@@ -1,5 +1,5 @@
 // Talabat Operations - Service Worker
-const CACHE_VERSION = 'talabat-v1781094107';
+const CACHE_VERSION = 'talabat-v1781094378';
 const CACHE_NAME = CACHE_VERSION;
 
 const PRECACHE = ['./', './index.html'];
