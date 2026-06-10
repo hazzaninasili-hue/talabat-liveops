@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="build" content="1781109223">
 <title>Talabat Ops</title>
-<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#411517">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,18 +12,27 @@
 <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1828/1828640.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <script>
+// Clear any old SW immediately and reload once if needed
 (function(){
-  if('serviceWorker' in navigator){
+  if(!('serviceWorker' in navigator)) return;
+  // If we haven't cleared yet, clear and reload
+  if(location.hostname.includes('github.io') && !sessionStorage.getItem('sw-cleared')){
+    sessionStorage.setItem('sw-cleared','1');
     navigator.serviceWorker.getRegistrations().then(function(regs){
-      regs.forEach(function(r){r.unregister();});
-    });
-    caches.keys().then(function(keys){
-      keys.forEach(function(k){caches.delete(k);});
+      var had = regs.length > 0;
+      var p = regs.map(function(r){return r.unregister();});
+      return Promise.all(p).then(function(){
+        return caches.keys();
+      }).then(function(keys){
+        return Promise.all(keys.map(function(k){return caches.delete(k);}));
+      }).then(function(){
+        if(had) window.location.reload();
+      });
     });
   }
 })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8f8f8;color:#111;font-size:14px;-webkit-font-smoothing:antialiased}
@@ -190,7 +198,108 @@ const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 const REDIRECT='https://hazzaninasili-hue.github.io/talabat-liveops/app.html';
 const DASHBOARD='https://hazzaninasili-hue.github.io/talabat-liveops/';
 const WEBHOOK='https://hook.eu1.make.com/d24akwrimt9ipf9go2ourjwalmodng98';
-const sb=supabase.createClient(SURL,SKEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}});
+
+// Minimal Supabase REST client
+const sb=(function(){
+  const U=SURL,K=SKEY;
+  let ses=null;
+  try{const s=localStorage.getItem('sb-pat-session');if(s)ses=JSON.parse(s);}catch(e){}
+  
+  function hdrs(extra){
+    return Object.assign({'Content-Type':'application/json','apikey':K,'Authorization':'Bearer '+((ses&&ses.access_token)||K)},extra||{});
+  }
+  
+  function from(table){
+    let sel='*',filters=[],ord=null,lim=null,isSingle=false,isMaybe=false;
+    
+    async function run(method,body){
+      let qs='select='+encodeURIComponent(sel);
+      filters.forEach(f=>{qs+='&'+f;});
+      if(ord)qs+='&order='+ord;
+      if(lim)qs+='&limit='+lim;
+      const extra={};
+      if(isSingle||isMaybe)extra['Accept']='application/vnd.pgrst.object+json';
+      const resp=await fetch(U+'/rest/v1/'+table+'?'+qs,{
+        method:method||'GET',
+        headers:hdrs(extra),
+        body:body!=null?JSON.stringify(body):undefined
+      });
+      const txt=await resp.text();
+      let data=null;
+      try{data=txt?JSON.parse(txt):null;}catch(e){}
+      if(!resp.ok)return{data:null,error:{message:(data&&data.message)||txt||resp.statusText}};
+      return{data:data,error:null};
+    }
+    
+    const q={
+      select(s){sel=s;return q;},
+      eq(c,v){filters.push(c+'=eq.'+encodeURIComponent(v));return q;},
+      order(c,o){ord=c+(o&&o.ascending===false?'.desc':'');return q;},
+      limit(n){lim=n;return q;},
+      single(){isSingle=true;return q;},
+      maybeSingle(){isMaybe=true;return q;},
+      insert(d){return run('POST',d);},
+      update(d){return run('PATCH',d);},
+      delete(){return run('DELETE');},
+      upsert(d,o){
+        const h={'Prefer':'resolution=merge-duplicates,return=representation'};
+        return fetch(U+'/rest/v1/'+table+'?select='+encodeURIComponent(sel)+filters.map(f=>'&'+f).join(''),{
+          method:'POST',headers:hdrs(h),body:JSON.stringify(d)
+        }).then(async r=>{const t=await r.text();let data=null;try{data=t?JSON.parse(t):null;}catch(e){}
+          if(!r.ok)return{data:null,error:{message:(data&&data.message)||t}};
+          return{data:Array.isArray(data)?data[0]:data,error:null};});
+      },
+      then(res,rej){return run('GET').then(res,rej)},
+    };
+    return q;
+  }
+
+  const auth={
+    async signInWithPassword({email,password}){
+      const r=await fetch(U+'/auth/v1/token?grant_type=password',{
+        method:'POST',headers:{'Content-Type':'application/json','apikey':K},
+        body:JSON.stringify({email,password})
+      });
+      const d=await r.json();
+      if(!r.ok)return{data:null,error:{message:d.error_description||d.msg||d.message||'Login failed'}};
+      ses=d;try{localStorage.setItem('sb-pat-session',JSON.stringify(d));}catch(e){}
+      return{data:{user:d.user,session:d},error:null};
+    },
+    async getSession(){
+      if(!ses)return{data:{session:null}};
+      if(ses.expires_at&&Date.now()/1000>ses.expires_at-60){
+        try{
+          const r=await fetch(U+'/auth/v1/token?grant_type=refresh_token',{
+            method:'POST',headers:{'Content-Type':'application/json','apikey':K},
+            body:JSON.stringify({refresh_token:ses.refresh_token})
+          });
+          const d=await r.json();
+          if(r.ok){ses=d;localStorage.setItem('sb-pat-session',JSON.stringify(d));}
+          else{ses=null;localStorage.removeItem('sb-pat-session');return{data:{session:null}};}
+        }catch(e){}
+      }
+      return{data:{session:ses}};
+    },
+    async signOut(){
+      ses=null;
+      try{localStorage.removeItem('sb-pat-session');}catch(e){}
+    },
+    async updateUser({password}){
+      const r=await fetch(U+'/auth/v1/user',{method:'PUT',headers:hdrs(),body:JSON.stringify({password})});
+      const d=await r.json();
+      if(!r.ok)return{error:{message:d.message||'Failed'}};
+      return{data:d,error:null};
+    },
+    onAuthStateChange(fn){
+      // Check session on load
+      setTimeout(()=>{if(ses)fn('SIGNED_IN',ses);},0);
+      return{data:{subscription:{unsubscribe:()=>{}}}};
+    }
+  };
+  
+  return{from,auth};
+})();
+
 
 // ── STATE ──
 let D={user:null,profile:null,tab:'schedule',woff:0,
@@ -332,7 +441,11 @@ async function afterLogin(user){
   render();
 }
 
-async function doLogout(){await sb.auth.signOut();}
+async function doLogout(){
+  await sb.auth.signOut();
+  document.getElementById('app').style.display='none';
+  document.getElementById('s-login').style.display='flex';
+}
 
 // ── DATA LOADING ──
 async function loadAll(){
