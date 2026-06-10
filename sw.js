@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'talabat-v1781108142';
+const CACHE_VERSION = 'talabat-v1781108861';
 const CACHE_NAME = CACHE_VERSION;
 const PRECACHE = ['./', './index.html'];
 

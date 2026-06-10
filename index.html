@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781108142">
+<meta name="build" content="1781108861">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -980,14 +980,14 @@ function summaryView(){
   // Weekly attendance totals
   const ds2=d=>d.toISOString().split('T')[0];
   const weekAttended=dates.reduce((t,d)=>{const ds=ds2(d);return t+(D.attendance||[]).filter(a=>a.date===ds&&a.status==='Attended').length;},0);
-  const weekAbsent=dates.reduce((t,d)=>{const ds=ds2(d);return t+(D.attendance||[]).filter(a=>a.date===ds&&a.status==='Absent').length;},0);
+  const weekAbsent=dates.reduce((t,d)=>{const ds=ds2(d);return t+(D.attendance||[]).filter(a=>a.date===ds&&a.status&&a.status.startsWith('Absent')).length;},0);
   const weekVac=pts.filter(p=>dates.some(d=>{const ds=ds2(d);return D.timeoff.find(tf=>tf.patroller_id===p.id&&tf.status==='Approved'&&ds>=tf.start_date&&ds<=tf.end_date);})).length;
 
   const mkScheduleRow=(d,i,amV,pmV,offV,tot)=>{
     const ds=d.toISOString().split('T')[0];
     const dayAtts=(D.attendance||[]).filter(a=>a.date===ds);
     const attCount=dayAtts.filter(a=>a.status==='Attended').length;
-    const absCount=dayAtts.filter(a=>a.status==='Absent').length;
+    const absCount=dayAtts.filter(a=>a.status&&a.status.startsWith('Absent')).length;
     const vacCount=pts.filter(p=>D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds>=t.start_date&&ds<=t.end_date)).length;
 
     // Late clock-in: clocked in after shift start time
@@ -1061,7 +1061,7 @@ function summaryView(){
         if(isVac)return`<td><span style="font-size:9px;background:#EDE9FE;color:#7C3AED;padding:1px 5px;border-radius:3px">🌴</span></td>`;
         if(!zone)return`<td><span style="font-size:9px;color:var(--g3)">Off</span></td>`;
         if(rec?.status==='Attended')return`<td><span style="font-size:11px;color:#166534;font-weight:700">✓</span></td>`;
-        if(rec?.status==='Absent')return`<td><span style="font-size:11px;color:#DC2626;font-weight:700">✗</span></td>`;
+        if(rec?.status&&rec.status.startsWith('Absent'))return`<td><span style="font-size:11px;color:#DC2626;font-weight:700" title="${rec.status}">✗</span></td>`;
         return`<td><span style="font-size:9px;color:var(--g3)">?</span></td>`;
       }).join('');
       const attW=dates.filter(d=>{const ds=d.toISOString().split('T')[0];const r=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);return r?.status==='Attended';}).length;
@@ -1285,7 +1285,7 @@ function operationsView(){
       var durStr = Math.floor(dur)+'h'+(dur%1>0?' '+Math.round(dur%1*60)+'m':'');
       sHtml += '<div style="background:#fff;border:1.5px solid '+bdr+';border-radius:14px;padding:16px;">';
       sHtml += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">';
-      sHtml += '<div style="width:44px;height:44px;border-radius:12px;background:'+bg+';display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="ti ti-'+(isMorn?'sun':'moon')+'" style="font-size:22px;color:'+col+'"></i></div>';
+      sHtml += '<div style="width:44px;height:44px;border-radius:12px;background:'+bg+';display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="ti ti-'+(isMorn?'sun':isNight?'moon-stars':'moon')+'" style="font-size:22px;color:'+col+'"></i></div>';
       sHtml += '<div style="flex:1;min-width:0;">';
       sHtml += '<div style="font-size:14px;font-weight:700;color:#2A0D0F;">'+sh.name+'</div>';
       sHtml += '<div style="font-size:13px;font-weight:700;color:'+col+';margin-top:2px;">'+fmtT(sh.start_time)+' – '+fmtT(sh.end_time)+'</div>';
@@ -1298,7 +1298,7 @@ function operationsView(){
       }
       sHtml += '</div>';
       sHtml += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
-      sHtml += '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:'+bg+';color:'+col+';">'+(isMorn?'☀️':'🌙')+' '+(isMorn?'Morning':'Evening')+'</span>';
+      sHtml += '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:'+bg+';color:'+col+';">'+(isMorn?'☀️':isNight?'🌃':'🌙')+' '+(isMorn?'Morning':isNight?'Night':'Evening')+'</span>';
       sHtml += '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:#F4EDE3;color:#411517;">⏱ '+durStr+'</span>';
       sHtml += '<span style="font-size:10px;color:#A08070;">'+cnt+' patroller'+(cnt!==1?'s':'')+'</span>';
       sHtml += '</div></div>';
@@ -2174,7 +2174,7 @@ function renderModal(){
   }
   if(m.type==='adddoc'||m.type==='editdoc'){
     const f=m.form;const isE=m.type==='editdoc';
-    const CATEGORIES=[['','Auto-detect'],['form','Form'],['sheet','Google Sheet'],['dashboard','Dashboard'],['map','Map / Route'],['doc','Document'],['pdf','PDF'],['presentation','Presentation'],['link','Resource Link'],['whatsapp','WhatsApp'],['video','Video']];
+    const CATEGORIES=[['','Auto-detect'],['form','Form'],['gform','Google Form'],['sheet','Google Sheet'],['dashboard','Dashboard'],['map','Map / Route'],['doc','Document'],['pdf','PDF'],['presentation','Presentation'],['link','Resource Link'],['whatsapp','WhatsApp'],['video','Video']];
     box.innerHTML=`<div class="modal-title"><i class="ti ti-link"></i>${isE?'Edit document':'Add document'}</div>
     <div class="fg"><label>Name</label><input id="doc-name" value="${f.name}" placeholder="e.g. Patrol Route Map"></div>
     <div class="fg"><label>URL</label><input id="doc-url" value="${f.url}" placeholder="https://..."></div>
@@ -3640,7 +3640,7 @@ function leaveBalanceCard(p, showFull=true){
 
 // ── LEAVE BALANCE VIEW (admin) ──
 function leaveBalanceView(){
-  // Include ALL active staff (patrollers + leads) — exclude only admins
+  // Include ALL active patrollers (has schedule record)
   const pts = D.patrollers.filter(p=>{
     if(p.is_active===false)return false;
     const u=D.users.find(u=>u.id===p.user_id);
@@ -3651,16 +3651,25 @@ function leaveBalanceView(){
     }
     return true;
   });
+  // Also include team leads who have profiles but no patroller record
+  const leadProfiles=D.users.filter(u=>{
+    if(u.is_active===false)return false;
+    if(u.role==='admin')return false;
+    if(u.role!=='lead')return false;
+    if(D.patrollers.find(p=>p.user_id===u.id))return false; // already in pts
+    return true;
+  }).map(u=>({id:'profile-'+u.id,name:u.full_name,user_id:u.id,shift_id:null,is_active:true,user_type:'lead'}));
+  const allPts=[...pts,...leadProfiles];
   if(!pts.length) return `<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-calendar-off" style="font-size:40px;display:block;margin-bottom:10px;opacity:.3"></i><div style="font-weight:600">No users yet</div></div>`;
 
   // Summary stats
-  const allBalances = pts.map(p => getLeaveBalance(p.id));
+  const allBalances = allPts.map(p => getLeaveBalance(p.id));
   const lowBalance = allBalances.filter(b => b.annualRemaining < 5).length;
   const totalAnnualUsed = allBalances.reduce((s,b) => s + b.consumedAnnual, 0);
 
   const isJan1=getBahrainNow().getUTCMonth()===0&&getBahrainNow().getUTCDate()===1;
   return`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-    <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">${pts.length} staff · ${getLeaveYear()}</div>
+    <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">${allPts.length} staff · ${getLeaveYear()}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       ${lowBalance>0?`<span style="font-size:11px;background:#FEE2E2;color:#DC2626;padding:4px 10px;border-radius:8px;font-weight:600">⚠ ${lowBalance} low balance</span>`:''}
       <span style="font-size:11px;background:#F4EDE3;color:#411517;padding:4px 10px;border-radius:8px">Used this year: ${totalAnnualUsed}d</span>
@@ -3669,11 +3678,8 @@ function leaveBalanceView(){
     </div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
-    ${pts.map(p => leaveBalanceCard(p)).join('')}
-  </div>`;
-}
-
-// ── MY LEAVE BALANCE VIEW (patroller) ──
+    ${allPts.map(p => leaveBalanceCard(p)).join('')}
+  </div>`; MY LEAVE BALANCE VIEW (patroller) ──
 function myLeaveBalanceView(){
   const p = D.patrollers.find(pt => pt.user_id === D.profile.id);
   if(!p) return `<div style="padding:40px;text-align:center;color:var(--g3)">Your account is not linked to a schedule record.</div>`;
