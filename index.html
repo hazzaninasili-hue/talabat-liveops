@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781093242">
+<meta name="build" content="1781093591">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -29,7 +29,7 @@
       for(const r of regs){
         const swUrl = r.active?.scriptURL || '';
         // If the SW URL does NOT contain our current build, unregister it
-        if(!swUrl.includes('1781093242')){
+        if(!swUrl.includes('1781093591')){
           await r.unregister();
           console.log('[Cache] Unregistered old SW:', swUrl);
         }
@@ -39,7 +39,7 @@
     if('caches' in window){
       const keys = await caches.keys();
       for(const k of keys){
-        if(k !== 'talabat-v1781093242'){
+        if(k !== 'talabat-v1781093591'){
           await caches.delete(k);
           console.log('[Cache] Deleted old cache:', k);
         }
@@ -4029,11 +4029,22 @@ window.addEventListener('error', (e) => {
 });
 
 // ── PWA Service Worker Registration ──
+const APP_BUILD='1781093591';
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').then(r=>{
-      console.log('SW registered');
+    navigator.serviceWorker.register('sw.js?v='+APP_BUILD).then(reg=>{
+      console.log('SW registered build:'+APP_BUILD);
+      setInterval(()=>reg.update(),60000);
+      reg.addEventListener('updatefound',()=>{
+        const nw=reg.installing;
+        nw.addEventListener('statechange',()=>{
+          if(nw.state==='installed'&&navigator.serviceWorker.controller){
+            nw.postMessage({type:'SKIP_WAITING'});
+          }
+        });
+      });
     }).catch(e=>console.log('SW failed',e));
+    navigator.serviceWorker.addEventListener('controllerchange',()=>window.location.reload());
   });
 }
 
