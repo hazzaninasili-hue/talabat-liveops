@@ -2710,7 +2710,7 @@ function hourlyView(){
     D.hourlyDay=selDay;
   }
   const[y,m,d]=selDay.split('-').map(Number);
-  const selDate=new Date(y,m-1,d);
+  const selDate=new Date(Date.UTC(y,m-1,d));
   const selJsDay=selDate.getUTCDay();
   const selIdx=selJsDay;
 
@@ -2787,14 +2787,14 @@ function hourlyView(){
         } else if(ps.status==='clocked_in'){
           bg='#DCFCE7';col='#166534';border='2px solid #16A34A';
           const inT=new Date(ps.rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
-          // Use stored adj_end_time, extend bar width if late
           const adjEnd=ps.rec.adj_end_time||(ps.rec.late_mins>0?`${String(Math.floor((getShiftEndMins(ps.sh)+ps.rec.late_mins)/60)%24).padStart(2,'0')}:${String((getShiftEndMins(ps.sh)+ps.rec.late_mins)%60).padStart(2,'0')}`:null);
-          if(adjEnd&&ps.rec.late_mins>0){
-            // Extend bar width to new end time
-            const[aH,aM]=adjEnd.split(':').map(Number);
-            const newEnd=aH+aM/60;
-            const newWidth=(Math.min(newEnd,24)-Math.max(0,sh.start))*hourW;
-            bars=bars; // will be recalculated below with newEnd
+          // Add a "late period" red overlay from shift start to clock-in time
+          if(ps.rec.late_mins>0){
+            const lateStart=sh.start; // shift start hour
+            const lateEnd=lateStart+(ps.rec.late_mins/60);
+            const lateLeft=lateStart*hourW;
+            const lateWidth=(lateEnd-lateStart)*hourW;
+            bars+=`<div style="position:absolute;left:${lateLeft}px;width:${lateWidth}px;top:4px;bottom:4px;background:#FEE2E2;border:1.5px dashed #DC2626;border-radius:6px 0 0 6px;display:flex;align-items:center;justify-content:center;z-index:3"><span style="font-size:8px;color:#DC2626;font-weight:700">🔴 Late</span></div>`;
           }
           statusOverlay=`<span style="background:#166534;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px">🟢 ${inT}${adjEnd&&ps.rec.late_mins>0?`→${adjEnd}`:''}</span>`;
         } else if(ps.status==='completed'){
@@ -2826,7 +2826,8 @@ function hourlyView(){
         } else {
           // For running tasks, show from start to current time (or 1 hour minimum)
           if(selDay===today){
-            tEnd=Math.max(tStart+0.5,new Date().getHours()+new Date().getMinutes()/60);
+            const bhrN=getBahrainNow();
+            tEnd=Math.max(tStart+0.5,bhrN.getUTCHours()+bhrN.getUTCMinutes()/60);
           } else {
             tEnd=tStart+1;
           }
