@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781086707">
+<meta name="build" content="1781087997">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -289,7 +289,7 @@ table tr:hover td{background:rgba(26,111,232,.02)}
       <div class="topbar-ico"><i class="ti ti-shield-check"></i></div>
       <div><div class="topbar-name">Talabat Operations</div><div class="topbar-sub">Live Ops Management</div></div>
       <span class="wk-chip" id="wk-chip">--</span>
-      <span style="font-size:9px;color:rgba(255,255,255,.4);margin-left:2px" id="build-ts">v2.1.6707</span>
+      <span style="font-size:9px;color:rgba(255,255,255,.4);margin-left:2px" id="build-ts">v2.2.1039</span>
     </div>
     <div class="topbar-right">
       <div class="user-chip" id="user-chip"></div>
@@ -1224,113 +1224,130 @@ function rosterView(){
   <div class="card-grid">${pts.map(p=>{const sh=gsh(p.shift_id);const lu=D.users.find(u=>u.id===p.user_id);const isCoord=getUtype(p)==='coordinator';return`<div class="card"><div class="card-av ${sh.shift_type==='morning'?'m':'e'}">${ini(p.name)}</div><div class="card-info"><div class="card-name">${p.name}</div><div class="card-meta"><span class="shift-badge ${sh.shift_type==='morning'?'m':'e'}">${sh.name}</span>${isCoord?`<span class="role-badge rb-coord" style="margin-left:4px">Coordinator</span>`:''} ${p.cov_area?`<span style="font-size:10.5px;color:var(--g3)">${p.cov_area}</span>`:''}${lu?`<br><span style="font-size:10px;color:var(--g3);font-family:monospace">${lu.email}</span>`:''}${p.phone?`<br><span style="font-size:10px;color:var(--g3)"><i class="ti ti-brand-whatsapp" style="color:#25D366;font-size:11px;margin-right:2px"></i>${p.phone}</span>`:''}</div></div>${ed?`<button class="edit-btn" onclick="openEdit('${p.id}')"><i class="ti ti-edit"></i></button><button class="icon-btn" onclick="delPat('${p.id}','${p.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>`:''}</div>`;}).join('')}</div>`;
 }
 function operationsView(){
-  const ed=canEdit();
-  const sub=D.opsSub||'areas';
-  const tabs2=[
-    {id:'areas',icon:'ti-map-pin',label:'Areas'},
-    {id:'shifts',icon:'ti-clock',label:'Shifts'},
-    {id:'roles',icon:'ti-shield',label:'Roles'},
-  ];
-  const subNav=`<div style="display:flex;background:var(--g1);border-radius:10px;padding:3px;gap:2px;width:fit-content">
-    ${tabs2.map(t=>`<button onclick="D.opsSub='${t.id}';render()" style="padding:7px 16px;border-radius:8px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .13s;${sub===t.id?'background:#411517;color:#F4EDE3;':'background:transparent;color:var(--g4)'}"><i class="ti ${t.icon}" style="font-size:12px;margin-right:4px"></i>${t.label}</button>`).join('')}
-  </div>`;
-  const addBtn=ed&&sub==='areas'?`<button class="btn btn-primary" onclick="openM({type:'area'})"><i class="ti ti-plus"></i>Add area</button>`
-    :ed&&sub==='shifts'?`<button class="btn btn-primary" onclick="openM({type:'addshift',form:{name:'',start:'08:00',end:'16:00',type:'morning'}})"><i class="ti ti-plus"></i>Add shift</button>`
-    :ed&&sub==='roles'?`<button class="btn btn-primary" onclick="openM({type:'addrole'})"><i class="ti ti-plus"></i>Add role</button>`:'';
-  const header=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">${subNav}${addBtn}</div>`;
+  var ed = canEdit();
+  var sub = D.opsSub || 'areas';
 
-  if(sub==='areas'){
-    if(!D.areas.length)return header+`<div style="padding:50px;text-align:center;color:#A08070"><i class="ti ti-map-pin" style="font-size:48px;display:block;margin-bottom:12px;opacity:.3"></i><b>No areas yet</b></div>`;
-    return header+`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">
-      ${D.areas.map(a=>{
-        const cnt=D.patrollers.filter(p=>p.cov_area===a.name).length;
-        return`<div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px">
-          <div style="width:40px;height:40px;border-radius:10px;background:#F9EDEE;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-map-pin" style="font-size:18px;color:#411517"></i></div>
-          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${a.name}</div><div style="font-size:11px;color:#A08070;margin-top:2px">${cnt} patroller${cnt!==1?'s':''}</div></div>
-          ${ed?`<div style="display:flex;gap:4px">
-            <button class="edit-btn" onclick="openM({type:'editarea',id:'${a.id}',name:'${a.name.replace(/'/g,"\\'")}'})" style="width:30px;height:30px"><i class="ti ti-edit"></i></button>
-            <button class="icon-btn" onclick="delArea('${a.id}','${a.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
-          </div>`:''}
-        </div>`;
-      }).join('')}
-    </div>`;
+  // Sub navigation
+  var subHtml = '<div style="display:flex;background:#F4EDE3;border-radius:10px;padding:3px;gap:2px;width:fit-content">';
+  ['areas','shifts','roles'].forEach(function(s){
+    var active = sub === s;
+    var icons = {areas:'ti-map-pin', shifts:'ti-clock', roles:'ti-shield'};
+    var labels = {areas:'Areas', shifts:'Shifts', roles:'Roles'};
+    var style = active
+      ? 'padding:7px 16px;border-radius:8px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;background:#411517;color:#F4EDE3;'
+      : 'padding:7px 16px;border-radius:8px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;background:transparent;color:#6B7280;';
+    subHtml += '<button onclick="D.opsSub=\''+s+'\';render()" style="'+style+'"><i class="ti '+icons[s]+'" style="font-size:12px;margin-right:4px"></i>'+labels[s]+'</button>';
+  });
+  subHtml += '</div>';
+
+  var addHtml = '';
+  if(ed && sub==='areas') addHtml = '<button class="btn btn-primary" onclick="openM({type:\'area\'})"><i class="ti ti-plus"></i>Add area</button>';
+  if(ed && sub==='shifts') addHtml = '<button class="btn btn-primary" onclick="openM({type:\'addshift\',form:{name:\'\',start:\'08:00\',end:\'16:00\',type:\'morning\'}})"><i class="ti ti-plus"></i>Add shift</button>';
+  if(ed && sub==='roles') addHtml = '<button class="btn btn-primary" onclick="openM({type:\'addrole\'})"><i class="ti ti-plus"></i>Add role</button>';
+
+  var header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">'+subHtml+addHtml+'</div>';
+
+  // AREAS
+  if(sub === 'areas'){
+    if(!D.areas.length) return header+'<div style="padding:50px;text-align:center;color:#A08070"><i class="ti ti-map-pin" style="font-size:48px;display:block;margin-bottom:12px;opacity:.3"></i><b>No areas yet</b><div style="font-size:12px;margin-top:6px">Add areas where patrollers are deployed</div></div>';
+    var aHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">';
+    D.areas.forEach(function(a){
+      var cnt = D.patrollers.filter(function(p){return p.cov_area===a.name;}).length;
+      aHtml += '<div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;">';
+      aHtml += '<div style="width:40px;height:40px;border-radius:10px;background:#F9EDEE;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-map-pin" style="font-size:18px;color:#411517"></i></div>';
+      aHtml += '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">'+a.name+'</div><div style="font-size:11px;color:#A08070;margin-top:2px">'+cnt+' patroller'+(cnt!==1?'s':'')+'</div></div>';
+      if(ed){
+        aHtml += '<div style="display:flex;gap:4px">';
+        aHtml += '<button class="edit-btn" onclick="openM({type:\'editarea\',id:\''+a.id+'\',name:\''+a.name.replace(/'/g,"\\'")+'\'});" style="width:30px;height:30px"><i class="ti ti-edit"></i></button>';
+        aHtml += '<button class="icon-btn" onclick="delArea(\''+a.id+'\',\''+a.name.replace(/'/g,"\\'")+'\')" ><i class="ti ti-trash"></i></button>';
+        aHtml += '</div>';
+      }
+      aHtml += '</div>';
+    });
+    aHtml += '</div>';
+    return header + aHtml;
   }
 
-  if(sub==='shifts'){
-    if(!D.shifts.length)return header+`<div style="padding:50px;text-align:center;color:#A08070"><i class="ti ti-clock" style="font-size:48px;display:block;margin-bottom:12px;opacity:.3"></i><b>No shifts yet</b><div style="font-size:12px;margin-top:6px">Create shifts to define working hours</div></div>`;
-    return header+`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">
-      ${D.shifts.map(sh=>{
-        const isMorn=sh.shift_type==='morning';
-        const col=isMorn?'#FF5900':'#D97706';
-        const bg=isMorn?'#FFF0E6':'#FEF3C7';
-        const bdr=isMorn?'#BAE6FD':'#FDE68A';
-        const cnt=D.patrollers.filter(p=>p.shift_id===sh.id).length;
-        const[s_h,s_m]=sh.start_time.split(':').map(Number);
-        const[e_h,e_m]=sh.end_time.split(':').map(Number);
-        let dur=(e_h+e_m/60)-(s_h+s_m/60);if(dur<=0)dur+=24;
-        const durStr=Math.floor(dur)+'h'+(dur%1>0?' '+(dur%1*60|0)+'m':'');
-        return`<div style="background:#fff;border:1.5px solid ${bdr};border-radius:14px;padding:16px">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-            <div style="width:44px;height:44px;border-radius:12px;background:${bg};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-              <i class="ti ti-${isMorn?'sun':'moon'}" style="font-size:22px;color:${col}"></i>
-            </div>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:14px;font-weight:700;color:#2A0D0F">${sh.name}</div>
-              <div style="font-size:13px;font-weight:700;color:${col};margin-top:2px">${fmtT(sh.start_time)} – ${fmtT(sh.end_time)}</div>
-            </div>
-            ${ed?`<div style="display:flex;flex-direction:column;gap:4px">
-              <button class="edit-btn" onclick="openM({type:'editshift',id:'${sh.id}',form:{name:'${sh.name.replace(/'/g,"\\'")}',start:'${sh.start_time}',end:'${sh.end_time}',type:'${sh.shift_type}'}})" style="width:30px;height:30px"><i class="ti ti-edit"></i></button>
-              <button class="icon-btn" onclick="delShift('${sh.id}','${sh.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
-            </div>`:''}
-          </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:${bg};color:${col}">${isMorn?'☀️':'🌙'} ${isMorn?'Morning':'Evening'}</span>
-            <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:#F4EDE3;color:#411517">⏱ ${durStr}</span>
-            <span style="font-size:10px;color:#A08070">${cnt} patroller${cnt!==1?'s':''}</span>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>
-    <div style="margin-top:12px;padding:10px 14px;background:#F4EDE3;border-radius:10px;font-size:12px;color:#411517"><i class="ti ti-info-circle" style="margin-right:5px"></i>Shifts apply to all scheduled patrollers. Edit here to update everywhere.</div>`;
+  // SHIFTS
+  if(sub === 'shifts'){
+    if(!D.shifts.length) return header+'<div style="padding:50px;text-align:center;color:#A08070"><i class="ti ti-clock" style="font-size:48px;display:block;margin-bottom:12px;opacity:.3"></i><b>No shifts yet</b><div style="font-size:12px;margin-top:6px">Create shifts to define working hours</div></div>';
+    var sHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">';
+    D.shifts.forEach(function(sh){
+      var isMorn = sh.shift_type === 'morning';
+      var col = isMorn ? '#FF5900' : '#D97706';
+      var bg = isMorn ? '#FFF0E6' : '#FEF3C7';
+      var bdr = isMorn ? '#BAE6FD' : '#FDE68A';
+      var cnt = D.patrollers.filter(function(p){return p.shift_id===sh.id;}).length;
+      var parts1 = sh.start_time.split(':').map(Number);
+      var parts2 = sh.end_time.split(':').map(Number);
+      var dur = (parts2[0]+parts2[1]/60) - (parts1[0]+parts1[1]/60);
+      if(dur<=0) dur+=24;
+      var durStr = Math.floor(dur)+'h'+(dur%1>0?' '+Math.round(dur%1*60)+'m':'');
+      sHtml += '<div style="background:#fff;border:1.5px solid '+bdr+';border-radius:14px;padding:16px;">';
+      sHtml += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">';
+      sHtml += '<div style="width:44px;height:44px;border-radius:12px;background:'+bg+';display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="ti ti-'+(isMorn?'sun':'moon')+'" style="font-size:22px;color:'+col+'"></i></div>';
+      sHtml += '<div style="flex:1;min-width:0;">';
+      sHtml += '<div style="font-size:14px;font-weight:700;color:#2A0D0F;">'+sh.name+'</div>';
+      sHtml += '<div style="font-size:13px;font-weight:700;color:'+col+';margin-top:2px;">'+fmtT(sh.start_time)+' – '+fmtT(sh.end_time)+'</div>';
+      sHtml += '</div>';
+      if(ed){
+        sHtml += '<div style="display:flex;flex-direction:column;gap:4px;">';
+        sHtml += '<button class="edit-btn" onclick="openM({type:\'editshift\',id:\''+sh.id+'\',form:{name:\''+sh.name.replace(/'/g,"\\'")+'\'\,start:\''+sh.start_time+'\',end:\''+sh.end_time+'\',type:\''+sh.shift_type+'\'}});" style="width:30px;height:30px"><i class="ti ti-edit"></i></button>';
+        sHtml += '<button class="icon-btn" onclick="delShift(\''+sh.id+'\',\''+sh.name.replace(/'/g,"\\'")+'\')" ><i class="ti ti-trash"></i></button>';
+        sHtml += '</div>';
+      }
+      sHtml += '</div>';
+      sHtml += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+      sHtml += '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:'+bg+';color:'+col+';">'+(isMorn?'☀️':'🌙')+' '+(isMorn?'Morning':'Evening')+'</span>';
+      sHtml += '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;background:#F4EDE3;color:#411517;">⏱ '+durStr+'</span>';
+      sHtml += '<span style="font-size:10px;color:#A08070;">'+cnt+' patroller'+(cnt!==1?'s':'')+'</span>';
+      sHtml += '</div></div>';
+    });
+    sHtml += '</div><div style="margin-top:12px;padding:10px 14px;background:#F4EDE3;border-radius:10px;font-size:12px;color:#411517;"><i class="ti ti-info-circle" style="margin-right:5px"></i>Shifts define working hours for all patrollers.</div>';
+    return header + sHtml;
   }
 
-  if(sub==='roles'){
-    const roles=D.customRoles||[];
-    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents'];
-    const alBg={viewer:'#EAF1FD',editor:'#FFF0E6',admin:'#DCFCE7'};
-    const alCol={viewer:'#0C4FB3',editor:'#FF5900',admin:'#166534'};
-    const alLbl={viewer:'👁 Viewer',editor:'✏️ Editor',admin:'🔐 Admin'};
-    if(!roles.length)return header+`<div style="text-align:center;padding:50px;background:#fff;border-radius:16px;border:2px dashed #E8DDD4">
-      <i class="ti ti-shield" style="font-size:48px;color:#E8DDD4;display:block;margin-bottom:12px"></i>
-      <b style="color:#411517">No roles yet</b>
-      <div style="font-size:12px;color:#A08070;margin:8px 0 16px">Create roles to control what users see</div>
-      ${ed?`<button class="btn btn-primary" onclick="openM({type:'addrole'})"><i class="ti ti-plus"></i>Create role</button>`:''}
-    </div>`;
-    return header+`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
-      ${roles.map(r=>{
-        const al=r.access_level||'viewer';
-        let vtabs=ALL_TABS;try{if(r.visible_tabs)vtabs=JSON.parse(r.visible_tabs);}catch(e){}
-        return`<div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:16px;padding:16px">
-          <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px">
-            <div style="width:42px;height:42px;border-radius:12px;background:${alBg[al]};display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-shield-check" style="font-size:20px;color:${alCol[al]}"></i></div>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:14px;font-weight:700;color:#2A0D0F">${r.name}</div>
-              ${r.description?`<div style="font-size:11px;color:#A08070;margin-top:1px">${r.description}</div>`:''}
-              <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${alBg[al]};color:${alCol[al]};margin-top:4px;display:inline-block">${alLbl[al]}</span>
-            </div>
-            ${ed?`<div style="display:flex;gap:4px;flex-shrink:0">
-              <button class="edit-btn" style="width:28px;height:28px" onclick="openEditRole('${r.id}')"><i class="ti ti-edit"></i></button>
-              <button class="icon-btn" onclick="delCustomRole('${r.id}','${r.name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
-            </div>`:''}
-          </div>
-          <div style="border-top:1px solid #F4EDE3;padding-top:10px">
-            <div style="font-size:9px;font-weight:700;color:#A08070;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Visible tabs</div>
-            <div style="display:flex;gap:4px;flex-wrap:wrap">${ALL_TABS.map(t=>{const on=vtabs.includes(t);return`<span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:${on?'#DCFCE7':'#FEE2E2'};color:${on?'#166534':'#991B1B'}">${on?'✓':'✗'} ${t}</span>`;}).join('')}</div>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>`;
+  // ROLES
+  if(sub === 'roles'){
+    var roles = D.customRoles || [];
+    var ALL_TABS = ['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents'];
+    var alBg = {viewer:'#EAF1FD', editor:'#FFF0E6', admin:'#DCFCE7'};
+    var alCol = {viewer:'#0C4FB3', editor:'#FF5900', admin:'#166534'};
+    var alLbl = {viewer:'👁 Viewer', editor:'✏️ Editor', admin:'🔐 Admin'};
+    if(!roles.length) return header+'<div style="text-align:center;padding:50px;background:#fff;border-radius:16px;border:2px dashed #E8DDD4;"><i class="ti ti-shield" style="font-size:48px;color:#E8DDD4;display:block;margin-bottom:12px;"></i><b style="color:#411517;">No roles yet</b><div style="font-size:12px;color:#A08070;margin:8px 0 16px;">Create roles to control what users see</div>'+(ed?'<button class="btn btn-primary" onclick="openM({type:\'addrole\'})"><i class="ti ti-plus"></i>Create role</button>':'')+'</div>';
+    var rHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">';
+    roles.forEach(function(r){
+      var al = r.access_level || 'viewer';
+      var vtabs = ALL_TABS;
+      try{ if(r.visible_tabs) vtabs = JSON.parse(r.visible_tabs); }catch(e){}
+      rHtml += '<div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:16px;padding:16px;">';
+      rHtml += '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;">';
+      rHtml += '<div style="width:42px;height:42px;border-radius:12px;background:'+alBg[al]+';display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="ti ti-shield-check" style="font-size:20px;color:'+alCol[al]+'"></i></div>';
+      rHtml += '<div style="flex:1;min-width:0;">';
+      rHtml += '<div style="font-size:14px;font-weight:700;color:#2A0D0F;">'+r.name+'</div>';
+      if(r.description) rHtml += '<div style="font-size:11px;color:#A08070;margin-top:1px;">'+r.description+'</div>';
+      rHtml += '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:'+alBg[al]+';color:'+alCol[al]+';margin-top:4px;display:inline-block;">'+alLbl[al]+'</span>';
+      rHtml += '</div>';
+      if(ed){
+        rHtml += '<div style="display:flex;gap:4px;flex-shrink:0;">';
+        rHtml += '<button class="edit-btn" style="width:28px;height:28px;" onclick="openEditRole(\''+r.id+'\')"><i class="ti ti-edit"></i></button>';
+        rHtml += '<button class="icon-btn" onclick="delCustomRole(\''+r.id+'\',\''+r.name.replace(/'/g,"\\'")+'\')" ><i class="ti ti-trash"></i></button>';
+        rHtml += '</div>';
+      }
+      rHtml += '</div>';
+      rHtml += '<div style="border-top:1px solid #F4EDE3;padding-top:10px;">';
+      rHtml += '<div style="font-size:9px;font-weight:700;color:#A08070;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Visible tabs</div>';
+      rHtml += '<div style="display:flex;gap:4px;flex-wrap:wrap;">';
+      ALL_TABS.forEach(function(t){
+        var on = vtabs.includes(t);
+        rHtml += '<span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:'+(on?'#DCFCE7':'#FEE2E2')+';color:'+(on?'#166534':'#991B1B')+'">'+(on?'✓':'✗')+' '+t+'</span>';
+      });
+      rHtml += '</div></div></div>';
+    });
+    rHtml += '</div>';
+    return header + rHtml;
   }
+
   return header;
 }
 
