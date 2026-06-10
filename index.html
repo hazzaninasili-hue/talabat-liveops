@@ -858,9 +858,10 @@ function dateView(){
     if(patrollers.length){
       rows+=`<div style="font-size:9px;font-weight:700;color:#0C4FB3;text-transform:uppercase;letter-spacing:.05em;padding:3px 7px;background:#EAF1FD;border-radius:4px;margin-bottom:3px">Patrollers</div>`;
       patrollers.forEach(p=>{const z=gDZ(p.id,di);const io=!z;const sh=getDayShift(p.id,di);
-        const effEndD=getEffectiveEndTime(p.id,sh,selDay);
-      const isAdjD=effEndD&&sh&&effEndD!==sh.end_time;
-      const shTime=(!io&&sh)?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}–${fmtT(effEndD)}${isAdjD?' ⚠️':''}`:'';;
+        const dayStr=d.toISOString().split('T')[0];
+        const effEndD=getEffectiveEndTime(p.id,sh,dayStr);
+        const isAdjD=effEndD&&sh&&effEndD!==sh.end_time;
+        const shTime=(!io&&sh)?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}–${fmtT(effEndD)}${isAdjD?' ⚠️':''}`:'';;
         rows+=`<div class="dc-row${io?' off':''}"><div class="dc-av${sh?.shift_type==='evening'?' e':''}${io?' o':''}">${ini(p.name)}</div><div style="flex:1;min-width:0"><div class="dc-name">${p.name}</div><div class="dc-zone">${(()=>{const ds2=d.toISOString().split('T')[0];const ov2=D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds2>=t.start_date&&ds2<=t.end_date);return ov2?'🌴 On Vacation':io?'Off Day':z;})()}${shTime?` · <span style="font-size:9px;color:var(--g3)">${shTime}</span>`:''}</div></div></div>`;});
     }
     // Coordinator rows
@@ -1355,8 +1356,16 @@ function mySchedView(){
     <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;position:relative">
       <div style="background:rgba(255,255,255,.2);border-radius:12px;padding:10px 14px">
         <div style="font-size:10px;opacity:.75;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Shift time</div>
-        <div style="font-size:14px;font-weight:700">${sh.start_time&&sh.start_time!=='?'?fmtT(sh.start_time)+' – '+fmtEffEnd(p.id,sh,today):'Not set'}</div>
-        ${(()=>{const r=getAttRecordForDate(p.id,today);return r&&r.late_mins>0?`<div style="font-size:10px;color:rgba(255,220,180,1);margin-top:2px">⚠️ Adjusted (${Math.floor(r.late_mins/60)>0?Math.floor(r.late_mins/60)+'h ':''}${r.late_mins%60}m late)</div>`:'';})()} 
+        ${(()=>{
+          const shT=getDayShift(p.id,todayIdx)||sh;
+          const effEnd=getEffectiveEndTime(p.id,shT,today);
+          const rec=getAttRecordForDate(p.id,today);
+          const lateM=rec&&rec.clock_in?(()=>{const inT=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});const cM=parseInt(inT.split(':')[0])*60+parseInt(inT.split(':')[1]);const sM=getShiftStartMins(shT);return sM!==null?Math.max(0,cM-sM):0;})():0;
+          const adjLabel=lateM>0?`<div style="font-size:10px;color:rgba(255,220,180,1);margin-top:2px">⚠️ Adjusted (${Math.floor(lateM/60)>0?Math.floor(lateM/60)+'h ':''}${lateM%60}m late)</div>`:'';
+          const isAdj=effEnd&&shT&&effEnd!==shT.end_time;
+          const endDisp=isAdj?`<span style="text-decoration:line-through;opacity:.5">${fmtT(shT.end_time)}</span> <span style="color:#4ADE80">${fmtT(effEnd)}</span>`:fmtT(effEnd||shT.end_time);
+          return`<div style="font-size:14px;font-weight:700">${shT.start_time&&shT.start_time!=='?'?fmtT(shT.start_time)+' – '+endDisp:'Not set'}</div>${adjLabel}`;
+        })()}
       </div>
       <div style="background:rgba(255,255,255,.2);border-radius:12px;padding:10px 14px">
         <div style="font-size:10px;opacity:.75;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Today's zone</div>
@@ -1482,12 +1491,16 @@ function mySchedView(){
       </div>`;
     } else if(rec.clock_in&&!rec.clock_out){
       const inTime=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
-      const adjEnd=rec.adj_end_time||null;
-      const lateMinsRec=rec.late_mins||0;
+      // Calculate late mins live from clock_in vs shift start (works even without DB columns)
+      const clockInMins2=parseInt(inTime.split(':')[0])*60+parseInt(inTime.split(':')[1]);
+      const shStartMins2=shNow?getShiftStartMins(shNow):null;
+      const lateMinsRec=shStartMins2!==null?Math.max(0,clockInMins2-shStartMins2):0;
+      const adjEndMins2=shNow?getShiftEndMins(shNow)+lateMinsRec:null;
+      const adjEnd=adjEndMins2!==null&&lateMinsRec>0?`${String(Math.floor(adjEndMins2/60)%24).padStart(2,'0')}:${String(adjEndMins2%60).padStart(2,'0')}`:(rec.adj_end_time||null);
       const lateH=Math.floor(lateMinsRec/60);const lateM=lateMinsRec%60;
       const lateLabel=lateH>0?`${lateH}h ${lateM}m`:`${lateM}m`;
       const lateBadge=lateMinsRec>0?`<div style="background:rgba(220,38,38,.2);border:1px solid rgba(220,38,38,.4);border-radius:10px;padding:8px 14px;margin-bottom:12px;font-size:12px;color:#FCA5A5">
-        ⚠️ You were <strong>${lateLabel} late</strong> · Shift adjusted to <strong>${adjEnd}</strong>
+        ⚠️ You were <strong>${lateLabel} late</strong> · Shift end adjusted: <span style="text-decoration:line-through;opacity:.7">${fmtT(shNow?.end_time)}</span> → <strong style="color:#4ADE80">${adjEnd||'--'}</strong>
       </div>`:'';
       clockWidget=`<div style="background:linear-gradient(135deg,#14532D,#166534);border-radius:16px;padding:24px;text-align:center;color:#F0FDF4;margin-bottom:14px">
         <div style="font-size:13px;opacity:.7;margin-bottom:4px">CLOCKED IN · ${zone}</div>
