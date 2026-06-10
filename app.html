@@ -803,18 +803,7 @@ async function submitEarlyOut(patId,attId,adjEndStr){
 }
 
 // ── SW ──
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js?app=1').then(reg=>{
-      setInterval(()=>reg.update(),60000);
-      reg.addEventListener('updatefound',()=>{
-        const nw=reg.installing;
-        nw.addEventListener('statechange',()=>{if(nw.state==='installed'&&navigator.serviceWorker.controller)nw.postMessage({type:'SKIP_WAITING'});});
-      });
-    }).catch(e=>console.log('SW failed',e));
-    navigator.serviceWorker.addEventListener('controllerchange',()=>window.location.reload());
-  });
-}
+// No SW for patroller app
 </script>
 </body>
 </html>
