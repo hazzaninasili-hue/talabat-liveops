@@ -618,7 +618,21 @@ function getEffectiveEndTime(patId, sh, dateStr){
   if(!sh||!sh.end_time)return null;
   dateStr=dateStr||todayStr();
   const rec=getAttRecordForDate(patId,dateStr);
+  // Use stored adj_end_time if available
   if(rec&&rec.adj_end_time&&(rec.late_mins||0)>0)return rec.adj_end_time;
+  // Fallback: calculate from clock_in time vs shift start
+  if(rec&&rec.clock_in){
+    const inT=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+    const clockInMins=parseInt(inT.split(':')[0])*60+parseInt(inT.split(':')[1]);
+    const startMins=getShiftStartMins(sh);
+    if(startMins!==null){
+      const lateMins=Math.max(0,clockInMins-startMins);
+      if(lateMins>0){
+        const adjEnd=getShiftEndMins(sh)+lateMins;
+        return`${String(Math.floor(adjEnd/60)%24).padStart(2,'0')}:${String(adjEnd%60).padStart(2,'0')}`;
+      }
+    }
+  }
   return sh.end_time;
 }
 // Returns effective end time formatted
@@ -2747,8 +2761,7 @@ function hourlyView(){
     const[sh_h,sh_m]=sh.start_time.split(':').map(Number);
     // Check for adj_end_time from attendance record
     const rec=getAttRecordForDate(p.id,selDay);
-    let endStr=sh.end_time;
-    if(rec&&rec.adj_end_time&&rec.late_mins>0)endStr=rec.adj_end_time;
+    let endStr=getEffectiveEndTime(p.id,sh,selDay)||sh.end_time;
     const[eh,em]=endStr.split(':').map(Number);
     const startH=sh_h+sh_m/60;
     let endH=eh+em/60;
@@ -2928,7 +2941,7 @@ function hourlyView(){
     <div style="overflow-x:auto">
       <div style="display:flex;background:#F4EDE3;border-bottom:1.5px solid #E8DDD4;position:sticky;top:0;z-index:5;min-width:${24*hourW+nameW}px">
         <div style="width:${nameW}px;flex-shrink:0;padding:7px 10px;font-size:10px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">Name</div>
-        ${HOURS.map(h=>{const isNow=selDay===today&&h===new Date().getHours();return`<div style="width:${hourW}px;flex-shrink:0;text-align:center;padding:7px 0;font-size:9px;font-weight:${isNow?'700':'500'};color:${isNow?'#FF5900':'var(--g3)'};font-family:monospace">${String(h).padStart(2,'0')}:00</div>`}).join('')}
+        ${HOURS.map(h=>{const isNow=selDay===today&&h===getBahrainNow().getUTCHours();return`<div style="width:${hourW}px;flex-shrink:0;text-align:center;padding:7px 0;font-size:9px;font-weight:${isNow?'700':'500'};color:${isNow?'#FF5900':'var(--g3)'};font-family:monospace">${String(h).padStart(2,'0')}:00</div>`}).join('')}
       </div>
       ${rows}
     </div>
