@@ -687,12 +687,17 @@ function clockedInTag(rec,sh){
   const endTag=adjEndStr&&rec.late_mins>0?`<span style="font-size:8px;color:#D97706;font-weight:700"> →${adjEndStr}</span>`:'';
   return`<span style="display:inline-flex;align-items:center;gap:3px;background:#DCFCE7;color:#166534;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">🟢 ${inT}${endTag}</span>`;
 }
-function completedTag(rec){
+function completedTag(rec,sh){
   const inT=rec.clock_in?new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
   const outT=rec.clock_out?new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
   const mins=rec.clock_in&&rec.clock_out?Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000):0;
   const dur=`${Math.floor(mins/60)}h${mins%60}m`;
-  return`<span style="display:inline-flex;align-items:center;gap:3px;background:#EAF1FD;color:#1565C0;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">✓ ${inT}→${outT} ${dur}</span>`;
+  // Show late indicator if clocked in late
+  const clockInMins=parseInt(inT.split(':')[0])*60+parseInt(inT.split(':')[1]);
+  const startMins=sh?getShiftStartMins(sh):null;
+  const lateMins=startMins!==null?Math.max(0,clockInMins-startMins):0;
+  const lateTag2=lateMins>0?`<span style="background:#DC2626;color:#fff;font-size:7px;padding:1px 3px;border-radius:2px;margin-left:2px">+${lateMins}m late</span>`:'';
+  return`<span style="display:inline-flex;align-items:center;gap:3px;background:#EAF1FD;color:#1565C0;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">✓ ${inT}→${outT} ${dur}${lateTag2}</span>`;
 }
 
 function getActiveNow(){
@@ -825,7 +830,7 @@ function weekTable(ed){
         let statusTag='';
         if(ps.status==='late')statusTag=`<div style="margin-top:2px">${lateTag(ps.lateMins)}</div>`;
         else if(ps.status==='clocked_in')statusTag=`<div style="margin-top:2px">${clockedInTag(ps.rec,ps.sh)}</div>`;
-        else if(ps.status==='completed')statusTag=`<div style="margin-top:2px">${completedTag(ps.rec)}</div>`;
+        else if(ps.status==='completed')statusTag=`<div style="margin-top:2px">${completedTag(ps.rec,ps.sh)}</div>`;
         else if(ps.status==='early_out_pending')statusTag=`<div style="margin-top:2px"><span style="font-size:9px;font-weight:700;background:#FEF3C7;color:#D97706;padding:2px 6px;border-radius:4px">⏳ Early out pending</span></div>`;
         const shTag=sh?`<div style="font-size:8px;color:var(--g3);margin-top:1px">${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}-${fmtT(sh.end_time)}</div>`:'';
         row+=ed?`<td><span class="zone-chip clickable" onclick="openCell('${p.id}',${i})" title="${z}">${s}</span>${shTag}${statusTag}</td>`:`<td><span class="zone-chip" title="${z}">${s}</span>${shTag}${statusTag}</td>`;
@@ -2783,9 +2788,13 @@ function hourlyView(){
   }).join('');
 
   // Hours 0-23
-  const HOURS=Array.from({length:24},(_,i)=>i);
-  const hourW=52; // px per hour cell
+  // 30-minute intervals (48 slots)
+  const SLOTS=Array.from({length:48},(_,i)=>i); // 0=00:00, 1=00:30, 2=01:00 ...
+  const HOURS=Array.from({length:24},(_,i)=>i); // kept for compat
+  const slotW=34; // px per 30-min slot (34*48=1632px total)
+  const hourW=slotW*2; // 68px per hour (for bar positioning)
   const nameW=140;
+  const fmtSlot=s=>{const h=Math.floor(s/2);const m=s%2===0?'00':'30';return`${String(h).padStart(2,'0')}:${m}`;};
 
   function getShiftSpan(p){
     const sh=getDayShift(p.id,selIdx);
@@ -2909,42 +2918,52 @@ function hourlyView(){
     if(selDay===today){
       const bhrNow=getBahrainNow();
       const nowH=bhrNow.getUTCHours()+bhrNow.getUTCMinutes()/60;
-      const nowLeft=nowH*hourW;
+      const nowLeft=nowH*hourW; // hourW=2*slotW so this is correct
       bars+=`<div style="position:absolute;left:${nowLeft}px;top:0;bottom:0;width:2px;background:#DC2626;z-index:10;pointer-events:none" title="Now (Bahrain)"></div>`;
     }
 
-    return`<div style="position:relative;height:38px;min-width:${24*hourW}px">${bars}</div>`;
+    return`<div style="position:relative;height:38px;min-width:${48*slotW}px">${bars}</div>`;
   }
 
   // Hourly count bar (how many on duty per hour)
   const activePtsDay=pts.filter(p=>!isOnVacDay(p.id)&&!isAbsentOnDate(p.id,selDay)&&gDZ(p.id,selIdx));
-  const hourCounts=HOURS.map(h=>{
+  const slotCounts=SLOTS.map(s=>{
+    const slotH=s/2; // decimal hour (e.g. slot 17 = 8.5 = 08:30)
     const onDuty=activePtsDay.filter(p=>{
       const sh=getShiftSpan(p);if(!sh)return false;
-      return h>=Math.floor(sh.start)&&h<Math.ceil(sh.end>24?sh.end-24:sh.end)||
-             (sh.end>24&&(h>=Math.floor(sh.start)||h<Math.ceil(sh.end-24)));
+      return slotH>=sh.start&&slotH<sh.end;
     }).length;
-    const onTask=activePtsDay.filter(p=>(D.tasks||[]).some(t=>t.patroller_id===p.id&&t.date===selDay&&t.status==='Approved'&&t.start_time&&parseInt(t.start_time)<=h&&parseInt(t.end_time)>h)).length;
-    return{h,onDuty,onTask};
+    const onTask=activePtsDay.filter(p=>(D.tasks||[]).some(t=>{
+      if(!t.start_time||t.patroller_id!==p.id||t.date!==selDay||t.status==='Pending')return false;
+      const[th,tm]=t.start_time.split(':').map(Number);const tStart=th+tm/60;
+      const[eh,em]=(t.end_time||'23:59').split(':').map(Number);const tEnd=eh+em/60;
+      return slotH>=tStart&&slotH<tEnd;
+    })).length;
+    return{s,onDuty,onTask};
   });
-  const maxDuty=Math.max(1,...hourCounts.map(x=>x.onDuty));
+  const maxDuty=Math.max(1,...slotCounts.map(x=>x.onDuty));
 
   const countBar=`<div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:12px;padding:12px 16px;margin-bottom:12px;overflow-x:auto">
     <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Hourly staffing — ${selDay}</div>
-    <div style="min-width:${24*hourW+nameW}px">
+    <div style="min-width:${48*slotW+nameW}px">
       <div style="display:flex;margin-left:${nameW}px;margin-bottom:4px">
-        ${HOURS.map(h=>`<div style="width:${hourW}px;font-size:9px;color:var(--g3);text-align:center;font-family:monospace">${String(h).padStart(2,'0')}:00</div>`).join('')}
+        ${SLOTS.map(s=>{
+          const isHour=s%2===0;
+          const isNowSlot=selDay===today&&s===Math.floor(getBahrainNow().getUTCHours()*2+getBahrainNow().getUTCMinutes()/30);
+          return`<div style="width:${slotW}px;font-size:${isHour?'9':'8'}px;color:${isNowSlot?'#FF5900':isHour?'var(--g3)':'var(--g2)'};text-align:center;font-family:monospace;overflow:hidden">${isHour?fmtSlot(s):s%4===2?'30':''}</div>`;
+        }).join('')}
       </div>
       <div style="display:flex;align-items:flex-end;margin-left:${nameW}px;height:40px;gap:1px">
-        ${hourCounts.map(({h,onDuty,onTask})=>{
+        ${slotCounts.map(({s,onDuty,onTask})=>{
           const barH=maxDuty?Math.round((onDuty/maxDuty)*36):0;
           const taskH=onDuty?Math.round((onTask/onDuty)*barH):0;
-          const isNow=selDay===today&&h===getBahrainNow().getUTCHours();
-          return`<div style="width:${hourW-2}px;display:flex;flex-direction:column;justify-content:flex-end;height:36px;position:relative;cursor:default" title="Hour ${h}:00 — ${onDuty} on duty, ${onTask} on task">
-            <div style="background:${isNow?'#FF5900':'#411517'};height:${barH}px;border-radius:3px 3px 0 0;transition:height .3s;position:relative">
-              ${taskH>0?`<div style="position:absolute;bottom:0;left:0;right:0;height:${taskH}px;background:#7C3AED;border-radius:3px 3px 0 0"></div>`:''}
+          const isNow=selDay===today&&s===Math.floor(getBahrainNow().getUTCHours()*2+getBahrainNow().getUTCMinutes()/30);
+          const isHour=s%2===0;
+          return`<div style="width:${slotW-1}px;display:flex;flex-direction:column;justify-content:flex-end;height:36px;position:relative;cursor:default;border-left:${isHour?'1px solid #F0EDE8':'none'}" title="${fmtSlot(s)} — ${onDuty} on duty">
+            <div style="background:${isNow?'#FF5900':'#411517'};height:${barH}px;border-radius:2px 2px 0 0;transition:height .3s;position:relative">
+              ${taskH>0?`<div style="position:absolute;bottom:0;left:0;right:0;height:${taskH}px;background:#7C3AED;border-radius:2px 2px 0 0"></div>`:''}
             </div>
-            ${onDuty>0?`<div style="position:absolute;top:0;left:0;right:0;text-align:center;font-size:8px;font-weight:700;color:${isNow?'#FF5900':'#411517'}">${onDuty}</div>`:''}
+            ${onDuty>0&&isHour?`<div style="position:absolute;top:0;left:0;right:0;text-align:center;font-size:8px;font-weight:700;color:${isNow?'#FF5900':'#411517'}">${onDuty}</div>`:''}
           </div>`;
         }).join('')}
       </div>
@@ -2971,9 +2990,13 @@ function hourlyView(){
   ${countBar}
   <div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:12px;overflow:hidden">
     <div style="overflow-x:auto">
-      <div style="display:flex;background:#F4EDE3;border-bottom:1.5px solid #E8DDD4;position:sticky;top:0;z-index:5;min-width:${24*hourW+nameW}px">
+      <div style="display:flex;background:#F4EDE3;border-bottom:1.5px solid #E8DDD4;position:sticky;top:0;z-index:5;min-width:${48*slotW+nameW}px">
         <div style="width:${nameW}px;flex-shrink:0;padding:7px 10px;font-size:10px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">Name</div>
-        ${HOURS.map(h=>{const isNow=selDay===today&&h===getBahrainNow().getUTCHours();return`<div style="width:${hourW}px;flex-shrink:0;text-align:center;padding:7px 0;font-size:9px;font-weight:${isNow?'700':'500'};color:${isNow?'#FF5900':'var(--g3)'};font-family:monospace">${String(h).padStart(2,'0')}:00</div>`}).join('')}
+        ${SLOTS.map(s=>{
+          const isHour=s%2===0;
+          const isNow=selDay===today&&s===Math.floor(getBahrainNow().getUTCHours()*2+getBahrainNow().getUTCMinutes()/30);
+          return`<div style="width:${slotW}px;flex-shrink:0;text-align:center;padding:${isHour?'7':'9'}px 0 ${isHour?'7':'5'}px;font-size:${isHour?'9':'8'}px;font-weight:${isNow?'700':'400'};color:${isNow?'#FF5900':isHour?'var(--g3)':'var(--g2)'};font-family:monospace;border-left:${isHour?'1px solid #E8DDD4':'none'}">${isHour?fmtSlot(s):s%4===2?':30':''}</div>`;
+        }).join('')}
       </div>
       ${rows}
     </div>
