@@ -613,6 +613,19 @@ function getShiftEndMins(sh){
   const parts=sh.end_time.split(':');
   return parseInt(parts[0])*60+parseInt(parts[1]);
 }
+// Returns effective end time string considering late clock-in adjustment
+function getEffectiveEndTime(patId, sh, dateStr){
+  if(!sh||!sh.end_time)return null;
+  dateStr=dateStr||todayStr();
+  const rec=getAttRecordForDate(patId,dateStr);
+  if(rec&&rec.adj_end_time&&(rec.late_mins||0)>0)return rec.adj_end_time;
+  return sh.end_time;
+}
+// Returns effective end time formatted
+function fmtEffEnd(patId, sh, dateStr){
+  const t=getEffectiveEndTime(patId,sh,dateStr);
+  return t?fmtT(t):'--';
+}
 function getBahrainMinutes(){
   const b=getBahrainNow();
   return b.getUTCHours()*60+b.getUTCMinutes();
@@ -831,7 +844,9 @@ function dateView(){
     if(patrollers.length){
       rows+=`<div style="font-size:9px;font-weight:700;color:#0C4FB3;text-transform:uppercase;letter-spacing:.05em;padding:3px 7px;background:#EAF1FD;border-radius:4px;margin-bottom:3px">Patrollers</div>`;
       patrollers.forEach(p=>{const z=gDZ(p.id,di);const io=!z;const sh=getDayShift(p.id,di);
-        const shTime=(!io&&sh)?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}`:'';
+        const effEndD=getEffectiveEndTime(p.id,sh,selDay);
+      const isAdjD=effEndD&&sh&&effEndD!==sh.end_time;
+      const shTime=(!io&&sh)?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}–${fmtT(effEndD)}${isAdjD?' ⚠️':''}`:'';;
         rows+=`<div class="dc-row${io?' off':''}"><div class="dc-av${sh?.shift_type==='evening'?' e':''}${io?' o':''}">${ini(p.name)}</div><div style="flex:1;min-width:0"><div class="dc-name">${p.name}</div><div class="dc-zone">${(()=>{const ds2=d.toISOString().split('T')[0];const ov2=D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds2>=t.start_date&&ds2<=t.end_date);return ov2?'🌴 On Vacation':io?'Off Day':z;})()}${shTime?` · <span style="font-size:9px;color:var(--g3)">${shTime}</span>`:''}</div></div></div>`;});
     }
     // Coordinator rows
@@ -1129,7 +1144,7 @@ function operationsView(){
         </div>
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:700;color:#2A0D0F">${sh.name}</div>
-          <div style="font-size:12px;color:var(--g4);margin-top:3px;font-weight:500">${fmtT(sh.start_time)} → ${fmtT(sh.end_time)}</div>
+          <div style="font-size:12px;color:var(--g4);margin-top:3px;font-weight:500">${fmtT(sh.start_time)} → ${fmtEffEnd(p.id,sh,ds)}</div>
           <div style="display:flex;align-items:center;gap:8px;margin-top:5px">
             <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:${isMorn?'#FFF0E6':'#FEF3C7'};color:${isMorn?'#FF5900':'#D97706'}">${isMorn?'Morning':'Evening'}</span>
             <span style="font-size:10px;color:var(--g3)">${pats.length} patroller${pats.length!==1?'s':''} on this shift</span>
@@ -1326,7 +1341,8 @@ function mySchedView(){
     <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;position:relative">
       <div style="background:rgba(255,255,255,.2);border-radius:12px;padding:10px 14px">
         <div style="font-size:10px;opacity:.75;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Shift time</div>
-        <div style="font-size:14px;font-weight:700">${sh.start_time&&sh.start_time!=='?'?fmtT(sh.start_time)+' – '+fmtT(sh.end_time):'Not set'}</div>
+        <div style="font-size:14px;font-weight:700">${sh.start_time&&sh.start_time!=='?'?fmtT(sh.start_time)+' – '+fmtEffEnd(p.id,sh,today):'Not set'}</div>
+        ${(()=>{const r=getAttRecordForDate(p.id,today);return r&&r.late_mins>0?`<div style="font-size:10px;color:rgba(255,220,180,1);margin-top:2px">⚠️ Adjusted (${Math.floor(r.late_mins/60)>0?Math.floor(r.late_mins/60)+'h ':''}${r.late_mins%60}m late)</div>`:'';})()} 
       </div>
       <div style="background:rgba(255,255,255,.2);border-radius:12px;padding:10px 14px">
         <div style="font-size:10px;opacity:.75;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Today's zone</div>
@@ -1402,7 +1418,7 @@ function mySchedView(){
         </div>
         <div style="padding:12px;text-align:center">
           <div style="font-size:14px;font-weight:700;color:${status.color}">${status.label}</div>
-          ${!onVacDay&&z?`<div style="font-size:10px;color:#A08070;margin-top:3px">${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}–${fmtT(sh.end_time)}</div>`:''}
+          ${!onVacDay&&z?`<div style="font-size:10px;color:#A08070;margin-top:3px">${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}–${fmtEffEnd(p.id,sh,ds)}</div>`:''}
         </div>
       </div>`;
     }).join('')}
@@ -2424,10 +2440,8 @@ async function doClockOut(){
   // Check if clocking out before shift end
   if(sh&&sh.end_time){
     const nowMins=getBahrainMinutes();
-    // Calculate adjusted end time (accounting for late clock in)
-    const startMins=getShiftStartMins(sh);
-    const clockInMins=parseInt(new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}).split(':')[0])*60+parseInt(new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}).split(':')[1]);
-    const lateMins=Math.max(0,clockInMins-startMins);
+    // Use stored late_mins from attendance record (most accurate)
+    const lateMins=rec.late_mins||0;
     const adjEndMins=getShiftEndMins(sh)+lateMins;
     if(nowMins<adjEndMins-5){ // 5 min grace period
       const early=adjEndMins-nowMins;
@@ -2632,7 +2646,7 @@ function attendanceView(){
     return`<tr>
       <td class="lt" style="font-weight:600">${p.name}</td>
       <td style="font-size:11px">${zone}</td>
-      <td style="font-size:11px">${sh?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}-${fmtT(sh.end_time)}`:'-'}</td>
+      <td style="font-size:11px">${sh?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}-${fmtT(getEffectiveEndTime(p.id,sh,a.date)||sh.end_time)}${(a.late_mins||0)>0?` <span style="color:#D97706;font-size:9px">⚠+${a.late_mins}m</span>`:''}`:'-'}</td>
       <td><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;${isAtt?'background:#DCFCE7;color:#166534':isAbs?'background:#FEE2E2;color:#991B1B':'background:#F4EDE3;color:#94A3B8'}">${status||'Pending'}</span></td>
       <td style="font-size:11px">${inT}${rec?.clock_in_map?` <a href="${rec.clock_in_map}" target="_blank" style="color:#FF5900"><i class="ti ti-map-pin" style="font-size:10px"></i></a>`:''}</td>
       <td style="font-size:11px">${outT}${rec?.clock_out_map?` <a href="${rec.clock_out_map}" target="_blank" style="color:#FF5900"><i class="ti ti-map-pin" style="font-size:10px"></i></a>`:''}</td>
