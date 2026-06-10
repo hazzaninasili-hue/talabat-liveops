@@ -896,11 +896,28 @@ function summaryView(){
 
   const mkScheduleRow=(d,i,amV,pmV,offV,tot)=>{
     const ds=d.toISOString().split('T')[0];
-    const attCount=(D.attendance||[]).filter(a=>a.date===ds&&a.status==='Attended').length;
-    const absCount=(D.attendance||[]).filter(a=>a.date===ds&&a.status==='Absent').length;
+    const dayAtts=(D.attendance||[]).filter(a=>a.date===ds);
+    const attCount=dayAtts.filter(a=>a.status==='Attended').length;
+    const absCount=dayAtts.filter(a=>a.status==='Absent').length;
     const vacCount=pts.filter(p=>D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds>=t.start_date&&ds<=t.end_date)).length;
+
+    // Late clock-in: clocked in after shift start time
+    const lateCount=dayAtts.filter(a=>{
+      if(!a.clock_in)return false;
+      const pat=D.patrollers.find(p=>p.id===a.patroller_id);if(!pat)return false;
+      const dayIdx=new Date(Date.UTC(...ds.split('-').map((v,i)=>i===1?v-1:+v))).getUTCDay();
+      const sh=getDayShift(pat.id,dayIdx);if(!sh||!sh.start_time)return false;
+      const inT=new Date(a.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+      const clockInMins=parseInt(inT.split(':')[0])*60+parseInt(inT.split(':')[1]);
+      return clockInMins>getShiftStartMins(sh)+1; // 1 min grace
+    }).length;
+
+    // Early clock-out: approved early clock-out tasks for this day
+    const earlyOutCount=(D.tasks||[]).filter(t=>
+      t.date===ds&&t.task_type==='Early Clock Out'&&t.status==='Approved'
+    ).length;
+
     const on=amV+pmV;const pct=tot?Math.round(offV/tot*100):0;
-    const bc=pct>=50?'var(--red)':pct>=30?'var(--amber)':'var(--teal)';
     const pb=pct>=50?'background:var(--red-l);color:var(--red-d)':pct>=30?'background:var(--amber-l);color:var(--amber-d)':'background:var(--green-l);color:var(--green)';
     const isToday=ds===todayStr();
     return`<tr${isToday?' style="background:#FFF8F0"':''}>
@@ -913,6 +930,8 @@ function summaryView(){
       <td>${attCount>0?`<span style="font-size:10px;font-weight:700;color:#166534;background:#DCFCE7;padding:2px 7px;border-radius:6px">${attCount}</span>`:'<span style="font-size:10px;color:var(--g3)">--</span>'}</td>
       <td>${absCount>0?`<span style="font-size:10px;font-weight:700;color:#991B1B;background:#FEE2E2;padding:2px 7px;border-radius:6px">${absCount}</span>`:'<span style="font-size:10px;color:var(--g3)">--</span>'}</td>
       <td>${vacCount>0?`<span style="font-size:10px;font-weight:700;color:#7C3AED;background:#EDE9FE;padding:2px 7px;border-radius:6px">🌴 ${vacCount}</span>`:'<span style="font-size:10px;color:var(--g3)">--</span>'}</td>
+      <td>${lateCount>0?`<span style="font-size:10px;font-weight:700;color:#D97706;background:#FEF3C7;padding:2px 7px;border-radius:6px">🕐 ${lateCount}</span>`:'<span style="font-size:10px;color:var(--g3)">--</span>'}</td>
+      <td>${earlyOutCount>0?`<span style="font-size:10px;font-weight:700;color:#7C3AED;background:#EDE9FE;padding:2px 7px;border-radius:6px">⏩ ${earlyOutCount}</span>`:'<span style="font-size:10px;color:var(--g3)">--</span>'}</td>
       <td><span class="pct-badge" style="${pb}">${pct}%</span></td>
     </tr>`;
   };
@@ -925,7 +944,7 @@ function summaryView(){
   </div>
   <div class="tcard"><div class="t-scroll"><table class="sum-table"><thead><tr>
     <th class="lt">Day</th><th>Date</th><th>AM</th><th>PM</th><th>On duty</th><th>Off</th>
-    <th style="color:#166534">Attended</th><th style="color:#991B1B">Absent</th><th style="color:#7C3AED">Vacation</th><th style="min-width:80px">Off%</th>
+    <th style="color:#166534">Attended</th><th style="color:#991B1B">Absent</th><th style="color:#7C3AED">Vacation</th><th style="color:#D97706">Late In</th><th style="color:#7C3AED">Early Out</th><th style="min-width:80px">Off%</th>
   </tr></thead><tbody>${dates.map((d,i)=>mkScheduleRow(d,i,pam[i],ppm[i],poff[i],ptot)).join('')}</tbody></table></div></div>`:''}
 
   ${coordinators.length?`
@@ -934,7 +953,7 @@ function summaryView(){
   </div>
   <div class="tcard"><div class="t-scroll"><table class="sum-table"><thead><tr>
     <th class="lt">Day</th><th>Date</th><th>AM</th><th>PM</th><th>On duty</th><th>Off</th>
-    <th style="color:#166534">Attended</th><th style="color:#991B1B">Absent</th><th style="color:#7C3AED">Vacation</th><th style="min-width:80px">Off%</th>
+    <th style="color:#166534">Attended</th><th style="color:#991B1B">Absent</th><th style="color:#7C3AED">Vacation</th><th style="color:#D97706">Late In</th><th style="color:#7C3AED">Early Out</th><th style="min-width:80px">Off%</th>
   </tr></thead><tbody>${dates.map((d,i)=>mkScheduleRow(d,i,cam[i],cpm[i],coff[i],ctot)).join('')}</tbody></table></div></div>`:''}
 
   <div style="margin-top:20px;border-top:1.5px solid var(--g2);padding-top:16px">
