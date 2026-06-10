@@ -601,6 +601,79 @@ function summ(pts){const p=pts||activePats();const am=Array(7).fill(0),pm=Array(
   }});
   return{am,pm,off};}
 
+
+// ── LATE / SHIFT STATUS HELPERS ──
+function getShiftStartMins(sh){
+  if(!sh||!sh.start_time)return null;
+  const parts=sh.start_time.split(':');
+  return parseInt(parts[0])*60+parseInt(parts[1]);
+}
+function getShiftEndMins(sh){
+  if(!sh||!sh.end_time)return null;
+  const parts=sh.end_time.split(':');
+  return parseInt(parts[0])*60+parseInt(parts[1]);
+}
+function getBahrainMinutes(){
+  const b=getBahrainNow();
+  return b.getUTCHours()*60+b.getUTCMinutes();
+}
+function getAttRecordForDate(pid,dateStr){
+  return (D.attendance||[]).find(a=>a.patroller_id===pid&&a.date===dateStr);
+}
+function getPatrollerShiftStatus(pid,dayIdx,dateStr){
+  // Returns: 'off'|'vacation'|'absent'|'early_out_pending'|'clocked_in'|'late'|'scheduled'|'completed'
+  const z=gDZ(pid,dayIdx);
+  if(!z)return{status:'off'};
+  const onVac=D.timeoff.find(t=>t.patroller_id===pid&&t.status==='Approved'&&dateStr>=t.start_date&&dateStr<=t.end_date);
+  if(onVac)return{status:'vacation'};
+  if(isAbsentOnDate(pid,dateStr))return{status:'absent'};
+  const sh=getDayShift(pid,dayIdx);
+  const rec=getAttRecordForDate(pid,dateStr);
+  const isToday=dateStr===todayStr();
+  if(rec&&rec.clock_out)return{status:'completed',rec,sh};
+  if(rec&&rec.clock_in&&!rec.clock_out){
+    // Check early clock out request
+    const earlyReq=(D.tasks||[]).find(t=>t.patroller_id===pid&&t.date===dateStr&&t.task_type==='Early Clock Out'&&t.status==='Pending');
+    if(earlyReq)return{status:'early_out_pending',rec,sh,earlyReq};
+    return{status:'clocked_in',rec,sh};
+  }
+  if(isToday&&sh){
+    const nowMins=getBahrainMinutes();
+    const startMins=getShiftStartMins(sh);
+    if(startMins!==null&&nowMins>startMins)return{status:'late',lateMins:nowMins-startMins,sh,z};
+  }
+  return{status:'scheduled',sh,z};
+}
+function lateTag(lateMins){
+  const h=Math.floor(lateMins/60);const m=lateMins%60;
+  const label=h>0?`${h}h ${m}m late`:`${m}m late`;
+  return`<span style="display:inline-flex;align-items:center;gap:3px;background:#FEE2E2;color:#DC2626;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;animation:pulse 2s infinite">🔴 ${label}</span>`;
+}
+function clockedInTag(rec,sh){
+  const inT=rec.clock_in?new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
+  // Calculate adjusted end time
+  let endTag='';
+  if(sh&&rec.clock_in){
+    const clockInMins=parseInt(new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}).split(':')[0])*60+parseInt(new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}).split(':')[1]);
+    const startMins=getShiftStartMins(sh);
+    if(startMins!==null&&clockInMins>startMins){
+      const late=clockInMins-startMins;
+      const adjEnd=getShiftEndMins(sh)+late;
+      const adjH=Math.floor(adjEnd/60)%24;const adjM=adjEnd%60;
+      const adjStr=`${String(adjH).padStart(2,'0')}:${String(adjM).padStart(2,'0')}`;
+      endTag=`<span style="font-size:8px;color:#D97706">→${adjStr}</span>`;
+    }
+  }
+  return`<span style="display:inline-flex;align-items:center;gap:3px;background:#DCFCE7;color:#166534;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">🟢 ${inT}</span>${endTag}`;
+}
+function completedTag(rec){
+  const inT=rec.clock_in?new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
+  const outT=rec.clock_out?new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
+  const mins=rec.clock_in&&rec.clock_out?Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000):0;
+  const dur=`${Math.floor(mins/60)}h${mins%60}m`;
+  return`<span style="display:inline-flex;align-items:center;gap:3px;background:#EAF1FD;color:#1565C0;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">✓ ${inT}→${outT} ${dur}</span>`;
+}
+
 function getActiveNow(){
   // Get today's day index (0=Sat, 1=Sun, ... 6=Fri)
   const now=new Date();
@@ -727,8 +800,14 @@ function weekTable(ed){
       else if(!z){row+=`<td><span class="off-badge">Off</span></td>`;}
       else{
         const s=z.length>15?z.substring(0,14)+'...':z;
-        const shTag=sh?`<div style="font-size:8px;color:var(--g3);margin-top:1px">${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}-${fmtT(sh.end_time)}</div>`:'<div style="font-size:8px;color:var(--g3);margin-top:1px">--</div>';
-        row+=ed?`<td><span class="zone-chip clickable" onclick="openCell('${p.id}',${i})" title="${z}">${s}</span>${shTag}</td>`:`<td><span class="zone-chip" title="${z}">${s}</span>${shTag}</td>`;
+        const ps=getPatrollerShiftStatus(p.id,i,dayStr);
+        let statusTag='';
+        if(ps.status==='late')statusTag=`<div style="margin-top:2px">${lateTag(ps.lateMins)}</div>`;
+        else if(ps.status==='clocked_in')statusTag=`<div style="margin-top:2px">${clockedInTag(ps.rec,ps.sh)}</div>`;
+        else if(ps.status==='completed')statusTag=`<div style="margin-top:2px">${completedTag(ps.rec)}</div>`;
+        else if(ps.status==='early_out_pending')statusTag=`<div style="margin-top:2px"><span style="font-size:9px;font-weight:700;background:#FEF3C7;color:#D97706;padding:2px 6px;border-radius:4px">⏳ Early out pending</span></div>`;
+        const shTag=sh?`<div style="font-size:8px;color:var(--g3);margin-top:1px">${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}-${fmtT(sh.end_time)}</div>`:'';
+        row+=ed?`<td><span class="zone-chip clickable" onclick="openCell('${p.id}',${i})" title="${z}">${s}</span>${shTag}${statusTag}</td>`:`<td><span class="zone-chip" title="${z}">${s}</span>${shTag}${statusTag}</td>`;
       }
     });
     row+=ed?'<td></td></tr>':'</tr>';return row;
@@ -1758,6 +1837,23 @@ function renderModal(){
       <button class="btn" onclick="closeM()">Close</button>
     </div>`;return;
   }
+  if(m.type==='earlyClockOut'){
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-clock-stop"></i>Early Clock Out Request</div>
+    <div style="text-align:center;padding:20px 10px">
+      <div style="font-size:48px;margin-bottom:10px">⏰</div>
+      <div style="font-size:15px;font-weight:700;color:#411517;margin-bottom:8px">Your shift ends at ${m.adjEndStr}</div>
+      <div style="font-size:13px;color:#A08070;margin-bottom:20px">You still have <strong style="color:#D97706">${m.earlyLabel}</strong> remaining on your shift.</div>
+      <div style="background:#FFF0E6;border:1px solid #FFB380;border-radius:12px;padding:14px;margin-bottom:20px;font-size:12px;color:#D94D00;text-align:left">
+        <i class="ti ti-info-circle" style="margin-right:5px"></i>
+        Early clock out requires <strong>Team Lead or Admin approval</strong>. Your request will be sent for review.
+      </div>
+      <div class="fg"><label>Reason for early clock out</label><textarea id="early-reason" rows="3" placeholder="e.g. Medical appointment, emergency..." style="width:100%;padding:10px;border-radius:8px;border:1.5px solid #E8DDD4;font-family:inherit;font-size:13px;resize:none"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeM()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEarlyClockOut('${m.patId}','${m.attId}','${m.adjEndStr}')"><i class="ti ti-send"></i>Submit Request</button>
+    </div>`;return;
+  }
   if(m.type==='editLeaveBalance'){
     const bal=m.balance||{};
     const cf=bal.annual_carry_forward||0;
@@ -2228,6 +2324,35 @@ async function doClockIn(){
 
 // ── CLOCK OUT ──
 async function doClockOut(){
+  const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
+  if(!pat)return;
+  const rec=getMyAttRecord();
+  if(!rec||!rec.clock_in)return;
+  const todayIdx=todayDayIdx();
+  const sh=getDayShift(pat.id,todayIdx);
+  // Check if clocking out before shift end
+  if(sh&&sh.end_time){
+    const nowMins=getBahrainMinutes();
+    // Calculate adjusted end time (accounting for late clock in)
+    const startMins=getShiftStartMins(sh);
+    const clockInMins=parseInt(new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}).split(':')[0])*60+parseInt(new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}).split(':')[1]);
+    const lateMins=Math.max(0,clockInMins-startMins);
+    const adjEndMins=getShiftEndMins(sh)+lateMins;
+    if(nowMins<adjEndMins-5){ // 5 min grace period
+      const early=adjEndMins-nowMins;
+      const eH=Math.floor(early/60);const eM=early%60;
+      const earlyLabel=eH>0?`${eH}h ${eM}m`:`${eM}m`;
+      const adjEndStr=`${String(Math.floor(adjEndMins/60)%24).padStart(2,'0')}:${String(adjEndMins%60).padStart(2,'0')}`;
+      // Submit early clock out request
+      openM({type:'earlyClockOut',earlyLabel,adjEndStr,patId:pat.id,attId:rec.id});
+      return;
+    }
+  }
+  // Normal clock out
+  await _doNormalClockOut();
+}
+
+async function _doNormalClockOut(){
   const btn=document.getElementById('clock-out-btn');
   if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader" style="animation:spin .7s linear infinite"></i> Getting location...';}
   try{
@@ -3211,6 +3336,40 @@ function myLeaveBalanceView(){
   const p = D.patrollers.find(pt => pt.user_id === D.profile.id);
   if(!p) return `<div style="padding:40px;text-align:center;color:var(--g3)">Your account is not linked to a schedule record.</div>`;
   return `<div style="max-width:480px;margin:0 auto">${leaveBalanceCard(p, true)}</div>`;
+}
+
+// ── EARLY CLOCK OUT ──
+async function submitEarlyClockOut(patId,attId,adjEndStr){
+  const reason=document.getElementById('early-reason').value.trim()||'No reason provided';
+  const pat=D.patrollers.find(p=>p.id===patId);
+  const now=getBahrainNow();
+  const timeStr=`${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')}`;
+  const{error}=await sb.from('task_requests').insert({
+    patroller_id:patId,patroller_name:pat?.name||'',
+    task_type:'Early Clock Out',
+    date:todayStr(),start_time:timeStr,end_time:adjEndStr,
+    status:'Pending',description:`Early clock out request. Reason: ${reason}. Att ID: ${attId}`,
+  });
+  if(error){alert(error.message);return;}
+  closeM();await reload();
+  addNotification('Early clock out request submitted — awaiting approval','info');
+}
+
+async function approveEarlyClockOut(taskId,attId){
+  // Complete the clock out
+  const now=new Date();
+  let map='';
+  try{const pos=await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000}));map=`https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;}catch(e){}
+  await sb.from('attendance').update({clock_out:now.toISOString(),clock_out_map:map||null,status:'Attended'}).eq('id',attId);
+  await sb.from('task_requests').update({status:'Approved',reviewed_by:D.profile.id,updated_at:now.toISOString()}).eq('id',taskId);
+  await reload();
+  addNotification('Early clock out approved','success');
+}
+
+async function rejectEarlyClockOut(taskId){
+  await sb.from('task_requests').update({status:'Rejected',reviewed_by:D.profile.id,updated_at:new Date().toISOString()}).eq('id',taskId);
+  await reload();
+  addNotification('Early clock out rejected — patroller must complete shift','warning');
 }
 
 // ── YEAR END LEAVE CARRY FORWARD ──
