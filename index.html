@@ -17,6 +17,35 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Talabat Ops">
 <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1828/1828640.png">
+<script>
+// ── Nuclear cache clear for stuck PWA ──
+(async function(){
+  try{
+    // Unregister ALL old service workers
+    if('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for(const r of regs){
+        const swUrl = r.active?.scriptURL || '';
+        // If the SW URL does NOT contain our current build, unregister it
+        if(!swUrl.includes('1781089547')){
+          await r.unregister();
+          console.log('[Cache] Unregistered old SW:', swUrl);
+        }
+      }
+    }
+    // Clear all old caches
+    if('caches' in window){
+      const keys = await caches.keys();
+      for(const k of keys){
+        if(k !== 'talabat-v1781089547'){
+          await caches.delete(k);
+          console.log('[Cache] Deleted old cache:', k);
+        }
+      }
+    }
+  }catch(e){console.warn('[Cache] Clear error:',e);}
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
