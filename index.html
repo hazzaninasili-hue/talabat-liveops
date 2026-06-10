@@ -1,11 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+(function(){
+  var w=window.screen.width||window.innerWidth;
+  var ua=navigator.userAgent||'';
+  var isMobileUA=/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile/i.test(ua);
+  if(isMobileUA||w<=1024){
+    document.documentElement.classList.add('is-mobile');
+  }
+  // Re-check after load in case innerWidth differs
+  window.addEventListener('load',function(){
+    var lw=window.innerWidth;
+    if(lw<=1024||isMobileUA){
+      document.documentElement.classList.add('is-mobile');
+    }
+  });
+})();
+</script>
 <meta charset="UTF-8">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781095291">
+<meta name="build" content="1781095821">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -26,7 +43,7 @@
       for(const r of regs){
         const swUrl = r.active?.scriptURL || '';
         // If the SW URL does NOT contain our current build, unregister it
-        if(!swUrl.includes('1781095291')){
+        if(!swUrl.includes('1781095821')){
           await r.unregister();
           console.log('[Cache] Unregistered old SW:', swUrl);
         }
@@ -36,7 +53,7 @@
     if('caches' in window){
       const keys = await caches.keys();
       for(const k of keys){
-        if(k !== 'talabat-v1781095291'){
+        if(k !== 'talabat-v1781095821'){
           await caches.delete(k);
           console.log('[Cache] Deleted old cache:', k);
         }
@@ -1863,7 +1880,7 @@ function buildRoleLiveTable(isToday){
   </div>`;
 }
 
-function isMobile(){return window.innerWidth<=1024;}
+function isMobile(){return document.documentElement.classList.contains('is-mobile');}
 
 function renderMobileHeader(){
   const u=D.profile;
@@ -3304,54 +3321,63 @@ function tasksView(){
   }).join('');
 
   return`<style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-@media(max-width:1024px){
-  /* ── FONT RENDERING ── */
+
   body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-  /* ── HIDE DESKTOP TOPBAR & TABS — replaced by mobile header ── */
+
   .topbar{display:none!important}
-  .tabs{display:none!important}
-  /* ── MOBILE HEADER (injected by renderMobileHeader) ── */
+html.is-mobile .topbar{display:none!important}
+html.is-mobile .tabs{display:none!important}
+html.is-mobile #mobile-header{display:block!important}
+html.is-mobile .page{padding:0 0 80px 0!important;background:#f8f8f8!important}
+html.is-mobile .toolbar{flex-wrap:wrap!important;gap:6px!important;padding:10px 12px 6px!important;background:#fff;border-bottom:1px solid #f0f0f0}
+html.is-mobile .card-grid{grid-template-columns:1fr!important}
+html.is-mobile .stats{grid-template-columns:repeat(2,1fr)!important;gap:8px!important;padding:10px 12px!important;background:#fff;margin-bottom:0!important}
+html.is-mobile .tcard{border-radius:12px!important;margin:8px 12px!important;border:1px solid #f0e8e0!important}
+html.is-mobile .modal-ov{align-items:flex-end!important;padding:0!important}
+html.is-mobile #mobile-bottom-nav{display:flex!important}
+html.is-mobile body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+html.is-mobile .tabs{display:none!important}
+
   #mobile-header{display:block!important}
-  /* ── LAYOUT ── */
+
   .page{padding:0 0 80px 0!important;background:#f8f8f8!important}
-  /* ── TOOLBAR ── */
+
   .toolbar{flex-wrap:wrap!important;gap:6px!important;padding:10px 12px 6px!important;background:#fff;border-bottom:1px solid #f0f0f0}
-  .search-wrap{width:100%!important;order:10}
-  .search-input{width:100%!important;font-size:14px!important}
-  .btn{padding:9px 12px!important;font-size:12px!important;border-radius:10px!important;font-weight:600!important}
-  .btn-primary{padding:10px 14px!important}
-  .seg{gap:3px!important}
-  .seg-btn{padding:7px 12px!important;font-size:12px!important;font-weight:600!important}
-  .nav-btn{width:34px!important;height:34px!important}
-  .wk-range{font-size:11px!important;max-width:180px;font-weight:600}
-  /* ── CARDS/GRIDS ── */
+html.is-mobile .search-wrap{width:100%!important;order:10}
+html.is-mobile .search-input{width:100%!important;font-size:14px!important}
+html.is-mobile .btn{padding:9px 12px!important;font-size:12px!important;border-radius:10px!important;font-weight:600!important}
+html.is-mobile .btn-primary{padding:10px 14px!important}
+html.is-mobile .seg{gap:3px!important}
+html.is-mobile .seg-btn{padding:7px 12px!important;font-size:12px!important;font-weight:600!important}
+html.is-mobile .nav-btn{width:34px!important;height:34px!important}
+html.is-mobile .wk-range{font-size:11px!important;max-width:180px;font-weight:600}
+
   .card-grid{grid-template-columns:1fr!important}
-  .fg-row{grid-template-columns:1fr!important}
-  .date-grid{grid-template-columns:1fr 1fr!important}
-  /* ── STATS ── */
+html.is-mobile .fg-row{grid-template-columns:1fr!important}
+html.is-mobile .date-grid{grid-template-columns:1fr 1fr!important}
+
   .stats{grid-template-columns:repeat(2,1fr)!important;gap:8px!important;padding:10px 12px!important;background:#fff;margin-bottom:0!important}
-  .stat{border-radius:12px!important;padding:12px!important}
-  .stat-value{font-size:22px!important}
-  /* ── TABLES ── */
+html.is-mobile .stat{border-radius:12px!important;padding:12px!important}
+html.is-mobile .stat-value{font-size:22px!important}
+
   .tcard{border-radius:12px!important;margin:8px 12px!important;border:1px solid #f0e8e0!important}
-  .t-scroll{-webkit-overflow-scrolling:touch}
-  table{font-size:12px!important}
-  table th,table td{padding:8px 6px!important}
-  /* ── MODAL ── */
+html.is-mobile .t-scroll{-webkit-overflow-scrolling:touch}
+html.is-mobile table{font-size:12px!important}
+html.is-mobile table th,html.is-mobile table td{padding:8px 6px!important}
+
   .modal-ov{align-items:flex-end!important;padding:0!important}
-  .modal-box{padding:20px 16px 32px!important;border-radius:24px 24px 0 0!important;margin:0!important;max-height:90vh!important;width:100%!important;max-width:100%!important;overflow-y:auto}
-  /* ── AUTH ── */
+html.is-mobile .modal-box{padding:20px 16px 32px!important;border-radius:24px 24px 0 0!important;margin:0!important;max-height:90vh!important;width:100%!important;max-width:100%!important;overflow-y:auto}
+
   .auth-wrap{padding:12px!important;align-items:flex-start!important;padding-top:24px!important}
-  .auth-box{padding:24px 16px!important;width:100%!important;border-radius:16px!important}
-  .auth-box h2{font-size:20px!important}
-  .auth-btn{padding:14px!important;font-size:16px!important;border-radius:12px!important}
-  .fg label{font-size:12px!important;font-weight:600!important}
-  .fg input,.fg select,.fg textarea{font-size:16px!important;padding:12px!important;border-radius:10px!important}
-  /* ── NOTES ── */
+html.is-mobile .auth-box{padding:24px 16px!important;width:100%!important;border-radius:16px!important}
+html.is-mobile .auth-box h2{font-size:20px!important}
+html.is-mobile .auth-btn{padding:14px!important;font-size:16px!important;border-radius:12px!important}
+html.is-mobile .fg label{font-size:12px!important;font-weight:600!important}
+html.is-mobile .fg input,html.is-mobile .fg select,html.is-mobile .fg textarea{font-size:16px!important;padding:12px!important;border-radius:10px!important}
+
   .info-box{font-size:12px!important}
-  /* ── MOBILE BOTTOM NAV ── */
+
   #mobile-bottom-nav{display:flex!important}
-}
 </style><div class="stats">
     <div class="stat green"><div class="stat-label">Running</div><div class="stat-value">${running}</div></div>
     <div class="stat blue"><div class="stat-label">Completed</div><div class="stat-value">${completed}</div></div>
@@ -4027,7 +4053,7 @@ window.addEventListener('error', (e) => {
 });
 
 // ── PWA Service Worker Registration ──
-const APP_BUILD='1781095291';
+const APP_BUILD='1781095821';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('build-ts');if(el)el.textContent='v2.2.'+APP_BUILD.slice(-4);});
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
