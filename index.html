@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781099812">
+<meta name="build" content="1781103806">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -476,8 +476,15 @@ async function afterLogin(user){
     }
     D.profile=prof||{id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};
   }catch(e){D.profile={id:user.id,email:user.email,full_name:user.email.split('@')[0],role:'patroller',is_active:true};}
-  // Set default tab based on role
+  // Redirect patrollers to app.html
   const patRoles=['patroller','coordinator'];
+  if(patRoles.includes(D.profile.role)){
+    // Check custom role - if viewer level, redirect to app.html
+    const crId=D.profile.custom_role_id;
+    let isEditor=false;
+    if(crId&&D.customRoles.length){const cr=D.customRoles.find(r=>r.id===crId);if(cr&&(cr.access_level==='editor'||cr.access_level==='admin'))isEditor=true;}
+    if(!isEditor){window.location.href='app.html';return;}
+  }
   D.tab=patRoles.includes(D.profile.role)?'myschedule':'schedule';
   // Also check custom role access level
   if(D.profile.custom_role_id&&D.customRoles.length){
@@ -4144,7 +4151,7 @@ window.addEventListener('error', (e) => {
 });
 
 // ── PWA Service Worker Registration ──
-const APP_BUILD='1781099812';
+const APP_BUILD='1781103806';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('build-ts');if(el)el.textContent='v2.2.'+APP_BUILD.slice(-4);});
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
