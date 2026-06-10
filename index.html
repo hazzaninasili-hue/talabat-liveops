@@ -27,7 +27,7 @@
       for(const r of regs){
         const swUrl = r.active?.scriptURL || '';
         // If the SW URL does NOT contain our current build, unregister it
-        if(!swUrl.includes('1781089547')){
+        if(!swUrl.includes('1781090849')){
           await r.unregister();
           console.log('[Cache] Unregistered old SW:', swUrl);
         }
@@ -37,7 +37,7 @@
     if('caches' in window){
       const keys = await caches.keys();
       for(const k of keys){
-        if(k !== 'talabat-v1781089547'){
+        if(k !== 'talabat-v1781090849'){
           await caches.delete(k);
           console.log('[Cache] Deleted old cache:', k);
         }
