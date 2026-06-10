@@ -42,7 +42,7 @@ body{font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sa
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
 /* ── AUTH ── */
-.auth-wrap{min-height:100vh;background:#411517;display:flex;align-items:center;justify-content:center;padding:20px}
+.auth-wrap{min-height:100vh;width:100%;background:#411517;display:flex;align-items:center;justify-content:center;padding:20px;position:fixed;top:0;left:0;right:0;bottom:0;z-index:999}
 .auth-box{background:#fff;border-radius:20px;padding:28px 24px;width:100%;max-width:380px}
 .auth-logo{width:48px;height:48px;background:#FF5900;border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:16px}
 .auth-logo i{font-size:24px;color:#fff}
@@ -146,7 +146,7 @@ body{font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sa
 <body>
 
 <!-- AUTH -->
-<div id="s-login" style="display:flex">
+<div id="s-login" style="display:flex;position:fixed;inset:0;z-index:999">
   <div class="auth-wrap">
     <div class="auth-box">
       <div class="auth-logo"><i class="ti ti-shield-check"></i></div>
