@@ -630,12 +630,12 @@ function getPatrollerShiftStatus(pid,dayIdx,dateStr){
   const sh=getDayShift(pid,dayIdx);
   const rec=getAttRecordForDate(pid,dateStr);
   const isToday=dateStr===todayStr();
-  if(rec&&rec.clock_out)return{status:'completed',rec,sh};
+  if(rec&&rec.clock_out)return{status:'completed',rec,sh,lateMins:rec.late_mins||0,adjEndTime:rec.adj_end_time||null};
   if(rec&&rec.clock_in&&!rec.clock_out){
     // Check early clock out request
     const earlyReq=(D.tasks||[]).find(t=>t.patroller_id===pid&&t.date===dateStr&&t.task_type==='Early Clock Out'&&t.status==='Pending');
     if(earlyReq)return{status:'early_out_pending',rec,sh,earlyReq};
-    return{status:'clocked_in',rec,sh};
+    return{status:'clocked_in',rec,sh,lateMins:rec.late_mins||0,adjEndTime:rec.adj_end_time||null};
   }
   if(isToday&&sh){
     const nowMins=getBahrainMinutes();
@@ -651,20 +651,14 @@ function lateTag(lateMins){
 }
 function clockedInTag(rec,sh){
   const inT=rec.clock_in?new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
-  // Calculate adjusted end time
-  let endTag='';
-  if(sh&&rec.clock_in){
-    const clockInMins=parseInt(new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}).split(':')[0])*60+parseInt(new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}).split(':')[1]);
-    const startMins=getShiftStartMins(sh);
-    if(startMins!==null&&clockInMins>startMins){
-      const late=clockInMins-startMins;
-      const adjEnd=getShiftEndMins(sh)+late;
-      const adjH=Math.floor(adjEnd/60)%24;const adjM=adjEnd%60;
-      const adjStr=`${String(adjH).padStart(2,'0')}:${String(adjM).padStart(2,'0')}`;
-      endTag=`<span style="font-size:8px;color:#D97706">→${adjStr}</span>`;
-    }
+  // Use stored adj_end_time from DB, fallback to calculation
+  let adjEndStr=rec.adj_end_time||null;
+  if(!adjEndStr&&sh&&rec.late_mins>0){
+    const adjEnd=getShiftEndMins(sh)+(rec.late_mins||0);
+    adjEndStr=`${String(Math.floor(adjEnd/60)%24).padStart(2,'0')}:${String(adjEnd%60).padStart(2,'0')}`;
   }
-  return`<span style="display:inline-flex;align-items:center;gap:3px;background:#DCFCE7;color:#166534;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">🟢 ${inT}</span>${endTag}`;
+  const endTag=adjEndStr&&rec.late_mins>0?`<span style="font-size:8px;color:#D97706;font-weight:700"> →${adjEndStr}</span>`:'';
+  return`<span style="display:inline-flex;align-items:center;gap:3px;background:#DCFCE7;color:#166534;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">🟢 ${inT}${endTag}</span>`;
 }
 function completedTag(rec){
   const inT=rec.clock_in?new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
@@ -1458,10 +1452,29 @@ function mySchedView(){
       </div>`;
     } else if(rec.clock_in&&!rec.clock_out){
       const inTime=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+      const adjEnd=rec.adj_end_time||null;
+      const lateMinsRec=rec.late_mins||0;
+      const lateH=Math.floor(lateMinsRec/60);const lateM=lateMinsRec%60;
+      const lateLabel=lateH>0?`${lateH}h ${lateM}m`:`${lateM}m`;
+      const lateBadge=lateMinsRec>0?`<div style="background:rgba(220,38,38,.2);border:1px solid rgba(220,38,38,.4);border-radius:10px;padding:8px 14px;margin-bottom:12px;font-size:12px;color:#FCA5A5">
+        ⚠️ You were <strong>${lateLabel} late</strong> · Shift adjusted to <strong>${adjEnd}</strong>
+      </div>`:'';
       clockWidget=`<div style="background:linear-gradient(135deg,#14532D,#166534);border-radius:16px;padding:24px;text-align:center;color:#F0FDF4;margin-bottom:14px">
         <div style="font-size:13px;opacity:.7;margin-bottom:4px">CLOCKED IN · ${zone}</div>
         <div style="font-size:22px;font-weight:700;margin-bottom:4px">${inTime}</div>
-        <div style="margin-bottom:14px"><a href="${rec.clock_in_map}" target="_blank" style="color:#86efac;font-size:11px"><i class="ti ti-map-pin"></i> View location</a></div>
+        ${lateBadge}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          <div style="background:rgba(255,255,255,.1);border-radius:10px;padding:8px">
+            <div style="font-size:9px;opacity:.7;text-transform:uppercase;margin-bottom:2px">Shift end</div>
+            <div style="font-size:${adjEnd&&lateMinsRec>0?'13px':'16px'};font-weight:700;${adjEnd&&lateMinsRec>0?'text-decoration:line-through;opacity:.5':''}">${fmtT(shNow?.end_time)}</div>
+            ${adjEnd&&lateMinsRec>0?`<div style="font-size:16px;font-weight:700;color:#4ADE80">${adjEnd}</div>`:''}
+          </div>
+          <div style="background:rgba(255,255,255,.1);border-radius:10px;padding:8px">
+            <div style="font-size:9px;opacity:.7;text-transform:uppercase;margin-bottom:2px">Zone</div>
+            <div style="font-size:14px;font-weight:700">${zone}</div>
+          </div>
+        </div>
+        <div style="margin-bottom:14px"><a href="${rec.clock_in_map}" target="_blank" style="color:#86efac;font-size:11px"><i class="ti ti-map-pin"></i> View clock-in location</a></div>
         <button id="clock-out-btn" onclick="doClockOut()" style="background:#FF5900;color:#fff;border:none;padding:14px 40px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px">
           <i class="ti ti-clock-stop" style="font-size:18px"></i> Clock Out
         </button>
@@ -1850,6 +1863,42 @@ function renderModal(){
     <div class="modal-footer">
       ${canEdit()&&t.status==='Pending'?`<button class="btn" style="background:#DCFCE7;color:#166534;border-color:#86efac" onclick="reviewTask('${t.id}','Approved');closeM()"><i class="ti ti-check"></i>Approve</button><button class="btn" style="background:#FEE2E2;color:#DC2626;border-color:#fca5a5" onclick="reviewTask('${t.id}','Rejected');closeM()"><i class="ti ti-x"></i>Reject</button>`:''}
       <button class="btn" onclick="closeM()">Close</button>
+    </div>`;return;
+  }
+  if(m.type==='lateAlert'){
+    const lH=Math.floor(m.lateMins/60);const lM=m.lateMins%60;
+    box.innerHTML=`<div style="text-align:center;padding:10px">
+      <div style="font-size:56px;margin-bottom:10px">⏰</div>
+      <div style="font-size:18px;font-weight:700;color:#DC2626;margin-bottom:8px">You're Late for Duty</div>
+      <div style="font-size:13px;color:#A08070;margin-bottom:20px">You clocked in <strong style="color:#DC2626">${m.lLabel}</strong> after your shift start time.</div>
+      <div style="background:#FFF0E6;border:1.5px solid #FFB380;border-radius:14px;padding:16px;margin-bottom:20px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:center">
+          <div>
+            <div style="font-size:10px;color:#A08070;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Shift Started</div>
+            <div style="font-size:22px;font-weight:700;color:#411517">${m.startTime}</div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:#A08070;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">You Clocked In</div>
+            <div style="font-size:22px;font-weight:700;color:#DC2626">${m.clockInTime}</div>
+          </div>
+        </div>
+      </div>
+      <div style="background:#DCFCE7;border:1.5px solid #86EFAC;border-radius:14px;padding:16px;margin-bottom:20px">
+        <div style="font-size:11px;color:#166534;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Your shift has been adjusted</div>
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;text-align:center">
+          <div>
+            <div style="font-size:10px;color:#A08070;margin-bottom:2px">Original end</div>
+            <div style="font-size:18px;font-weight:700;color:#A08070;text-decoration:line-through">${m.origEnd}</div>
+          </div>
+          <div style="font-size:20px">→</div>
+          <div>
+            <div style="font-size:10px;color:#166534;margin-bottom:2px">New end time</div>
+            <div style="font-size:24px;font-weight:700;color:#166534">${m.adjEnd}</div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#A08070;margin-bottom:16px">Your ${lH>0?lH+'h ':''}${lM}m late arrival has been added to your shift end time.</div>
+      <button class="btn btn-primary" style="width:100%;padding:12px" onclick="closeM()">Got it</button>
     </div>`;return;
   }
   if(m.type==='earlyClockOut'){
@@ -2320,16 +2369,43 @@ async function doClockIn(){
     const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
     if(!pat)throw new Error('No schedule record found');
     const today=todayStr();
+    const todayIdx=todayDayIdx();
+    const sh=getDayShift(pat.id,todayIdx);
     const mapUrl=mapsLink(loc.lat,loc.lng);
-    const now=new Date().toISOString();
+    const now=new Date();
+    const nowIso=now.toISOString();
+
+    // Calculate late minutes and adjusted end time
+    const bhrNow=getBahrainNow();
+    const clockInMins=bhrNow.getUTCHours()*60+bhrNow.getUTCMinutes();
+    const startMins=sh?getShiftStartMins(sh):null;
+    const lateMins=startMins!==null?Math.max(0,clockInMins-startMins):0;
+    const adjEndMins=sh?getShiftEndMins(sh)+lateMins:null;
+    const adjEndTime=adjEndMins!==null?`${String(Math.floor(adjEndMins/60)%24).padStart(2,'0')}:${String(adjEndMins%60).padStart(2,'0')}`:null;
+    const clockInTimeStr=`${String(bhrNow.getUTCHours()).padStart(2,'0')}:${String(bhrNow.getUTCMinutes()).padStart(2,'0')}`;
+
     const{data,error}=await sb.from('attendance').upsert({
       patroller_id:pat.id,patroller_name:pat.name,date:today,
-      clock_in:now,clock_in_lat:loc.lat,clock_in_lng:loc.lng,clock_in_map:mapUrl,
-      status:'Attended',updated_at:now
+      clock_in:nowIso,clock_in_lat:loc.lat,clock_in_lng:loc.lng,clock_in_map:mapUrl,
+      late_mins:lateMins,adj_end_time:adjEndTime,
+      status:'Attended',updated_at:nowIso
     },{onConflict:'patroller_id,date'}).select().single();
     if(error)throw error;
-    // Webhook to Make.com (backlog to Google Sheet)
-    sendWebhook('clock_in',{patroller_name:pat.name,patroller_id:pat.id,date:today,clock_in_time:new Date(now).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}),clock_in_location:mapUrl,accuracy_meters:Math.round(loc.accuracy),app_url:REDIRECT});
+
+    // Notify patroller if late
+    if(lateMins>0&&sh){
+      const lH=Math.floor(lateMins/60);const lM=lateMins%60;
+      const lLabel=lH>0?`${lH}h ${lM}m`:`${lM}m`;
+      addNotification(`⚠️ You clocked in ${lLabel} late. Shift adjusted: ${sh.start_time} → ${adjEndTime}`,'warning');
+      // Show prominent modal alert
+      setTimeout(()=>{
+        openM({type:'lateAlert',lateMins,lLabel,origEnd:fmtT(sh.end_time),adjEnd:adjEndTime,startTime:fmtT(sh.start_time),clockInTime:clockInTimeStr});
+      },500);
+    } else {
+      addNotification('Clocked in successfully! Have a great shift 🟢','success');
+    }
+
+    sendWebhook('clock_in',{patroller_name:pat.name,patroller_id:pat.id,date:today,clock_in_time:clockInTimeStr,late_mins:lateMins,adj_end_time:adjEndTime||'',clock_in_location:mapUrl,accuracy_meters:Math.round(loc.accuracy),app_url:REDIRECT});
     await reload();
   }catch(e){
     if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-clock-play"></i> Clock In';}
@@ -2655,11 +2731,15 @@ function hourlyView(){
     const sh=getDayShift(p.id,selIdx);
     if(!sh||sh.start_time==='?')return null;
     const[sh_h,sh_m]=sh.start_time.split(':').map(Number);
-    const[eh,em]=sh.end_time.split(':').map(Number);
+    // Check for adj_end_time from attendance record
+    const rec=getAttRecordForDate(p.id,selDay);
+    let endStr=sh.end_time;
+    if(rec&&rec.adj_end_time&&rec.late_mins>0)endStr=rec.adj_end_time;
+    const[eh,em]=endStr.split(':').map(Number);
     const startH=sh_h+sh_m/60;
     let endH=eh+em/60;
     if(endH<=startH)endH+=24;
-    return{start:startH,end:endH,type:sh.shift_type,name:sh.name};
+    return{start:startH,end:endH,type:sh.shift_type,name:sh.name,adjEnd:rec?.adj_end_time||null,lateMins:rec?.late_mins||0};
   }
 
   function getTasksForDay(pid){
@@ -2707,13 +2787,16 @@ function hourlyView(){
         } else if(ps.status==='clocked_in'){
           bg='#DCFCE7';col='#166534';border='2px solid #16A34A';
           const inT=new Date(ps.rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
-          // Calculate adjusted end time if late
-          const clockInMins=parseInt(inT.split(':')[0])*60+parseInt(inT.split(':')[1]);
-          const startMins=getShiftStartMins(ps.sh);
-          const lateMins=startMins!==null?Math.max(0,clockInMins-startMins):0;
-          const adjEndMins=getShiftEndMins(ps.sh)+(lateMins||0);
-          const adjEnd=`${String(Math.floor(adjEndMins/60)%24).padStart(2,'0')}:${String(adjEndMins%60).padStart(2,'0')}`;
-          statusOverlay=`<span style="background:#166534;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px">🟢 ${inT}→${adjEnd}</span>`;
+          // Use stored adj_end_time, extend bar width if late
+          const adjEnd=ps.rec.adj_end_time||(ps.rec.late_mins>0?`${String(Math.floor((getShiftEndMins(ps.sh)+ps.rec.late_mins)/60)%24).padStart(2,'0')}:${String((getShiftEndMins(ps.sh)+ps.rec.late_mins)%60).padStart(2,'0')}`:null);
+          if(adjEnd&&ps.rec.late_mins>0){
+            // Extend bar width to new end time
+            const[aH,aM]=adjEnd.split(':').map(Number);
+            const newEnd=aH+aM/60;
+            const newWidth=(Math.min(newEnd,24)-Math.max(0,sh.start))*hourW;
+            bars=bars; // will be recalculated below with newEnd
+          }
+          statusOverlay=`<span style="background:#166534;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px">🟢 ${inT}${adjEnd&&ps.rec.late_mins>0?`→${adjEnd}`:''}</span>`;
         } else if(ps.status==='completed'){
           bg='#EAF1FD';col='#1565C0';border='1.5px solid #1565C0';
           const inT=new Date(ps.rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
