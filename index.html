@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781103806">
+<meta name="build" content="1781104173">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -69,37 +69,7 @@ body{font-family:'Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,san
   --sh:0 1px 3px rgba(65,21,23,.08);--sh2:0 4px 16px rgba(65,21,23,.12);--sh3:0 20px 60px rgba(65,21,23,.18);
 }
 .auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#411517;padding:20px}
-/* ── MOBILE HEADER & BOTTOM NAV ── */
-#mobile-header{display:none;position:sticky;top:0;z-index:200;background:#411517}
-#mobile-header .mh-top{padding:10px 14px 0;display:flex;align-items:center;justify-content:space-between}
-#mobile-header .mh-brand{display:flex;align-items:center;gap:8px}
-#mobile-header .mh-logo{width:30px;height:30px;background:#FF5900;border-radius:9px;display:flex;align-items:center;justify-content:center}
-#mobile-header .mh-logo i{font-size:15px;color:#fff}
-#mobile-header .mh-title{font-size:14px;font-weight:800;color:#fff;letter-spacing:-.3px}
-#mobile-header .mh-sub{font-size:10px;color:rgba(255,255,255,.45);margin-top:0px}
-#mobile-header .mh-avatar{width:32px;height:32px;background:#FF5900;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;cursor:pointer;flex-shrink:0}
-#mobile-header .mh-stats{display:flex;gap:5px;padding:10px 14px 12px}
-#mobile-header .mh-stat{background:rgba(255,255,255,.12);border-radius:9px;padding:6px 8px;flex:1;text-align:center}
-#mobile-header .mh-stat-val{font-size:16px;font-weight:800;line-height:1.1}
-#mobile-header .mh-stat-lbl{font-size:9px;color:rgba(255,255,255,.5);margin-top:2px;font-weight:600;letter-spacing:.03em}
-#mobile-header .mh-tabs{background:#fff;display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;border-bottom:1px solid #f0f0f0}
-#mobile-header .mh-tabs::-webkit-scrollbar{display:none}
-#mobile-header .mh-tab{padding:10px 14px;font-size:12px;font-weight:600;color:#aaa;white-space:nowrap;border:none;background:transparent;cursor:pointer;border-bottom:2.5px solid transparent;flex-shrink:0;font-family:inherit}
-#mobile-header .mh-tab.active{color:#411517;border-bottom-color:#FF5900}
-#mobile-bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:#fff;border-top:1px solid #eee;padding:6px 0 max(6px, env(safe-area-inset-bottom));justify-content:space-around}
-#mobile-bottom-nav .bn-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 10px;border:none;background:transparent;cursor:pointer;font-family:inherit;min-width:44px}
-#mobile-bottom-nav .bn-item i{font-size:20px;color:#bbb}
-#mobile-bottom-nav .bn-item span{font-size:9px;font-weight:600;color:#bbb}
-#mobile-bottom-nav .bn-item.active i{color:#411517}
-#mobile-bottom-nav .bn-item.active span{color:#411517}
-.mobile-list-row{padding:12px 14px;border-bottom:1px solid #f5f5f5;display:flex;align-items:center;gap:10px;background:#fff}
-.mobile-list-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
-.mobile-status-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap}
-.mobile-today-highlight{background:#FFF7ED;padding:10px 14px;border-bottom:1px solid #FFD7B5;display:flex;align-items:center;gap:8px}
-.mobile-section-header{padding:10px 14px 5px;font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;background:#f8f8f8}
-.mobile-progress-bar{background:#f0f0f0;border-radius:4px;height:6px;overflow:hidden;margin:4px 0 2px}
-.mobile-progress-fill{height:6px;border-radius:4px}
-.mobile-action-btn{width:100%;background:#411517;border-radius:12px;padding:14px;font-size:14px;font-weight:700;color:#fff;text-align:center;border:none;cursor:pointer;font-family:inherit;margin-top:4px}
+
 .auth-box{background:var(--sur);border-radius:var(--r20);padding:36px;width:400px;max-width:100%;box-shadow:var(--sh3)}
 .auth-brand{display:flex;align-items:center;gap:10px;margin-bottom:28px}
 .auth-brand-ico{width:44px;height:44px;background:#F4EDE3;border-radius:12px;display:flex;align-items:center;justify-content:center}
@@ -258,31 +228,7 @@ table tr:hover td{background:rgba(26,111,232,.02)}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ─── MOBILE: only at ≤768px ─── */
-@media screen and (max-width:768px){
-  .topbar{display:none!important}
-  #tabs{display:none!important}
-  #mob-hdr{display:block!important}
-  #mob-nav{display:flex!important}
-  .page{padding:0 0 72px 0!important;background:#f8f8f8!important}
-  .toolbar{flex-wrap:wrap!important;gap:6px!important;padding:10px 12px 6px!important;background:#fff;border-bottom:1px solid #f0f0f0!important}
-  .search-wrap{width:100%!important;order:10!important}
-  .search-input{width:100%!important;font-size:14px!important}
-  .btn{font-size:12px!important;border-radius:10px!important}
-  .seg-btn{padding:7px 12px!important;font-size:12px!important}
-  .nav-btn{width:34px!important;height:34px!important}
-  .card-grid,.fg-row{grid-template-columns:1fr!important}
-  .stats{grid-template-columns:repeat(2,1fr)!important;gap:8px!important;margin-bottom:0!important}
-  .tcard{border-radius:12px!important;margin:8px 12px!important}
-  table{font-size:12px!important}
-  table th,table td{padding:7px 5px!important}
-  .modal-ov{align-items:flex-end!important;padding:0!important}
-  .modal-box{border-radius:22px 22px 0 0!important;margin:0!important;max-height:90vh!important;width:100%!important;max-width:100%!important;overflow-y:auto!important}
-  .fg input,.fg select,.fg textarea{font-size:16px!important}
-  .auth-wrap{padding:16px!important}
-  .auth-box{width:100%!important;border-radius:16px!important}
-}
-#mob-hdr{display:none}
-#mob-nav{display:none}
+
 </style>
 </head>
 <body>
@@ -315,10 +261,6 @@ table tr:hover td{background:rgba(26,111,232,.02)}
 </div>
 
 <div id="app" style="display:none">
-<div id="mob-hdr" style="position:sticky;top:0;z-index:200;background:#411517">
-  <div style="padding:10px 14px 0;display:flex;align-items:center;justify-content:space-between">
-    <div style="display:flex;align-items:center;gap:8px">
-      <div style="width:30px;height:30px;background:#FF5900;border-radius:9px;display:flex;align-items:center;justify-content:center"><i class="ti ti-shield-check" style="font-size:15px;color:#fff"></i></div>
       <div><div style="font-size:14px;font-weight:800;color:#fff;letter-spacing:-.3px">Talabat Ops</div><div id="mob-week" style="font-size:10px;color:rgba(255,255,255,.45)">Week 24 · 2026</div></div>
     </div>
     <div style="display:flex;align-items:center;gap:6px">
@@ -329,7 +271,6 @@ table tr:hover td{background:rgba(26,111,232,.02)}
   <div id="mob-stats" style="display:flex;gap:5px;padding:10px 14px 12px"></div>
   <div id="mob-tabs" style="background:#fff;display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;border-bottom:1px solid #eee"></div>
 </div>
-<div id="mob-nav" style="position:fixed;bottom:0;left:0;right:0;z-index:200;background:#fff;border-top:1px solid #eee;padding:5px 0 max(5px,env(safe-area-inset-bottom));justify-content:space-around"></div>
 <!-- ── MOBILE HEADER ── -->
 <div id="mobile-header">
   <div class="mh-top">
@@ -1916,183 +1857,6 @@ function buildRoleLiveTable(isToday){
   </div>`;
 }
 
-function isMobile(){return window.innerWidth<=768;}
-
-function renderMobileHeader(){
-  const u=D.profile;
-  const pts=activePats();
-  const todayIdx=todayDayIdx();
-  const onShift=pts.filter(p=>gDZ(p.id,todayIdx)&&!isOnVacationToday(p.id)&&!isAbsentToday(p.id)).length;
-  const absent=pts.filter(p=>isAbsentToday(p.id)).length;
-  const onVac=pts.filter(p=>isOnVacationToday(p.id)).length;
-  const onTask=(D.tasks||[]).filter(t=>t.date===todayStr()&&(t.status==='Running'||t.status==='Approved')).length;
-
-  // Avatar initials
-  const av=document.getElementById('mh-avatar');
-  if(av){av.textContent=ini(u.full_name);}
-
-  // Week label
-  const dates=wDates();const wn=wNum(dates[0]);
-  const wl=document.getElementById('mh-week-label');
-  if(wl)wl.textContent='Week '+wn+' · '+dates[0].getFullYear();
-
-  // Stats — show for admin/lead; for patroller show personal stats
-  const isAdmin=canEdit();
-  const statsEl=document.getElementById('mh-stats');
-  if(statsEl){
-    if(isAdmin){
-      const s1=document.getElementById('mhs-on');const s2=document.getElementById('mhs-abs');
-      const s3=document.getElementById('mhs-vac');const s4=document.getElementById('mhs-task');
-      if(s1)s1.textContent=onShift;if(s2)s2.textContent=absent;
-      if(s3)s3.textContent=onVac;if(s4)s4.textContent=onTask;
-      statsEl.style.display='flex';
-    } else {
-      // Patroller: show their personal today info
-      const pat=D.patrollers.find(p=>p.user_id===u.id);
-      const todayZone=pat?gDZ(pat.id,todayIdx):'';
-      const sh=pat?getDayShift(pat.id,todayIdx):null;
-      statsEl.innerHTML=pat?
-        '<div class="mh-stat" style="flex:2"><div class="mh-stat-val" style="color:#fff;font-size:13px">'+(todayZone||'Off today')+'</div><div class="mh-stat-lbl">TODAY&#39;S ZONE</div></div>'+
-        '<div class="mh-stat" style="flex:2"><div class="mh-stat-val" style="color:#fff;font-size:13px">'+(sh?fmtT(sh.start_time)+' – '+fmtT(sh.end_time):'—')+'</div><div class="mh-stat-lbl">SHIFT HOURS</div></div>':
-        '<div class="mh-stat" style="flex:1"><div class="mh-stat-val" style="color:#fff;font-size:12px">Welcome</div><div class="mh-stat-lbl">'+u.full_name+'</div></div>';
-    }
-  }
-
-  // Tabs — mirror renderTabs() but for mobile header
-  const tabsEl=document.getElementById('mh-tabs');
-  if(!tabsEl)return;
-  const role=u.role;
-  const crId=u.custom_role_id||(u.custom_roles?.id);
-  const cr=crId?(D.customRoles||[]).find(r=>r.id===crId)||u.custom_roles||null:null;
-  let tabs=[];
-  if(cr&&cr.visible_tabs){
-    let visTabs=[];try{visTabs=JSON.parse(cr.visible_tabs);}catch(e){}
-    const al=cr.access_level||'viewer';
-    const canEditData=al==='editor'||al==='admin';
-    const isFullAdmin=al==='admin';
-    if(canEditData){
-      tabs=[
-        {id:'schedule',label:'Schedule'},
-        {id:'summary',label:'Summary'},
-        {id:'myattendance',label:'My Attend.'},
-        {id:'attendance',label:'Team Attend.'},
-        {id:'timeofftask',label:'Tasks'},
-        {id:'zonenshift',label:'Shifts'},
-        {id:'leavebalance',label:'Leave'},
-        {id:'documents',label:'Docs'},
-      ];
-      if(isFullAdmin)tabs.push({id:'access',label:'Access'});
-    } else {
-      tabs=[{id:'myschedule',label:'My Schedule'}];
-      if(visTabs.includes('Schedule'))tabs.push({id:'schedule',label:'Schedule'});
-      if(visTabs.includes('Summary'))tabs.push({id:'summary',label:'Summary'});
-      if(visTabs.includes('Attendance'))tabs.push({id:'myattendance',label:'Attendance'});
-      if(visTabs.includes('Time off & Tasks'))tabs.push({id:'timeofftask',label:'Tasks'});
-      if(visTabs.includes('Leave Balance'))tabs.push({id:'myleavebalance',label:'Leave'});
-      if(visTabs.includes('Documents'))tabs.push({id:'documents',label:'Docs'});
-    }
-  } else if(role==='patroller'||role==='coordinator'){
-    tabs=[{id:'myschedule',label:'My Schedule'},{id:'myattendance',label:'Attendance'},{id:'timeofftask',label:'Tasks'},{id:'myleavebalance',label:'Leave'},{id:'documents',label:'Docs'}];
-  } else {
-    tabs=[{id:'schedule',label:'Schedule'},{id:'summary',label:'Summary'},{id:'attendance',label:'Attendance'},{id:'timeofftask',label:'Tasks'},{id:'zonenshift',label:'Shifts'},{id:'leavebalance',label:'Leave'},{id:'documents',label:'Docs'},...(role==='admin'?[{id:'access',label:'Access'}]:[])];
-  }
-  tabsEl.innerHTML=tabs.map(t=>'<button class="mh-tab'+(D.tab===t.id?' active':'')+'" onclick="setTab(\''+t.id+'\')">' +t.label+'</button>').join('');
-
-  // Bottom nav — show top 5 most important tabs
-  const bnEl=document.getElementById('mobile-bottom-nav');
-  if(!bnEl)return;
-  const bnTabs=tabs.slice(0,5);
-  const icons={schedule:'ti-calendar',myschedule:'ti-calendar-user',summary:'ti-chart-bar',attendance:'ti-clock-check',myattendance:'ti-clock-check',timeofftask:'ti-calendar-off',zonenshift:'ti-map-pin',leavebalance:'ti-calendar-stats',myleavebalance:'ti-calendar-stats',documents:'ti-files',access:'ti-lock'};
-  bnEl.innerHTML=bnTabs.map(t=>'<button class="bn-item'+(D.tab===t.id?' active':'')+'" onclick="setTab(\''+t.id+'\')"><i class="ti '+( icons[t.id]||'ti-grid')+'"></i><span>'+t.label.replace('My ','').replace(' Balance','').replace(' Attend.','')+'</span></button>').join('');
-}
-
-function renderMob(){
-  if(window.innerWidth>768)return;
-  var u=D.profile;
-  var pts=activePats();
-  var ti=todayDayIdx();
-  var av=document.getElementById('mob-av');
-  if(av)av.textContent=ini(u.full_name);
-  var wl=document.getElementById('mob-week');
-  var dates=wDates();
-  if(wl)wl.textContent='Week '+wNum(dates[0])+' \u00b7 '+dates[0].getFullYear();
-  var st=document.getElementById('mob-stats');
-  if(st){
-    if(canEdit()){
-      var on=pts.filter(function(p){return gDZ(p.id,ti)&&!isOnVacationToday(p.id)&&!isAbsentToday(p.id);}).length;
-      var ab=pts.filter(function(p){return isAbsentToday(p.id);}).length;
-      var vc=pts.filter(function(p){return isOnVacationToday(p.id);}).length;
-      var tk=(D.tasks||[]).filter(function(t){return t.date===todayStr()&&(t.status==='Running'||t.status==='Approved');}).length;
-      var sp=function(v,c,l){return '<div style="background:rgba(255,255,255,.12);border-radius:8px;padding:5px 7px;flex:1;text-align:center"><div style="font-size:16px;font-weight:800;color:'+c+'">'+v+'</div><div style="font-size:8.5px;color:rgba(255,255,255,.5);margin-top:1px;font-weight:600">'+l+'</div></div>';};
-      st.innerHTML=sp(on,'#4ADE80','ON SHIFT')+sp(ab,'#F87171','ABSENT')+sp(vc,'#C084FC','VACATION')+sp(tk,'#FCD34D','ON TASK');
-    }else{
-      var pat=D.patrollers.find(function(p){return p.user_id===u.id;});
-      var zone=pat?gDZ(pat.id,ti):'';
-      var sh=pat?getDayShift(pat.id,ti):null;
-      var sp2=function(v,l){return '<div style="background:rgba(255,255,255,.12);border-radius:8px;padding:5px 10px;flex:2;text-align:center"><div style="font-size:13px;font-weight:800;color:#fff">'+v+'</div><div style="font-size:8.5px;color:rgba(255,255,255,.5);margin-top:1px;font-weight:600">'+l+'</div></div>';};
-      st.innerHTML=sp2(zone||'Off today','ZONE')+sp2(sh?fmtT(sh.start_time)+' - '+fmtT(sh.end_time):'--','SHIFT');
-    }
-  }
-  var tb=document.getElementById('mob-tabs');
-  if(tb){
-    var tabs=getMobTabs();
-    var html='';
-    for(var i=0;i<tabs.length;i++){
-      var t=tabs[i];
-      var active=D.tab===t.id;
-      html+='<button style="padding:10px 14px;font-size:12px;font-weight:600;color:'+(active?'#411517':'#aaa')+';white-space:nowrap;border:none;background:transparent;cursor:pointer;border-bottom:2.5px solid '+(active?'#FF5900':'transparent')+';flex-shrink:0;font-family:inherit" onclick="setTab(\''+t.id+'\')">'+t.label+'</button>';
-    }
-    tb.innerHTML=html;
-  }
-  var bn=document.getElementById('mob-nav');
-  if(bn){
-    var btabs=getMobTabs().slice(0,5);
-    var icons={schedule:'ti-calendar',myschedule:'ti-calendar-user',summary:'ti-chart-bar',attendance:'ti-clock-check',myattendance:'ti-clock-check',timeofftask:'ti-calendar-off',zonenshift:'ti-map-pin',leavebalance:'ti-calendar-stats',myleavebalance:'ti-calendar-stats',documents:'ti-files',access:'ti-lock'};
-    var bnhtml='';
-    for(var j=0;j<btabs.length;j++){
-      var bt=btabs[j];
-      var bactive=D.tab===bt.id;
-      var ic=icons[bt.id]||'ti-grid';
-      var lbl=bt.label.replace('My ','').replace(' Balance','').replace(' Attend.','');
-      bnhtml+='<button onclick="setTab(\''+bt.id+'\')" style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 8px;border:none;background:transparent;cursor:pointer;font-family:inherit;min-width:44px"><i class="ti '+ic+'" style="font-size:20px;color:'+(bactive?'#411517':'#bbb')+'"></i><span style="font-size:9px;font-weight:600;color:'+(bactive?'#411517':'#bbb')+'">'+lbl+'</span></button>';
-    }
-    bn.innerHTML=bnhtml;
-  }
-}
-function getMobTabs(){
-  const role=D.profile.role;
-  const crId=D.profile.custom_role_id;
-  const cr=crId?(D.customRoles||[]).find(function(r){return r.id===crId;}):null;
-  if(cr){
-    const al=cr.access_level||'viewer';
-    if(al==='editor'||al==='admin')return[
-      {id:'schedule',label:'Schedule'},{id:'summary',label:'Summary'},
-      {id:'myattendance',label:'My Attend.'},{id:'attendance',label:'Team Attend.'},
-      {id:'timeofftask',label:'Tasks'},{id:'zonenshift',label:'Shifts'},
-      {id:'leavebalance',label:'Leave'},{id:'documents',label:'Docs'},
-      ...(al==='admin'?[{id:'access',label:'Access'}]:[])
-    ];
-    var vt=[];try{vt=JSON.parse(cr.visible_tabs||'[]');}catch(e){}
-    var tabs=[{id:'myschedule',label:'My Schedule'}];
-    if(vt.includes('Attendance'))tabs.push({id:'myattendance',label:'Attendance'});
-    if(vt.includes('Time off & Tasks'))tabs.push({id:'timeofftask',label:'Tasks'});
-    if(vt.includes('Leave Balance'))tabs.push({id:'myleavebalance',label:'Leave'});
-    if(vt.includes('Documents'))tabs.push({id:'documents',label:'Docs'});
-    return tabs;
-  }
-  if(role==='admin'||role==='lead')return[
-    {id:'schedule',label:'Schedule'},{id:'summary',label:'Summary'},
-    {id:'myattendance',label:'My Attend.'},{id:'attendance',label:'Team Attend.'},
-    {id:'timeofftask',label:'Tasks'},{id:'zonenshift',label:'Shifts'},
-    {id:'leavebalance',label:'Leave'},{id:'documents',label:'Docs'},
-    ...(role==='admin'?[{id:'access',label:'Access'}]:[])
-  ];
-  return[
-    {id:'myschedule',label:'My Schedule'},{id:'myattendance',label:'Attendance'},
-    {id:'timeofftask',label:'Tasks'},{id:'myleavebalance',label:'Leave'},
-    {id:'documents',label:'Docs'}
-  ];
-}
 
 function render(){
   if(!D.profile)return;
@@ -2112,7 +1876,6 @@ function render(){
   const userCR=u.custom_role_id?(D.customRoles||[]).find(r=>r.id===u.custom_role_id):null;
   document.getElementById('user-chip').innerHTML=`<div class="user-av" style="background:${roleBg(u.role)};color:${roleCol(u.role)}">${ini(u.full_name)}</div><div><div class="user-nm">${u.full_name}</div><div class="user-rl">${userCR?userCR.name:roleLabel(u.role)}</div></div>`;
   renderTabs();
-  renderMobileHeader();
   const pts=activePats();const{am,pm,off}=summ(pts);
   const nav=`<div class="toolbar"><div class="seg"><button class="seg-btn${D.view==='week'?' active':''}" onclick="D.view='week';render()"><i class="ti ti-calendar-week" style="font-size:12px;margin-right:3px"></i>Week</button><button class="seg-btn${D.view==='date'?' active':''}" onclick="D.view='date';render()"><i class="ti ti-layout-columns" style="font-size:12px;margin-right:3px"></i>Daily</button><button class="seg-btn${D.view==='hourly'?' active':''}" onclick="D.view='hourly';render()"><i class="ti ti-timeline" style="font-size:12px;margin-right:3px"></i>Hourly</button></div><button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button><span class="wk-range">Week ${wn} - ${fmt(dates[0])} to ${fmt(dates[6])}</span><button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button>${D.woff!==0?`<button class="btn" onclick="D.woff=0;render()" style="padding:5px 10px;font-size:11px"><i class="ti ti-home" style="font-size:11px"></i>Today</button>`:''}<div class="search-wrap"><i class="ti ti-search"></i><input class="search-input" type="text" placeholder="Search..." value="${D.search}" oninput="D.search=this.value;render()"></div>${canEdit()?`<button class="btn btn-primary" onclick="openCreateSchedule()"><i class="ti ti-calendar-plus"></i>Create schedule</button>`:''}<button class="btn" onclick="openM({type:'taskreq'})"><i class="ti ti-plus"></i>Task request</button></div>`;
 
@@ -3450,8 +3213,7 @@ function tasksView(){
 
   .topbar{display:none!important}
 
-  #mobile-header{display:block!important}
-
+  
   .page{padding:0 0 80px 0!important;background:#f8f8f8!important}
 
   .toolbar{flex-wrap:wrap!important;gap:6px!important;padding:10px 12px 6px!important;background:#fff;border-bottom:1px solid #f0f0f0}
@@ -3468,8 +3230,7 @@ function tasksView(){
 
   .info-box{font-size:12px!important}
 
-  #mobile-bottom-nav{display:flex!important}
-</style><div class="stats">
+  </style><div class="stats">
     <div class="stat green"><div class="stat-label">Running</div><div class="stat-value">${running}</div></div>
     <div class="stat blue"><div class="stat-label">Completed</div><div class="stat-value">${completed}</div></div>
     <div class="stat amber"><div class="stat-label">Pending</div><div class="stat-value">${pen}</div></div>
@@ -4151,7 +3912,7 @@ window.addEventListener('error', (e) => {
 });
 
 // ── PWA Service Worker Registration ──
-const APP_BUILD='1781103806';
+const APP_BUILD='1781104173';
 document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('build-ts');if(el)el.textContent='v2.2.'+APP_BUILD.slice(-4);});
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
@@ -4182,7 +3943,5 @@ function installApp(){
   if(deferredPrompt){deferredPrompt.prompt();deferredPrompt.waitForOutcome().then(()=>{deferredPrompt=null;const btn=document.getElementById('install-btn');if(btn)btn.style.display='none';});}
 }
 </script>
-<!-- ── MOBILE BOTTOM NAV ── -->
-<div id="mobile-bottom-nav"></div>
 </body>
 </html>
