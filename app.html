@@ -285,12 +285,14 @@ const sb=(function(){
 let D={user:null,profile:null,tab:'schedule',woff:0,
   shifts:[],patrollers:[],schedules:[],users:[],timeoff:[],attendance:[],
   leaveBalances:[],docs:[],tasks:[],customRoles:[],
-  notesAll:{content:''},notesPat:{content:''}};
+  notesAll:{content:''},notesPat:{content:''},
+  coachingCases:[],coachingAssignments:[]};
 
 // ── TABS CONFIG ──
 const TABS=[
   {id:'schedule',label:'My Schedule',icon:'ti-calendar-user'},
   {id:'attendance',label:'Attendance',icon:'ti-clock-check'},
+  {id:'coaching',label:'Coaching',icon:'ti-school'},
   {id:'tasks',label:'Tasks',icon:'ti-calendar-off'},
   {id:'leave',label:'Leave',icon:'ti-calendar-stats'},
   {id:'docs',label:'Docs',icon:'ti-files'},
@@ -445,6 +447,9 @@ async function loadAll(){
   try{const{data}=await wt(sb.from('task_requests').select('*').order('created_at',{ascending:false}),5000);D.tasks=data||[];}catch(e){}
   try{const{data}=await wt(sb.from('custom_roles').select('*'),4000);D.customRoles=data||[];}catch(e){}
   try{const notes=await wt(sb.from('notes').select('*'),5000);const nd=notes.data||[];D.notesAll={content:(nd.find(n=>n.audience==='all')||{}).content||''};D.notesPat={content:(nd.find(n=>n.audience==='patroller')||{}).content||''};}catch(e){}
+  // Coaching
+  try{const{data}=await wt(sb.from('coaching_cases').select('*').order('created_at',{ascending:false}),5000);D.coachingCases=data||[];}catch(e){D.coachingCases=[];}
+  try{const pat=D.patrollers.find(p=>p.user_id===D.profile?.id);if(pat){const{data}=await wt(sb.from('coaching_assignments').select('*').eq('patroller_id',pat.id).order('created_at',{ascending:false}),5000);D.coachingAssignments=data||[];}else{D.coachingAssignments=[];}}catch(e){D.coachingAssignments=[];}
 }
 async function reload(){await loadAll();render();}
 
@@ -456,6 +461,7 @@ function render(){
   const main=document.getElementById('main');
   if(D.tab==='schedule')main.innerHTML=renderSchedule();
   else if(D.tab==='attendance')main.innerHTML=renderAttendance();
+  else if(D.tab==='coaching')main.innerHTML=renderCoaching();
   else if(D.tab==='tasks')main.innerHTML=renderTasks();
   else if(D.tab==='leave')main.innerHTML=renderLeave();
   else if(D.tab==='docs')main.innerHTML=renderDocs();
@@ -850,6 +856,126 @@ function renderDocs(){
   });
   html+='</div>';
   return html;
+}
+
+// ── COACHING VIEW ──
+function renderCoaching(){
+  const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
+  const myAssignments=pat?D.coachingAssignments:[];
+  const myPending=myAssignments.filter(a=>a.status==='pending');
+  const myDone=myAssignments.filter(a=>a.status==='completed');
+  const myTotal=myAssignments.length;
+  const now=getBahrainNow();
+  const curMonth=now.getUTCFullYear()+'-'+String(now.getUTCMonth()+1).padStart(2,'0');
+  const donePct=myTotal?Math.round(myDone.length/myTotal*100):0;
+  const barCol=donePct===100?'#16A34A':donePct>=50?'#D97706':'#FF5900';
+
+  if(!pat||myTotal===0){
+    return '<div style="padding:60px 20px;text-align:center;color:#999">'
+      +'<i class="ti ti-school" style="font-size:48px;display:block;margin-bottom:14px;color:#ddd"></i>'
+      +'<div style="font-size:16px;font-weight:700;color:#411517;margin-bottom:8px">No coaching cases assigned</div>'
+      +'<div style="font-size:13px;color:#aaa">Your assigned cases will appear here when your team lead uploads new coaching data.</div>'
+      +'</div>';
+  }
+
+  let html='';
+
+  // Progress card
+  html+='<div style="background:#411517;margin:10px 12px;border-radius:14px;padding:18px">';
+  html+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">';
+  html+='<div style="width:44px;height:44px;background:rgba(255,89,0,.25);border-radius:12px;display:flex;align-items:center;justify-content:center"><i class="ti ti-school" style="font-size:22px;color:#FF5900"></i></div>';
+  html+='<div><div style="font-size:16px;font-weight:800;color:#fff">My Coaching Cases</div><div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:1px">'+myDone.length+' of '+myTotal+' completed · '+curMonth+'</div></div></div>';
+  html+='<div style="display:flex;align-items:center;gap:10px">';
+  html+='<div style="flex:1;height:7px;background:rgba(255,255,255,.15);border-radius:4px;overflow:hidden"><div style="height:7px;border-radius:4px;background:'+barCol+';width:'+donePct+'%"></div></div>';
+  html+='<span style="font-size:13px;font-weight:800;color:'+barCol+'">'+donePct+'%</span>';
+  html+='</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px">';
+  html+='<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:#fff">'+myTotal+'</div><div style="font-size:9px;color:rgba(255,255,255,.45);font-weight:700;text-transform:uppercase;margin-top:2px">Total</div></div>';
+  html+='<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:#4ADE80">'+myDone.length+'</div><div style="font-size:9px;color:rgba(255,255,255,.45);font-weight:700;text-transform:uppercase;margin-top:2px">Done</div></div>';
+  html+='<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:#FCD34D">'+myPending.length+'</div><div style="font-size:9px;color:rgba(255,255,255,.45);font-weight:700;text-transform:uppercase;margin-top:2px">Pending</div></div>';
+  html+='</div></div>';
+
+  // Pending cases
+  if(myPending.length){
+    html+='<div class="section-lbl">Pending ('+myPending.length+')</div>';
+    myPending.forEach(a=>{
+      const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return;
+      html+='<div style="background:#fff;border-radius:12px;border:1px solid #f0e8e0;border-left:4px solid #FF5900;margin:0 12px 8px;padding:13px 14px" onclick="openCoachingCase(\''+a.id+'\')" >';
+      html+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">';
+      html+='<div style="flex:1;min-width:0">';
+      html+='<div style="font-size:14px;font-weight:700;color:#111;margin-bottom:3px">'+( c.rider_name||'Rider')+'</div>';
+      html+='<div style="font-size:11px;color:#888">ID: '+(c.rider_id||'--')+' · '+(c.violation_type||'--')+'</div>';
+      html+='<div style="font-size:11px;color:#888;margin-top:2px">Level '+(c.level||'--')+' · '+(c.violation_date||'--')+'</div>';
+      html+='</div>';
+      html+='<span style="font-size:10px;font-weight:700;background:#FEF3C7;color:#D97706;padding:3px 8px;border-radius:8px;white-space:nowrap;flex-shrink:0">⏳ Pending</span>';
+      html+='</div>';
+      html+='<button onclick="event.stopPropagation();openCoachingCase(\''+a.id+'\')" style="width:100%;margin-top:10px;background:#411517;color:#fff;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px"><i class="ti ti-circle-check" style="font-size:16px"></i>View & Complete</button>';
+      html+='</div>';
+    });
+  }
+
+  // Completed cases
+  if(myDone.length){
+    html+='<div class="section-lbl">Completed ('+myDone.length+')</div>';
+    myDone.forEach(a=>{
+      const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return;
+      const doneAt=a.completed_at?new Date(a.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
+      html+='<div style="background:#fff;border-radius:12px;border:1px solid #f0e8e0;margin:0 12px 8px;padding:13px 14px;opacity:.7">';
+      html+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">';
+      html+='<div style="flex:1;min-width:0">';
+      html+='<div style="font-size:14px;font-weight:700;color:#111;margin-bottom:3px">'+(c.rider_name||'Rider')+'</div>';
+      html+='<div style="font-size:11px;color:#888">ID: '+(c.rider_id||'--')+' · '+(c.violation_type||'--')+'</div>';
+      html+='<div style="font-size:11px;color:#16A34A;margin-top:3px;font-weight:600">✓ Completed '+doneAt+'</div>';
+      html+='</div>';
+      html+='<span style="font-size:10px;font-weight:700;background:#DCFCE7;color:#166534;padding:3px 8px;border-radius:8px;white-space:nowrap;flex-shrink:0">✓ Done</span>';
+      html+='</div></div>';
+    });
+  }
+
+  return html;
+}
+
+function openCoachingCase(assignmentId){
+  const a=D.coachingAssignments.find(x=>x.id===assignmentId);if(!a)return;
+  const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return;
+  const isDone=a.status==='completed';
+  const row=(label,val)=>val?'<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid #f5f5f5"><div style="font-size:12px;color:#999;width:130px;flex-shrink:0">'+label+'</div><div style="font-size:12px;font-weight:600;color:#111;flex:1">'+val+'</div></div>':'';
+  const box=document.getElementById('modal-box');
+  box.innerHTML='<div class="modal-title"><i class="ti ti-school"></i>Coaching Case</div>'
+    +row('Rider Name',c.rider_name)
+    +row('Rider ID',c.rider_id)
+    +row('Supplier',c.supplier)
+    +row('Contact',c.contact_number)
+    +row('Violation',c.violation_type)
+    +row('Level',c.level)
+    +row('Rooster Action',c.rooster_action)
+    +row('Action Category',c.action_category)
+    +row('Summary',c.violation_summary)
+    +row('Date',c.violation_date)
+    +(c.proof_url?'<div style="padding:10px 0"><a href="'+c.proof_url+'" target="_blank" style="color:#FF5900;font-size:13px;font-weight:600"><i class="ti ti-external-link"></i> View proof</a></div>':'')
+    +'<div class="modal-footer">'
+    +'<button class="btn" onclick="closeModal()">Close</button>'
+    +(!isDone?'<button class="btn btn-primary" onclick="markCoachingDone(\''+assignmentId+'\')"><i class="ti ti-circle-check"></i>Mark Complete</button>'
+      :'<span style="font-size:12px;color:#16A34A;font-weight:600;display:flex;align-items:center;gap:4px"><i class="ti ti-circle-check"></i>Completed</span>')
+    +'</div>';
+  document.getElementById('modal').classList.add('open');
+}
+
+async function markCoachingDone(assignmentId){
+  const btn=document.querySelector('#modal-box .btn-primary');
+  if(btn){btn.disabled=true;btn.textContent='Saving...';}
+  const now=new Date();
+  const nowBhr=getBahrainNow();
+  const month=nowBhr.getUTCFullYear()+'-'+String(nowBhr.getUTCMonth()+1).padStart(2,'0');
+  const{error}=await sb.from('coaching_assignments').update({
+    status:'completed',
+    completed_at:now.toISOString(),
+    completed_by_name:D.profile.full_name,
+    month
+  }).eq('id',assignmentId);
+  if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.textContent='Mark Complete';}return;}
+  closeModal();
+  await reload();
 }
 
 // ── MODALS ──
