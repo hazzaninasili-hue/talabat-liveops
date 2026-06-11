@@ -377,7 +377,7 @@ let D={user:null,profile:null,customRoles:[],leaveBalances:[],tab:'schedule',vie
   shifts:[],areas:[],zones:[],patrollers:[],schedules:[],users:[],
   notesAll:{id:null,content:''},notesPat:{id:null,content:''},notesCoo:{id:null,content:''},
   docs:[],history:[],timeoff:[],attendance:[],attDate:null,opsSub:'areas',locPerms:{},tasks:[],hourlyDay:null,
-  coachingCases:[],coachingAssignments:[],overtimeRequests:[]};
+  coachingCases:[],coachingAssignments:[],overtimeRequests:[],evaluations:[]};
 
 function showS(n){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display=n==='login'?'flex':'none';if(np)np.style.display=n==='newpw'?'flex':'none';document.getElementById('app').style.display='none';}
 function showApp(){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display='none';if(np)np.style.display='none';document.getElementById('app').style.display='block';}
@@ -657,6 +657,14 @@ async function loadAll(){
     D.coachingAssignments=ca||[];
   }catch(e){D.coachingAssignments=[];}
   try{const{data:ot}=await wt(sb.from('overtime_requests').select('*').order('created_at',{ascending:false}),5000);D.overtimeRequests=ot||[];}catch(e){D.overtimeRequests=[];}
+  try{
+    const isPatOrCoord=D.profile?.role==='patroller'||D.profile?.role==='coordinator';
+    const myPat=D.patrollers.find(p=>p.user_id===D.profile?.id);
+    let evQ=sb.from('evaluations').select('*').order('eval_date',{ascending:false});
+    if(isPatOrCoord&&myPat)evQ=evQ.eq('patroller_id',myPat.id);
+    const{data:ev}=await wt(evQ,5000);
+    D.evaluations=ev||[];
+  }catch(e){D.evaluations=[];}
   try{
     const{data:att,error:atterr}=await wt(sb.from('attendance').select('*').order('date',{ascending:false}).limit(500),5000);
     if(atterr){console.warn('Attendance table not ready:',atterr.message);D.attendance=[];}
@@ -1434,7 +1442,7 @@ function operationsView(){
   // ROLES
   if(sub === 'roles'){
     var roles = D.customRoles || [];
-    var ALL_TABS = ['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents','Coaching'];
+    var ALL_TABS = ['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents','Coaching','Evaluation'];
     var alBg = {viewer:'#EAF1FD', editor:'#FFF0E6', admin:'#DCFCE7'};
     var alCol = {viewer:'#0C4FB3', editor:'#FF5900', admin:'#166534'};
     var alLbl = {viewer:'👁 Viewer', editor:'✏️ Editor', admin:'🔐 Admin'};
@@ -1869,6 +1877,7 @@ function renderTabs(){
     if(visTabs.includes('Leave Balance'))tabs.push({id:'myleavebalance',icon:'ti-calendar-stats',label:'Leave Balance'});
     if(visTabs.includes('Documents'))tabs.push({id:'documents',icon:'ti-files',label:'Documents'});
     if(visTabs.includes('Coaching')||isFullAdmin)tabs.push({id:'coaching',icon:'ti-school',label:'Coaching'});
+    if(visTabs.includes('Evaluation')||isFullAdmin)tabs.push({id:'evaluation',icon:'ti-clipboard-check',label:'Evaluation'});
     if(isFullAdmin){tabs.push({id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'});tabs.push({id:'access',icon:'ti-lock',label:'Access control'});}
     document.getElementById('tabs').innerHTML=tabs.map(t=>`<button class="tab${D.tab===t.id?' active':''}" onclick="setTab('${t.id}')"><i class="ti ${t.icon}"></i>${t.label}</button>`).join('');
     return;
@@ -1876,6 +1885,7 @@ function renderTabs(){
   const tabs=(role==='patroller'||role==='coordinator')?[
     {id:'myschedule',icon:'ti-user',label:'My schedule'},
     {id:'coaching',icon:'ti-school',label:'Coaching'},
+    {id:'evaluation',icon:'ti-clipboard-check',label:'Evaluation'},
     {id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'},
     {id:'myleavebalance',icon:'ti-calendar-stats',label:'Leave Balance'},
     {id:'documents',icon:'ti-files',label:'Documents'},
@@ -1884,6 +1894,7 @@ function renderTabs(){
     {id:'summary',icon:'ti-chart-bar',label:'Summary'},
     {id:'attendance',icon:'ti-clock-check',label:'Attendance'},
     {id:'coaching',icon:'ti-school',label:'Coaching'},
+    {id:'evaluation',icon:'ti-clipboard-check',label:'Evaluation'},
     {id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'},
     {id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'},
     {id:'leavebalance',icon:'ti-calendar-stats',label:'Leave Balance'},
@@ -1978,6 +1989,7 @@ function render(){
   else if(D.tab==='attendance')html=safeRender(()=>attendanceView(),'Attendance');
   else if(D.tab==='myattendance')html=safeRender(()=>myAttendanceView(),'My Attendance');
   else if(D.tab==='coaching')html=safeRender(()=>coachingView(),'Coaching');
+  else if(D.tab==='evaluation')html=safeRender(()=>evaluationView(),'Evaluation');
   document.getElementById('main').innerHTML=`<div class="fade-in">${html}</div>`;
 }
 function setTab(t){D.tab=t;D.ne=false;render();}
@@ -2040,6 +2052,16 @@ function renderModal(){
     <div class="modal-footer">
       <button class="btn" onclick="closeM()">Close</button>
       ${!isDone?`<button id="coaching-submit-btn" class="btn btn-primary" onclick="markCoachingDone('${m.assignmentId}')"><i class="ti ti-circle-check"></i>Mark as Completed</button>`:''}
+    </div>`;
+    return;
+  }
+
+  if(m.type==='evalEdit'){
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-clipboard-check" style="color:#FF5900"></i>Edit Evaluation</div>
+    ${m.html}
+    <div class="modal-footer">
+      <button class="btn" onclick="closeM()">Cancel</button>
+      <button id="eval-save-btn" class="btn btn-primary" onclick="saveEvalEdit('${m.evalId}')"><i class="ti ti-circle-check"></i>Save changes</button>
     </div>`;
     return;
   }
@@ -2277,7 +2299,7 @@ function renderModal(){
     const isEdit=m.type==='editrole';const r=isEdit?m.role:{};
     let savedTabs=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
     if(isEdit&&r.visible_tabs){try{savedTabs=JSON.parse(r.visible_tabs);}catch(e){}}
-    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents','Coaching'];
+    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents','Coaching','Evaluation'];
     const tabChecks=ALL_TABS.map(t=>{const checked=savedTabs.includes(t);
       return`<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid ${checked?'#FF5900':'#E8DDD4'};border-radius:8px;cursor:pointer;background:#fff" onclick="const cb=this.querySelector('input');setTimeout(()=>{this.style.borderColor=cb.checked?'#FF5900':'#E8DDD4';},0)">
         <input type="checkbox" name="role-tab" value="${t}" ${checked?'checked':''} style="accent-color:#FF5900;width:14px;height:14px">
@@ -4593,6 +4615,364 @@ async function deleteOT(id){
   await sb.from('overtime_requests').delete().eq('id',id);
   await reload();
   addNotification('OT record deleted','info');
+}
+
+// ── EVALUATION VIEW ──
+const EVAL_QUESTIONS=[
+  {key:'q_availability',label:'Availability at duty and zone'},
+  {key:'q_appearance',label:'Appearance and approaching riders'},
+  {key:'q_id_wearing',label:'Wearing ID'},
+  {key:'q_car',label:'Maintaining car'},
+  {key:'q_equipment',label:'Rider equipment and uniform'},
+  {key:'q_road_safety',label:'Vehicle check and road safety'},
+  {key:'q_hygiene',label:'Hygiene and appearance coaching'},
+  {key:'q_critical',label:'Critical compliance coaching'},
+  {key:'q_busy_areas',label:'Busy areas check'},
+  {key:'q_vendor',label:'Vendor awareness'},
+  {key:'q_professionalism',label:'Professionalism and problem solving'},
+];
+const RATING_LABELS={1:'Not performing',2:'Low performing',3:'Performing',4:'Good performing'};
+const RC={1:['#FEE2E2','#991B1B','#FCA5A5'],2:['#FEF3C7','#92400E','#FCD34D'],3:['#DCFCE7','#166534','#86EFAC'],4:['#DBEAFE','#1E40AF','#93C5FD']};
+
+function evalScore(ev){
+  const s=EVAL_QUESTIONS.map(q=>ev[q.key]).filter(v=>v>0);
+  if(!s.length)return 0;
+  return Math.round((s.reduce((a,b)=>a+b,0)/s.length/4)*100);
+}
+function evalAvgRating(ev){
+  const s=EVAL_QUESTIONS.map(q=>ev[q.key]).filter(v=>v>0);
+  if(!s.length)return 0;
+  return+(s.reduce((a,b)=>a+b,0)/s.length).toFixed(2);
+}
+function evalMonthStr(d){
+  const dt=new Date(d);
+  return dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0');
+}
+function scoreBadge(pct){
+  const s=pct>=75?'background:#DBEAFE;color:#1E40AF':pct>=50?'background:#DCFCE7;color:#166534':pct>=25?'background:#FEF3C7;color:#92400E':'background:#FEE2E2;color:#991B1B';
+  return'<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;'+s+'">'+pct+'%</span>';
+}
+function ratingBadge(v){
+  if(!v)return'<span style="font-size:10px;color:var(--g3)">--</span>';
+  return'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:12px;background:'+RC[v][0]+';color:'+RC[v][1]+'">'+v+' — '+RATING_LABELS[v]+'</span>';
+}
+function rbBtn(key,n,cur,pfx){
+  pfx=pfx||'rb';
+  const isSel=cur===n;
+  const bg=isSel?RC[n][0]:'var(--sur)';
+  const col=isSel?RC[n][1]:'var(--g3)';
+  const bdr=isSel?RC[n][2]:'var(--g2)';
+  return'<button type="button" data-key="'+key+'" data-val="'+n+'" id="'+pfx+'-'+key+'-'+n+'" onclick="setRating(\''+key+'\','+n+',this,\''+pfx+'\')" style="width:30px;height:30px;border-radius:7px;border:0.5px solid '+bdr+';background:'+bg+';cursor:pointer;font-size:11px;font-weight:600;color:'+col+';font-family:inherit">'+n+'</button>';
+}
+function qFormRow(q,cur,pfx){
+  pfx=pfx||'rb';
+  return'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--g1)"><span style="font-size:11px;flex:1;color:var(--g4)">'+q.label+'</span><div style="display:flex;gap:3px" id="'+pfx+'-wrap-'+q.key+'">'+[1,2,3,4].map(n=>rbBtn(q.key,n,cur,pfx)).join('')+'</div></div>';
+}
+
+function evaluationView(){
+  const isAL=canEdit();
+  const myPat=D.patrollers.find(p=>p.user_id===D.profile?.id);
+  const now=getBahrainNow();
+  const curMonth=now.getUTCFullYear()+'-'+String(now.getUTCMonth()+1).padStart(2,'0');
+
+  // ── ADMIN / LEAD VIEW ──
+  if(isAL){
+    const pts=activePats().filter(p=>getUtype(p)==='patroller');
+    const patOptions=pts.map(p=>'<option value="'+p.id+'">'+p.name+'</option>').join('');
+
+    // Month selector
+    const months=[...new Set(D.evaluations.map(e=>evalMonthStr(e.eval_date)))].sort().reverse();
+    if(!months.includes(curMonth))months.unshift(curMonth);
+    const selMonth=D.evalMonth||curMonth;
+    const monthOptions=months.map(m=>'<option value="'+m+'" '+( m===selMonth?'selected':'')+'>'+m+'</option>').join('');
+
+    // Filter for selected month
+    const monthEvals=D.evaluations.filter(e=>evalMonthStr(e.eval_date)===selMonth);
+
+    // Per-patroller summary
+    const patSummary=pts.map(p=>{
+      const pEvals=monthEvals.filter(e=>e.patroller_id===p.id);
+      if(!pEvals.length)return null;
+      const avgScore=Math.round(pEvals.reduce((s,e)=>s+evalScore(e),0)/pEvals.length);
+      const avgRating=+(pEvals.reduce((s,e)=>s+evalAvgRating(e),0)/pEvals.length).toFixed(2);
+      const qAvgs={};
+      EVAL_QUESTIONS.forEach(q=>{
+        const vals=pEvals.map(e=>e[q.key]).filter(v=>v>0);
+        qAvgs[q.key]=vals.length?+(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1):null;
+      });
+      return{p,avgScore,avgRating,qAvgs,count:pEvals.length};
+    }).filter(Boolean).sort((a,b)=>b.avgScore-a.avgScore);
+
+    // 3-month trend data
+    const last3Months=months.slice(0,3);
+    function pat3MonthData(patId){
+      return last3Months.map(m=>{
+        const evals=D.evaluations.filter(e=>e.patroller_id===patId&&evalMonthStr(e.eval_date)===m);
+        if(!evals.length)return null;
+        return Math.round(evals.reduce((s,e)=>s+evalScore(e),0)/evals.length);
+      });
+    }
+    function trendBars(data,color){
+      const max=Math.max(...data.filter(v=>v!==null),1);
+      const monthLabels=last3Months.map(m=>{const d=new Date(m+'-01');return d.toLocaleString('en-GB',{month:'short'});});
+      return data.map((v,i)=>{
+        const h=v?Math.round((v/100)*50):4;
+        return'<div style="flex:1;text-align:center"><div style="font-size:10px;color:var(--g3);margin-bottom:4px">'+monthLabels[i]+'</div><div style="height:50px;background:var(--g1);border-radius:6px;display:flex;align-items:flex-end;padding:2px"><div style="width:100%;height:'+h+'px;background:'+color+';border-radius:4px"></div></div><div style="font-size:10px;font-weight:700;margin-top:3px;color:'+color+'">'+( v!==null?v+'%':'--')+'</div></div>';
+      }).join('');
+    }
+
+    const best3=patSummary[0];
+    const worst3=patSummary[patSummary.length-1];
+    const bestData=best3?pat3MonthData(best3.p.id):[];
+    const worstData=worst3&&worst3!==best3?pat3MonthData(worst3.p.id):[];
+    const ini=n=>(n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+
+    function perfCard(patData,color,bgColor,icon){
+      if(!patData)return'<div class="tcard" style="padding:14px;flex:1"><div style="font-size:12px;color:var(--g3);text-align:center;padding:20px">No data</div></div>';
+      const data=pat3MonthData(patData.p.id);
+      return'<div class="tcard" style="padding:14px;flex:1">'+
+        '<div style="font-size:10px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti '+icon+'" style="margin-right:4px"></i>'+( icon==='ti-trophy'?'Best performer':'Lowest performer')+' — 3 months</div>'+
+        '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--g1);margin-bottom:10px">'+
+        '<div style="width:38px;height:38px;border-radius:50%;background:'+bgColor+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:'+color+';flex-shrink:0">'+ini(patData.p.name)+'</div>'+
+        '<div style="flex:1"><div style="font-size:13px;font-weight:700">'+patData.p.name+'</div><div style="font-size:10px;color:var(--g3);margin-top:2px">3-month average</div></div>'+
+        '<span style="font-size:14px;font-weight:700;padding:5px 10px;border-radius:20px;background:'+bgColor+';color:'+color+'">'+patData.avgScore+'%</span>'+
+        '</div>'+
+        '<div style="display:flex;gap:6px">'+trendBars(data,color)+'</div></div>';
+    }
+
+    // Summary table rows
+    const summaryRows=patSummary.map(({p,avgScore,avgRating,qAvgs,count},i)=>{
+      const isBest=i===0;
+      const qCells=EVAL_QUESTIONS.map(q=>{
+        const v=qAvgs[q.key];
+        if(!v)return'<td style="font-size:10px;color:var(--g3)">--</td>';
+        const pct=Math.round((v/4)*100);
+        const bg=pct>=75?'background:#DBEAFE;color:#1E40AF':pct>=50?'background:#DCFCE7;color:#166534':pct>=25?'background:#FEF3C7;color:#92400E':'background:#FEE2E2;color:#991B1B';
+        return'<td><span style="font-size:10px;font-weight:700;padding:2px 5px;border-radius:8px;'+bg+'">'+v+'</span></td>';
+      }).join('');
+      return'<tr '+( isBest?'style="background:rgba(255,89,0,.04)"':'')+ '>'+
+        '<td class="lt" style="font-weight:600">'+( isBest?'<i class="ti ti-trophy" style="color:#FF5900;font-size:11px;margin-right:3px"></i>':'')+p.name+'</td>'+
+        '<td style="font-size:11px;color:var(--g3)">'+count+'</td>'+
+        qCells+
+        '<td style="font-weight:700;font-size:11px">'+avgRating+' / 4</td>'+
+        '<td>'+scoreBadge(avgScore)+'</td>'+
+        '</tr>';
+    }).join('');
+
+    // Recent evals table
+    const recentRows=D.evaluations.slice(0,20).map(e=>{
+      const pat=D.patrollers.find(p=>p.id===e.patroller_id);
+      const pct=evalScore(e);
+      const avg=evalAvgRating(e);
+      const dt=new Date(e.eval_date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+      return'<tr><td class="lt" style="font-size:11px;font-weight:600">'+( pat?.name||'--')+'</td><td style="font-size:11px">'+dt+'</td><td style="font-size:11px;color:var(--g3)">'+( e.location||'--')+'</td><td style="font-size:11px;font-weight:600">'+avg+' / 4</td><td>'+scoreBadge(pct)+'</td><td style="font-size:11px;color:var(--g3)">'+( e.evaluator_name||'--')+'</td><td style="font-size:11px;color:var(--g3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+( e.comment||'--')+'</td><td><button onclick="openEvalEdit(\''+e.id+'\')" style="background:none;border:0.5px solid var(--g2);border-radius:6px;padding:3px 7px;cursor:pointer;font-size:10px;color:var(--g3);font-family:inherit"><i class="ti ti-edit" style="font-size:10px"></i> Edit</button></td></tr>';
+    }).join('');
+
+    // Team avg this month vs last
+    const teamAvg=monthEvals.length?Math.round(monthEvals.reduce((s,e)=>s+evalScore(e),0)/monthEvals.length):0;
+    const lastMonthIdx=months.indexOf(selMonth)+1;
+    const lastMonth=months[lastMonthIdx];
+    const lastMonthEvals=lastMonth?D.evaluations.filter(e=>evalMonthStr(e.eval_date)===lastMonth):[];
+    const lastAvg=lastMonthEvals.length?Math.round(lastMonthEvals.reduce((s,e)=>s+evalScore(e),0)/lastMonthEvals.length):0;
+    const diff=teamAvg-lastAvg;
+    const diffLabel=lastAvg?( diff>=0?'+'+diff+'%':''+diff+'%'):'--';
+    const diffCol=diff>0?'#166534':diff<0?'#DC2626':'var(--g3)';
+
+    // Build the form questions in 2 columns
+    const half=Math.ceil(EVAL_QUESTIONS.length/2);
+    const col1=EVAL_QUESTIONS.slice(0,half).map(q=>qFormRow(q,0,'rb')).join('');
+    const col2=EVAL_QUESTIONS.slice(half).map(q=>qFormRow(q,0,'rb')).join('');
+
+    return'<div class="stats">'+
+      '<div class="stat blue"><div class="stat-label">This month evals</div><div class="stat-value">'+monthEvals.length+'</div></div>'+
+      '<div class="stat"><div class="stat-label">Patrollers rated</div><div class="stat-value">'+patSummary.length+'</div></div>'+
+      '<div class="stat green"><div class="stat-label">Team avg ('+selMonth+')</div><div class="stat-value">'+( teamAvg||'--')+'%</div></div>'+
+      '<div class="stat"><div class="stat-label">vs last month</div><div class="stat-value" style="font-size:15px;margin-top:3px;color:'+diffCol+'">'+diffLabel+'</div></div>'+
+      '</div>'+
+
+      '<div style="display:flex;gap:12px;margin-bottom:12px">'+
+      perfCard(best3,'#1E40AF','#DBEAFE','ti-trophy')+
+      perfCard(worst3,'#991B1B','#FEE2E2','ti-trending-down')+
+      '</div>'+
+
+      '<div class="tcard" style="margin-bottom:12px;padding:14px">'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+          '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-chart-bar" style="margin-right:4px"></i>Monthly summary</div>'+
+          '<select onchange="D.evalMonth=this.value;render()" style="padding:4px 8px;border-radius:6px;border:0.5px solid var(--g2);font-size:11px;font-family:inherit;margin-left:auto">'+monthOptions+'</select>'+
+        '</div>'+
+        ( patSummary.length===0?'<div style="padding:30px;text-align:center;color:var(--g3)">No evaluations for this month</div>':
+          '<div class="t-scroll"><table style="min-width:900px"><thead><tr>'+
+          '<th class="lt">Patroller</th><th>Evals</th>'+
+          EVAL_QUESTIONS.map(q=>'<th style="font-size:8px;max-width:55px;white-space:normal;line-height:1.2">'+q.label.split(' ').slice(0,3).join(' ')+'</th>').join('')+
+          '<th style="background:#FFF0E6;color:#D94D00">Avg rating</th><th style="background:#FFF0E6;color:#D94D00">Score %</th>'+
+          '</tr></thead><tbody>'+summaryRows+'</tbody></table></div>')+
+      '</div>'+
+
+      '<div class="tcard" style="margin-bottom:12px;padding:14px">'+
+        '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px"><i class="ti ti-clipboard-plus" style="margin-right:4px"></i>New evaluation</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">'+
+          '<div class="fg"><label>Patroller</label><select id="ev-patroller"><option value="">-- Select patroller --</option>'+patOptions+'</select></div>'+
+          '<div class="fg"><label>Location</label><input type="text" id="ev-location" placeholder="e.g. Seef District, HRC"></div>'+
+          '<div class="fg"><label>Date</label><input type="date" id="ev-date" value="'+todayStr()+'"></div>'+
+        '</div>'+
+        '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--g3);margin-bottom:6px">Rating guide</div>'+
+        '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">'+
+          '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;background:#FEE2E2;color:#991B1B">1 Not performing</span>'+
+          '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;background:#FEF3C7;color:#92400E">2 Low performing</span>'+
+          '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;background:#DCFCE7;color:#166534">3 Performing</span>'+
+          '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;background:#DBEAFE;color:#1E40AF">4 Good performing</span>'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px">'+
+          '<div>'+col1+'</div><div>'+col2+'</div>'+
+        '</div>'+
+        '<div class="fg" style="margin-top:10px"><label>Comment</label><textarea id="ev-comment" rows="2" style="width:100%;padding:8px 10px;border-radius:8px;border:0.5px solid var(--g2);font-family:inherit;font-size:12px;resize:vertical"></textarea></div>'+
+        '<button onclick="submitEvaluation()" class="btn btn-primary" style="width:100%;padding:10px;justify-content:center"><i class="ti ti-circle-check"></i>Submit — score calculated on save</button>'+
+      '</div>'+
+
+      '<div class="tcard" style="padding:14px">'+
+        '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-list" style="margin-right:4px"></i>All evaluations</div>'+
+        ( D.evaluations.length===0?'<div style="padding:30px;text-align:center;color:var(--g3)">No evaluations yet</div>':
+          '<div class="t-scroll"><table style="min-width:750px"><thead><tr>'+
+          '<th class="lt">Patroller</th><th>Date</th><th>Location</th><th>Avg rating</th><th>Score %</th><th>By</th><th>Comment</th><th></th>'+
+          '</tr></thead><tbody>'+recentRows+'</tbody></table></div>')+
+      '</div>';
+  }
+
+  // ── PATROLLER VIEW ──
+  const myEvals=myPat?D.evaluations.filter(e=>e.patroller_id===myPat.id):[];
+  if(!myEvals.length){
+    return'<div style="padding:60px;text-align:center;color:var(--g3)">'+
+      '<i class="ti ti-clipboard-check" style="font-size:48px;display:block;margin-bottom:14px;opacity:.3"></i>'+
+      '<b style="font-size:15px;color:#411517">No evaluations yet</b>'+
+      '<div style="font-size:12px;margin-top:8px">Your performance evaluations will appear here once your team lead submits one.</div>'+
+      '</div>';
+  }
+
+  // Monthly breakdown
+  const myMonths=[...new Set(myEvals.map(e=>evalMonthStr(e.eval_date)))].sort().reverse();
+  const curMonthEvals=myEvals.filter(e=>evalMonthStr(e.eval_date)===myMonths[0]);
+  const myMonthAvg=curMonthEvals.length?Math.round(curMonthEvals.reduce((s,e)=>s+evalScore(e),0)/curMonthEvals.length):0;
+  const myBest=Math.max(...myEvals.map(e=>evalScore(e)));
+  const last3=myMonths.slice(0,3);
+  const m3avg=last3.length?Math.round(last3.map(m=>{
+    const ev=myEvals.filter(e=>evalMonthStr(e.eval_date)===m);
+    return ev.length?myEvals.filter(e=>evalMonthStr(e.eval_date)===m).reduce((s,e)=>s+evalScore(e),0)/ev.length:0;
+  }).reduce((a,b)=>a+b,0)/last3.length):0;
+
+  // 3-month trend bars for patroller
+  const monthLabels3=last3.map(m=>{const d=new Date(m+'-01');return d.toLocaleString('en-GB',{month:'short'});});
+  const trendBarsPat=last3.map((m,i)=>{
+    const ev=myEvals.filter(e=>evalMonthStr(e.eval_date)===m);
+    const sc=ev.length?Math.round(ev.reduce((s,e)=>s+evalScore(e),0)/ev.length):0;
+    const col=sc>=75?'#3B82F6':sc>=50?'#16A34A':sc>=25?'#D97706':'#DC2626';
+    return'<div style="flex:1;text-align:center"><div style="font-size:10px;color:var(--g3);margin-bottom:4px">'+monthLabels3[i]+'</div><div style="height:50px;background:var(--g1);border-radius:6px;display:flex;align-items:flex-end;padding:2px"><div style="width:100%;height:'+( sc||4)+'px;background:'+col+';border-radius:4px;max-height:46px;min-height:4px"></div></div><div style="font-size:10px;font-weight:700;margin-top:3px;color:'+col+'">'+sc+'%</div></div>';
+  }).join('');
+
+  const evalCards=myEvals.map(e=>{
+    const pct=evalScore(e);
+    const avg=evalAvgRating(e);
+    const dt=new Date(e.eval_date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    const s=pct>=75?'background:#DBEAFE;color:#1E40AF':pct>=50?'background:#DCFCE7;color:#166534':pct>=25?'background:#FEF3C7;color:#92400E':'background:#FEE2E2;color:#991B1B';
+    const qRows=EVAL_QUESTIONS.map(q=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:0.5px solid var(--g1)"><span style="font-size:12px;color:var(--g4)">'+q.label+'</span>'+ratingBadge(e[q.key])+'</div>').join('');
+    return'<div class="tcard" style="margin-bottom:10px;padding:14px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">'+
+        '<div><div style="font-size:14px;font-weight:700;color:#411517">'+dt+'</div>'+
+        '<div style="font-size:12px;color:var(--g3);margin-top:2px"><i class="ti ti-map-pin" style="font-size:11px"></i> '+( e.location||'--')+' · Evaluated by Team Lead</div></div>'+
+        '<div style="text-align:right"><span style="font-size:14px;font-weight:700;padding:5px 12px;border-radius:20px;'+s+'">'+pct+'%</span>'+
+        '<div style="font-size:10px;color:var(--g3);margin-top:3px">Avg rating: '+avg+' / 4</div></div>'+
+      '</div>'+
+      qRows+
+      ( e.comment?'<div style="margin-top:10px;padding:10px;background:var(--g1);border-radius:8px;font-size:12px;color:var(--g3)"><i class="ti ti-message" style="font-size:11px;margin-right:4px"></i>'+e.comment+'</div>':'')+
+    '</div>';
+  }).join('');
+
+  return'<div class="stats">'+
+    '<div class="stat blue"><div class="stat-label">My evaluations</div><div class="stat-value">'+myEvals.length+'</div></div>'+
+    '<div class="stat green"><div class="stat-label">This month score</div><div class="stat-value">'+myMonthAvg+'%</div></div>'+
+    '<div class="stat"><div class="stat-label">3-month avg</div><div class="stat-value">'+m3avg+'%</div></div>'+
+    '<div class="stat amber"><div class="stat-label">Best score</div><div class="stat-value">'+myBest+'%</div></div>'+
+    '</div>'+
+    '<div class="tcard" style="margin-bottom:12px;padding:14px">'+
+      '<div style="font-size:10px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-chart-bar" style="margin-right:4px"></i>My score trend — last 3 months</div>'+
+      '<div style="display:flex;gap:8px">'+trendBarsPat+'</div>'+
+    '</div>'+
+    evalCards;
+}
+
+function setRating(key,val,btn,pfx){
+  pfx=pfx||'rb';
+  const wrap=btn.closest('div[id*="wrap"]') || btn.parentElement;
+  wrap.querySelectorAll('button[data-key]').forEach(b=>{
+    b.style.background='var(--sur)';b.style.color='var(--g3)';b.style.borderColor='var(--g2)';
+  });
+  btn.style.background=RC[val][0];btn.style.color=RC[val][1];btn.style.borderColor=RC[val][2];
+}
+
+function getEvalScores(pfx){
+  pfx=pfx||'rb';
+  const scores={};
+  EVAL_QUESTIONS.forEach(q=>{
+    const wrap=document.getElementById(pfx+'-wrap-'+q.key);
+    if(wrap){
+      wrap.querySelectorAll('button[data-val]').forEach(b=>{
+        if(b.style.background&&b.style.background!=='var(--sur)'&&b.style.background!=='')scores[q.key]=parseInt(b.dataset.val);
+      });
+    }
+    if(!scores[q.key])scores[q.key]=0;
+  });
+  return scores;
+}
+
+async function submitEvaluation(){
+  const patrollerId=document.getElementById('ev-patroller')?.value;
+  const location=document.getElementById('ev-location')?.value?.trim();
+  const evalDate=document.getElementById('ev-date')?.value;
+  const comment=document.getElementById('ev-comment')?.value?.trim();
+  if(!patrollerId){alert('Please select a patroller.');return;}
+  if(!location){alert('Please enter a location.');return;}
+  const scores=getEvalScores('rb');
+  const missing=EVAL_QUESTIONS.filter(q=>!scores[q.key]);
+  if(missing.length){alert('Please rate all questions. Missing: '+missing[0].label);return;}
+  const pat=D.patrollers.find(p=>p.id===patrollerId);
+  const now=getBahrainNow();
+  const month=now.getUTCFullYear()+'-'+String(now.getUTCMonth()+1).padStart(2,'0');
+  const payload={patroller_id:patrollerId,patroller_name:pat?.name||'',evaluator_id:D.profile.id,evaluator_name:D.profile.full_name,eval_date:evalDate||todayStr(),location,comment:comment||'',month,...scores};
+  const btn=document.querySelector('button[onclick="submitEvaluation()"]');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Saving...';}
+  const{error}=await sb.from('evaluations').insert(payload);
+  if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-circle-check"></i>Submit — score calculated on save';}return;}
+  await reload();
+  addNotification('Evaluation submitted for '+( pat?.name||'patroller'),'success');
+}
+
+function openEvalEdit(evalId){
+  const ev=D.evaluations.find(e=>e.id===evalId);if(!ev)return;
+  const pts=activePats().filter(p=>getUtype(p)==='patroller');
+  const patOptions=pts.map(p=>'<option value="'+p.id+'" '+( p.id===ev.patroller_id?'selected':'')+'>'+p.name+'</option>').join('');
+  const qRows=EVAL_QUESTIONS.map(q=>qFormRow(q,ev[q.key]||0,'edrb')).join('');
+  const html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'+
+    '<div class="fg"><label>Patroller</label><select id="edit-ev-patroller">'+patOptions+'</select></div>'+
+    '<div class="fg"><label>Date</label><input type="date" id="edit-ev-date" value="'+ev.eval_date+'"></div>'+
+    '</div><div class="fg"><label>Location</label><input type="text" id="edit-ev-location" value="'+( ev.location||'')+'"></div>'+
+    '<div>'+qRows+'</div>'+
+    '<div class="fg" style="margin-top:8px"><label>Comment</label><textarea id="edit-ev-comment" rows="2" style="width:100%;padding:8px 10px;border-radius:8px;border:0.5px solid var(--g2);font-family:inherit;font-size:12px;resize:vertical">'+( ev.comment||'')+'</textarea></div>';
+  openM({type:'evalEdit',evalId,html});
+}
+
+async function saveEvalEdit(evalId){
+  const patrollerId=document.getElementById('edit-ev-patroller')?.value;
+  const location=document.getElementById('edit-ev-location')?.value?.trim();
+  const evalDate=document.getElementById('edit-ev-date')?.value;
+  const comment=document.getElementById('edit-ev-comment')?.value?.trim();
+  if(!patrollerId||!location){alert('Please fill in all required fields.');return;}
+  const scores=getEvalScores('edrb');
+  const pat=D.patrollers.find(p=>p.id===patrollerId);
+  const btn=document.getElementById('eval-save-btn');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Saving...';}
+  const{error}=await sb.from('evaluations').update({patroller_id:patrollerId,patroller_name:pat?.name||'',eval_date:evalDate,location,comment:comment||'',updated_at:new Date().toISOString(),...scores}).eq('id',evalId);
+  if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-circle-check"></i>Save changes';}return;}
+  closeM();await reload();
+  addNotification('Evaluation updated','success');
 }
 
 // ── GLOBAL ERROR HANDLER ──
