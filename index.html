@@ -379,7 +379,7 @@ let D={user:null,profile:null,customRoles:[],leaveBalances:[],tab:'schedule',vie
   docs:[],history:[],timeoff:[],attendance:[],attDate:null,opsSub:'areas',locPerms:{},tasks:[],hourlyDay:null,
   coachingCases:[],coachingAssignments:[],overtimeRequests:[],evaluations:[],
   coachingMonth:null,coachingShowOlder:false,evalMonth:null,
-  perfTab:'evaluation',perfSettings:null};
+  perfTab:null,perfSettings:null};
 
 function showS(n){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display=n==='login'?'flex':'none';if(np)np.style.display=n==='newpw'?'flex':'none';document.getElementById('app').style.display='none';}
 function showApp(){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display='none';if(np)np.style.display='none';document.getElementById('app').style.display='block';}
@@ -1873,7 +1873,10 @@ function renderTabs(){
     const canEditData=al==='editor'||al==='admin';
     const isFullAdmin=al==='admin';
     let tabs=[{id:'myschedule',icon:'ti-user',label:'My schedule'}];
-    if(visTabs.includes('Schedule')&&canEditData)tabs.push({id:'schedule',icon:'ti-calendar',label:'Schedule'});
+    if(visTabs.includes('Schedule')){
+      if(canEditData)tabs.push({id:'schedule',icon:'ti-calendar',label:'Schedule'});
+      else tabs.push({id:'myschedule',icon:'ti-user',label:'My schedule'});
+    }
     if(visTabs.includes('Summary'))tabs.push({id:'summary',icon:'ti-chart-bar',label:'Summary'});
     if(visTabs.includes('Attendance')){tabs.push({id:'myattendance',icon:'ti-clock-check',label:'Attendance'});if(canEditData)tabs.push({id:'attendance',icon:'ti-users',label:'Team Attendance'});}
     if(visTabs.includes('Time off & Tasks'))tabs.push({id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'});
@@ -4552,7 +4555,7 @@ function performanceView(){
                 monthSel+
               '</div>'+
               (sorted.length===0?'<div style="padding:20px;text-align:center;color:var(--g3)">No evaluations for '+selMonth+'</div>':
-                '<div class="t-scroll"><table><thead><tr><th class="lt">Patroller</th><th>Evals</th><th>Avg rating</th><th>Eval score</th><th></th></tr></thead><tbody>'+evalTableRows+'</tbody></table></div>')+
+                '<div class="t-scroll"><table style="min-width:400px"><thead><tr><th class="lt">Patroller</th><th>Evals</th><th>Avg rating</th><th>Eval score</th><th></th></tr></thead><tbody>'+evalTableRows+'</tbody></table></div>')+
             '</div>'+
             '<div class="tcard" style="padding:14px">'+
               '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-list" style="margin-right:4px"></i>Recent evaluations</div>'+
