@@ -3443,7 +3443,7 @@ function tasksView(){
     })();
     const durLabel=durMins>0?(durMins>=60?`${Math.floor(durMins/60)}h ${durMins%60}m`:`${durMins}m`):'';
     const timeCell=t.start_time&&t.end_time
-      ?`${t.start_time} → ${t.end_time}${durLabel?`<div style="font-size:10px;font-weight:700;color:#FF5900;margin-top:1px">${durLabel}</div>`:''}`
+      ?`${t.start_time} → ${t.end_time}`
       :t.start_time?`Started: ${t.start_time}`:'--';
     const statusDisplay=t.status==='Running'?`<i class="ti ti-circle-filled" style="font-size:6px;margin-right:4px;animation:pulse 1.5s infinite"></i>${t.status}`:`${t.status==='Completed'?'✓':''} ${t.status}`;
     
@@ -3452,6 +3452,7 @@ function tasksView(){
       <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${bg};color:${col}">${t.task_type}</span></td>
       <td style="font-family:monospace;font-size:11px">${t.date||'--'}</td>
       <td style="font-size:11px">${timeCell}</td>
+      <td style="font-size:11px;font-weight:700;color:#FF5900">${durLabel||'--'}</td>
       <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.description||'--'}</td>
       <td><span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:8px;${getStatusStyle(t.status)}">${statusDisplay}</span></td>
       ${ed?`<td style="white-space:nowrap">
@@ -3473,7 +3474,7 @@ function tasksView(){
   </div>
   ${all.length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-checklist" style="font-size:40px;display:block;margin-bottom:10px;opacity:.4"></i>No tasks yet.</div>`:`
   <div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr>
-    <th class="lt">Patroller</th><th>Type</th><th>Date</th><th>Time</th><th>Description</th><th>Status</th>${ed?'<th>Actions</th>':''}
+    <th class="lt">Patroller</th><th>Type</th><th>Date</th><th>Time</th><th>Duration</th><th>Description</th><th>Status</th>${ed?'<th>Actions</th>':''}
   </tr></thead><tbody>${rows}</tbody></table></div></div>`}`;
 }
 
@@ -3497,7 +3498,8 @@ function myTasksView(){
     return`<tr>
       <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${bg};color:${col}">${t.task_type}</span></td>
       <td style="font-family:monospace;font-size:11px">${t.date||'--'}</td>
-      <td style="font-size:11px">${t.start_time||'--'} → ${t.end_time||'--'}${durLabel2?`<div style="font-size:10px;font-weight:700;color:#FF5900;margin-top:1px">${durLabel2}</div>`:''}</td>
+      <td style="font-size:11px">${t.start_time||'--'} → ${t.end_time||'--'}</td>
+      <td style="font-size:11px;font-weight:700;color:#FF5900">${durLabel2||'--'}</td>
       <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.description||'--'}</td>
       <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;${sc}">${t.status}</span></td>
     </tr>`;
@@ -3511,7 +3513,7 @@ function myTasksView(){
   <div class="toolbar"><button class="btn btn-primary" onclick="openM({type:'taskreq'})"><i class="ti ti-plus"></i>New task request</button></div>
   ${myTasks.length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-checklist" style="font-size:40px;display:block;margin-bottom:10px;opacity:.4"></i>No task requests yet.<br><span style="font-size:12px">Submit a request for a task or meeting.</span></div>`:`
   <div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr>
-    <th>Type</th><th>Date</th><th>Time</th><th>Description</th><th>Status</th>
+    <th>Type</th><th>Date</th><th>Time</th><th>Duration</th><th>Description</th><th>Status</th>
   </tr></thead><tbody>${rows}</tbody></table></div></div>`}`;
 }
 
