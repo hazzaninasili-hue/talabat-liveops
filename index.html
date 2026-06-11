@@ -4446,7 +4446,7 @@ function overtimeView(){
     </tr>`;
   }).join('');
 
-  return`
+  const html=`
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
     <!-- Submission Form -->
     <div class="tcard" style="padding:16px">
@@ -4525,24 +4525,27 @@ function overtimeView(){
     <div class="tcard"><div class="t-scroll"><table style="min-width:800px"><thead><tr>
       <th class="lt">Patroller</th><th>Start</th><th>End</th><th>Total Hours</th><th>Requested By</th><th>Reason</th><th></th>
     </tr></thead><tbody>${summaryRows}</tbody></table></div></div>`}
-  </div>
+  </div>`;
 
-  <script>
-    // Live duration preview
-    document.getElementById('ot-start')?.addEventListener('change',updateOTPreview);
-    document.getElementById('ot-end')?.addEventListener('change',updateOTPreview);
-    function updateOTPreview(){
-      const s=document.getElementById('ot-start')?.value;
-      const e=document.getElementById('ot-end')?.value;
-      const el=document.getElementById('ot-duration-preview');
-      if(!el)return;
-      if(s&&e){
-        const ms=new Date(e)-new Date(s);
-        if(ms>0){const h=Math.floor(ms/3600000);const m=Math.floor((ms%3600000)/60000);el.textContent='Duration: '+h+'h '+m+'m';}
-        else el.textContent='⚠ End must be after start';
-      }else el.textContent='';
-    }
-  </script>`;
+  setTimeout(()=>{
+    const s=document.getElementById('ot-start');
+    const e=document.getElementById('ot-end');
+    if(s)s.addEventListener('change',updateOTPreview);
+    if(e)e.addEventListener('change',updateOTPreview);
+  },100);
+
+  return html;
+
+function updateOTPreview(){
+  const s=document.getElementById('ot-start')?.value;
+  const e=document.getElementById('ot-end')?.value;
+  const el=document.getElementById('ot-duration-preview');
+  if(!el)return;
+  if(s&&e){
+    const ms=new Date(e)-new Date(s);
+    if(ms>0){const h=Math.floor(ms/3600000);const m=Math.floor((ms%3600000)/60000);el.textContent='⏱ Duration: '+h+'h '+m+'m';}
+    else el.textContent='⚠ End must be after start';
+  }else el.textContent='';
 }
 
 async function submitOT(){
