@@ -4192,6 +4192,87 @@ function clearNotifications(){D_notifs=[];renderNotifications();}
 // ── COACHING VIEW ──
 // ── PERFORMANCE VIEW (replaces Coaching + Evaluation) ──
 
+// ── EVALUATION + PERFORMANCE HELPERS ──
+const EVAL_QUESTIONS=[
+  {key:'q_availability',label:'Availability at duty and zone'},
+  {key:'q_appearance',label:'Appearance and approaching riders'},
+  {key:'q_id_wearing',label:'Wearing ID'},
+  {key:'q_car',label:'Maintaining car'},
+  {key:'q_equipment',label:'Rider equipment and uniform'},
+  {key:'q_road_safety',label:'Vehicle check and road safety'},
+  {key:'q_hygiene',label:'Hygiene and appearance coaching'},
+  {key:'q_critical',label:'Critical compliance coaching'},
+  {key:'q_busy_areas',label:'Busy areas check'},
+  {key:'q_vendor',label:'Vendor awareness'},
+  {key:'q_professionalism',label:'Professionalism and problem solving'},
+];
+const RATING_LABELS={1:'Not performing',2:'Low performing',3:'Performing',4:'Good performing'};
+const RC={1:['#FEE2E2','#991B1B','#FCA5A5'],2:['#FEF3C7','#92400E','#FCD34D'],3:['#DCFCE7','#166534','#86EFAC'],4:['#DBEAFE','#1E40AF','#93C5FD']};
+const COACHING_OUTCOMES=[
+  {value:'rider_coached',label:'Rider has been coached'},
+  {value:'rider_acknowledged',label:'Rider acknowledged'},
+  {value:'no_answer',label:'No answer'},
+  {value:'washing_cleaning',label:'Washing/Cleaning — Jacket or uniform being washed'},
+  {value:'no_time',label:'No Time — Long shift, rushing, in a hurry'},
+  {value:'didnt_know',label:'Didn\'t Know — Unaware of policy'},
+  {value:'vendors_fault',label:'Vendor\'s Fault — Misusing ready button or no photos'},
+  {value:'health_issues',label:'Health Issues — Foot infection, injury, or medical'},
+  {value:'bad_weather',label:'Bad Weather — Rain, dust, or fog'},
+  {value:'phone_app_problems',label:'Phone/App Problems — GPS, auto drop-off, broken device'},
+  {value:'prayer_time',label:'Prayer Time — Wearing slippers or left vehicle'},
+  {value:'simply_forgot',label:'Simply Forgot — Bag, shoes, or proof picture'},
+  {value:'someone_else',label:'Someone Else Did It — Friend or family used account'},
+];
+
+function evalScore(ev){
+  const s=EVAL_QUESTIONS.map(q=>ev[q.key]).filter(v=>v>0);
+  if(!s.length)return 0;
+  return Math.round((s.reduce((a,b)=>a+b,0)/s.length/4)*100);
+}
+function evalAvgRating(ev){
+  const s=EVAL_QUESTIONS.map(q=>ev[q.key]).filter(v=>v>0);
+  if(!s.length)return 0;
+  return+(s.reduce((a,b)=>a+b,0)/s.length).toFixed(2);
+}
+function evalMonthStr(d){
+  const dt=new Date(d);
+  return dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0');
+}
+function ratingBadge(v){
+  if(!v)return'<span style="font-size:10px;color:var(--g3)">--</span>';
+  return'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:12px;background:'+RC[v][0]+';color:'+RC[v][1]+'">'+v+' — '+RATING_LABELS[v]+'</span>';
+}
+function rbBtn(key,n,cur,pfx){
+  pfx=pfx||'rb';
+  const isSel=cur===n;
+  const bg=isSel?RC[n][0]:'var(--sur)';
+  const col=isSel?RC[n][1]:'var(--g3)';
+  const bdr=isSel?RC[n][2]:'var(--g2)';
+  return'<button type="button" data-key="'+key+'" data-val="'+n+'" id="'+pfx+'-'+key+'-'+n+'" onclick="setRating(\''+key+'\','+n+',this,\''+pfx+'\')" style="width:30px;height:30px;border-radius:7px;border:0.5px solid '+bdr+';background:'+bg+';cursor:pointer;font-size:11px;font-weight:600;color:'+col+';font-family:inherit">'+n+'</button>';
+}
+function qFormRow(q,cur,pfx){
+  pfx=pfx||'rb';
+  return'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--g1)"><span style="font-size:11px;flex:1;color:var(--g4)">'+q.label+'</span><div style="display:flex;gap:3px" id="'+pfx+'-wrap-'+q.key+'">'+[1,2,3,4].map(n=>rbBtn(q.key,n,cur,pfx)).join('')+'</div></div>';
+}
+function setRating(key,val,btn,pfx){
+  pfx=pfx||'rb';
+  const wrap=btn.closest('div[id*="wrap"]')||btn.parentElement;
+  wrap.querySelectorAll('button[data-key]').forEach(b=>{
+    b.style.background='var(--sur)';b.style.color='var(--g3)';b.style.borderColor='var(--g2)';
+  });
+  btn.style.background=RC[val][0];btn.style.color=RC[val][1];btn.style.borderColor=RC[val][2];
+}
+function getEvalScores(pfx){
+  pfx=pfx||'rb';
+  const scores={};
+  EVAL_QUESTIONS.forEach(q=>{
+    const wrap=document.getElementById(pfx+'-wrap-'+q.key);
+    if(wrap){wrap.querySelectorAll('button[data-val]').forEach(b=>{if(b.style.background&&b.style.background!=='var(--sur)'&&b.style.background!=='')scores[q.key]=parseInt(b.dataset.val);});}
+    if(!scores[q.key])scores[q.key]=0;
+  });
+  return scores;
+}
+
 function getPerfSettings(){
   const s=D.perfSettings||{};
   return{
@@ -4757,6 +4838,227 @@ async function savePerfSettings(){
   addNotification('Performance settings saved','success');
 }
 
+
+async function submitEvaluation(){
+  const patrollerId=document.getElementById('ev-patroller')?.value;
+  const location=document.getElementById('ev-location')?.value?.trim();
+  const evalDate=document.getElementById('ev-date')?.value;
+  const comment=document.getElementById('ev-comment')?.value?.trim();
+  if(!patrollerId){alert('Please select a patroller.');return;}
+  if(!location){alert('Please enter a location.');return;}
+  const scores=getEvalScores('rb');
+  const missing=EVAL_QUESTIONS.filter(q=>!scores[q.key]);
+  if(missing.length){alert('Please rate all questions. Missing: '+missing[0].label);return;}
+  const pat=D.patrollers.find(p=>p.id===patrollerId);
+  const now=getBahrainNow();
+  const month=now.getUTCFullYear()+'-'+String(now.getUTCMonth()+1).padStart(2,'0');
+  const payload={patroller_id:patrollerId,patroller_name:pat?.name||'',evaluator_id:D.profile.id,evaluator_name:D.profile.full_name,eval_date:evalDate||todayStr(),location,comment:comment||'',month,...scores};
+  const btn=document.querySelector('button[onclick="submitEvaluation()"]');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Saving...';}
+  const{error}=await sb.from('evaluations').insert(payload);
+  if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-circle-check"></i>Submit — score on save';}return;}
+  await reload();
+  addNotification('Evaluation submitted for '+(pat?.name||'patroller'),'success');
+}
+
+function openEvalEdit(evalId){
+  const ev=D.evaluations.find(e=>e.id===evalId);if(!ev)return;
+  const pts=activePats().filter(p=>getUtype(p)==='patroller');
+  const patOptions=pts.map(p=>'<option value="'+p.id+'" '+(p.id===ev.patroller_id?'selected':'')+'>'+p.name+'</option>').join('');
+  const qRows=EVAL_QUESTIONS.map(q=>qFormRow(q,ev[q.key]||0,'edrb')).join('');
+  const html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'+
+    '<div class="fg"><label>Patroller</label><select id="edit-ev-patroller">'+patOptions+'</select></div>'+
+    '<div class="fg"><label>Date</label><input type="date" id="edit-ev-date" value="'+ev.eval_date+'"></div>'+
+    '</div><div class="fg"><label>Location</label><input type="text" id="edit-ev-location" value="'+(ev.location||'')+'"></div>'+
+    '<div>'+qRows+'</div>'+
+    '<div class="fg" style="margin-top:8px"><label>Comment</label><textarea id="edit-ev-comment" rows="2" style="width:100%;padding:8px 10px;border-radius:8px;border:0.5px solid var(--g2);font-family:inherit;font-size:12px;resize:vertical">'+(ev.comment||'')+'</textarea></div>';
+  openM({type:'evalEdit',evalId,html});
+}
+
+async function saveEvalEdit(evalId){
+  const patrollerId=document.getElementById('edit-ev-patroller')?.value;
+  const location=document.getElementById('edit-ev-location')?.value?.trim();
+  const evalDate=document.getElementById('edit-ev-date')?.value;
+  const comment=document.getElementById('edit-ev-comment')?.value?.trim();
+  if(!patrollerId||!location){alert('Please fill in all required fields.');return;}
+  const scores=getEvalScores('edrb');
+  const pat=D.patrollers.find(p=>p.id===patrollerId);
+  const btn=document.getElementById('eval-save-btn');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Saving...';}
+  const{error}=await sb.from('evaluations').update({patroller_id:patrollerId,patroller_name:pat?.name||'',eval_date:evalDate,location,comment:comment||'',updated_at:new Date().toISOString(),...scores}).eq('id',evalId);
+  if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-circle-check"></i>Save changes';}return;}
+  closeM();await reload();
+  addNotification('Evaluation updated','success');
+}
+
+// ── COACHING VIEW ──
+function coachingView(){return performanceView();}
+
+// ── COACHING CASE MODAL ──
+function openCoachingCase(assignmentId){
+  const a=D.coachingAssignments.find(x=>x.id===assignmentId);if(!a)return;
+  const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return;
+  const isDone=a.status==='completed';
+  const rawNum=(c.contact_number||'').replace(/\s/g,'');
+  const dialNum=rawNum.replace(/[^0-9+]/g,'');
+  const waNum=dialNum.startsWith('+')?dialNum.slice(1):dialNum;
+  const contactHtml=rawNum?`<div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;font-weight:600;color:#2A0D0F">${c.contact_number}</span><a href="tel:${dialNum}" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:#EAF1FD;border-radius:7px;color:#1565C0;text-decoration:none" title="Call"><i class="ti ti-phone" style="font-size:14px"></i></a><a href="https://wa.me/${waNum}" target="_blank" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:#DCFCE7;border-radius:7px;color:#16A34A;text-decoration:none" title="WhatsApp"><i class="ti ti-brand-whatsapp" style="font-size:14px"></i></a></div>`:'--';
+  const row=(label,val,custom)=>(val||custom)?`<tr><td style="padding:7px 0;font-size:11px;color:var(--g3);width:140px;vertical-align:middle;text-transform:uppercase;letter-spacing:.04em;font-weight:600">${label}</td><td style="padding:7px 0;font-size:12px;font-weight:600;color:#2A0D0F;border-bottom:1px solid var(--g1)">${custom||val}</td></tr>`:'';
+  const outcomeOptions=COACHING_OUTCOMES.map(o=>`<option value="${o.value}" ${a.outcome===o.value?'selected':''}>${o.label}</option>`).join('');
+  const todayIdx=todayDayIdx();
+  const onDutyPats=activePats().filter(p=>getUtype(p)==='patroller'&&gDZ(p.id,todayIdx)&&p.id!==a.patroller_id&&!isAbsentToday(p.id)&&!isOnVacationToday(p.id));
+  const transferOptions=onDutyPats.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  const transferSection=!isDone?`<div style="margin-top:12px;padding:12px;background:#FFF0E6;border-radius:10px;border:1px solid #FFB380"><div style="font-size:11px;font-weight:700;color:#D94D00;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px"><i class="ti ti-transfer" style="margin-right:4px"></i>Language barrier — transfer case</div><select id="transfer-pat" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid #FFB380;font-family:inherit;font-size:12px;color:var(--g5);background:#fff;margin-bottom:8px"><option value="">-- Select patroller to transfer to --</option>${transferOptions}</select><button onclick="transferCoachingCase('${assignmentId}')" style="width:100%;padding:9px;background:#FF5900;color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer"><i class="ti ti-arrow-right"></i> Transfer Case</button></div>`:'';
+  const html=`<table style="width:100%;border-collapse:collapse;margin-bottom:4px">${row('Rider ID',c.rider_id)}${row('Rider Name',c.rider_name)}${row('Supplier',c.supplier)}${c.contact_number?row('Contact',null,contactHtml):''}${row('Rider Status',c.rider_status)}${row('Violation Type',c.violation_type)}${row('Level',c.level)}${row('Rooster Action',c.rooster_action)}${row('Action Category',c.action_category)}${row('Violation Summary',c.violation_summary)}${row('Violation Date',c.violation_date)}${c.proof_url?`<tr><td style="padding:7px 0;font-size:11px;color:var(--g3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Proof</td><td style="padding:7px 0"><a href="${c.proof_url}" target="_blank" style="color:#FF5900;font-size:12px;font-weight:600"><i class="ti ti-external-link"></i> View proof</a></td></tr>`:''}</table>${transferSection}${!isDone?`<div style="margin-top:12px;padding-top:12px;border-top:1.5px solid var(--g2)"><label style="font-size:11px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Coaching outcome <span style="color:#DC2626">*</span></label><select id="coaching-outcome" style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;color:var(--g5);background:var(--sur)"><option value="">-- Select outcome --</option>${outcomeOptions}</select></div>`:`<div style="margin-top:12px;padding:10px 13px;background:#DCFCE7;border-radius:8px;font-size:12px;color:#166534;font-weight:600">✓ Completed ${a.completed_at?new Date(a.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):''}${a.outcome?' · '+(COACHING_OUTCOMES.find(o=>o.value===a.outcome)?.label||a.outcome):''}</div>`}`;
+  openM({type:'coachingCase',assignmentId,caseId:c.id,html,status:a.status,completedAt:a.completed_at});
+}
+
+async function transferCoachingCase(assignmentId){
+  const patId=document.getElementById('transfer-pat')?.value;
+  if(!patId){alert('Please select a patroller to transfer to.');return;}
+  const pat=D.patrollers.find(p=>p.id===patId);if(!pat)return;
+  const a=D.coachingAssignments.find(x=>x.id===assignmentId);if(!a)return;
+  const now=new Date();const nowBhr=getBahrainNow();
+  const month=`${nowBhr.getUTCFullYear()}-${String(nowBhr.getUTCMonth()+1).padStart(2,'0')}`;
+  const{error}=await sb.from('coaching_assignments').update({patroller_id:patId,patroller_name:pat.name,transferred_from:a.patroller_id,transfer_reason:'Language barrier',transferred_at:now.toISOString(),status:'pending'}).eq('id',assignmentId);
+  if(error){alert('Transfer failed: '+error.message);return;}
+  closeM();await reload();
+  addNotification(`Case transferred to ${pat.name}`,'info');
+}
+
+async function markCoachingDone(assignmentId){
+  const outcome=document.getElementById('coaching-outcome')?.value;
+  if(!outcome){alert('Please select a coaching outcome before marking complete.');return;}
+  const btn=document.getElementById('coaching-submit-btn');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Saving...';}
+  const now=new Date();const nowBhr=getBahrainNow();
+  const month=`${nowBhr.getUTCFullYear()}-${String(nowBhr.getUTCMonth()+1).padStart(2,'0')}`;
+  const{error}=await sb.from('coaching_assignments').update({status:'completed',completed_at:now.toISOString(),completed_by_name:D.profile.full_name,outcome,month}).eq('id',assignmentId);
+  if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-circle-check"></i>Mark as Completed';}return;}
+  const a=D.coachingAssignments.find(x=>x.id===assignmentId);
+  const c=a?D.coachingCases.find(x=>x.id===a.case_id):null;
+  if(c){sendWebhook('coaching_completed',{case_id:c.id,rider_id:c.rider_id,rider_name:c.rider_name,patroller_name:D.profile.full_name,outcome,completed_at:now.toISOString(),month});}
+  closeM();await reload();
+  addNotification('Coaching case marked complete','success');
+}
+
+async function autoAssignCoaching(){
+  if(!confirm('Auto-assign all unassigned cases equally among today\'s duty patrollers?'))return;
+  const today=todayStr();const todayIdx=todayDayIdx();
+  const onDuty=activePats().filter(p=>getUtype(p)==='patroller'&&gDZ(p.id,todayIdx)&&!isAbsentToday(p.id)&&!isOnVacationToday(p.id));
+  if(!onDuty.length){alert('No patrollers on duty today. Use the reassign dropdown to assign manually.');return;}
+  const unassigned=D.coachingCases.filter(c=>!D.coachingAssignments.find(a=>a.case_id===c.id));
+  if(!unassigned.length){addNotification('All cases already assigned','info');return;}
+  const now=getBahrainNow();
+  const month=`${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}`;
+  const inserts=unassigned.map((c,i)=>({case_id:c.id,patroller_id:onDuty[i%onDuty.length].id,patroller_name:onDuty[i%onDuty.length].name,status:'pending',month,assigned_date:today,assigned_by:D.profile.id}));
+  const{error}=await sb.from('coaching_assignments').insert(inserts);
+  if(error){alert('Error assigning: '+error.message);return;}
+  await reload();
+  addNotification(`${inserts.length} cases assigned to ${onDuty.length} patrollers`,'success');
+}
+
+async function reassignCase(caseId,patrollerId){
+  if(!patrollerId)return;
+  const pat=D.patrollers.find(p=>p.id===patrollerId);if(!pat)return;
+  const now=getBahrainNow();
+  const month=`${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}`;
+  const existing=D.coachingAssignments.find(a=>a.case_id===caseId);
+  if(existing){await sb.from('coaching_assignments').update({patroller_id:patrollerId,patroller_name:pat.name,status:'pending'}).eq('id',existing.id);}
+  else{await sb.from('coaching_assignments').insert({case_id:caseId,patroller_id:patrollerId,patroller_name:pat.name,status:'pending',month,assigned_date:todayStr(),assigned_by:D.profile.id});}
+  await reload();
+  addNotification(`Case reassigned to ${pat.name}`,'success');
+}
+
+// ── OVERTIME VIEW ──
+function overtimeView(){
+  const pts=activePats().filter(p=>getUtype(p)==='patroller');
+  const patOptions=pts.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  const summaryRows=(D.overtimeRequests||[]).map(ot=>{
+    const pat=D.patrollers.find(p=>p.id===ot.patroller_id);
+    const start=new Date(ot.start_datetime);const end=new Date(ot.end_datetime);
+    const diffMs=end-start;const hrs=Math.floor(diffMs/3600000);const mins=Math.floor((diffMs%3600000)/60000);
+    const durLabel=hrs>0?`${hrs}h ${mins}m`:`${mins}m`;
+    const fmtDT=dt=>new Date(dt).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Bahrain'});
+    return`<tr><td class="lt" style="font-size:11px;font-weight:600">${pat?.name||ot.patroller_name||'--'}</td><td style="font-size:11px">${fmtDT(ot.start_datetime)}</td><td style="font-size:11px">${fmtDT(ot.end_datetime)}</td><td style="font-size:11px;font-weight:700;color:#FF5900">${durLabel}</td><td style="font-size:11px">${ot.requested_by||'--'}</td><td style="font-size:11px;max-width:200px">${ot.ot_reason||'--'}</td><td><button onclick="deleteOT('${ot.id}')" style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:13px" title="Delete"><i class="ti ti-trash"></i></button></td></tr>`;
+  }).join('');
+  const otNow=getBahrainNow();
+  const otCurMonth=otNow.getUTCFullYear()+'-'+String(otNow.getUTCMonth()+1).padStart(2,'0');
+  const otThisMonth=(D.overtimeRequests||[]).filter(ot=>ot.start_datetime&&ot.start_datetime.startsWith(otCurMonth));
+  const otTotalMins=otThisMonth.reduce((s,ot)=>{const ms=new Date(ot.end_datetime)-new Date(ot.start_datetime);return s+(ms>0?Math.floor(ms/60000):0);},0);
+  const otHrs=Math.floor(otTotalMins/60);const otMins2=otTotalMins%60;
+  const otPatTotals={};
+  otThisMonth.forEach(ot=>{const pat=D.patrollers.find(p=>p.id===ot.patroller_id);const name=pat?.name||ot.patroller_name||'Unknown';if(!otPatTotals[name])otPatTotals[name]=0;const ms=new Date(ot.end_datetime)-new Date(ot.start_datetime);if(ms>0)otPatTotals[name]+=Math.floor(ms/60000);});
+  const otPatRows=Object.entries(otPatTotals).sort((a,b)=>b[1]-a[1]).map(([name,m])=>{const h=Math.floor(m/60);const mn=m%60;return'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f5f0ea"><span style="font-size:12px;font-weight:600">'+name+'</span><span style="font-size:12px;font-weight:700;color:#FF5900">'+h+'h '+mn+'m</span></div>';}).join('');
+  const otMonthlySummaryHtml='<div style="text-align:center;margin-bottom:12px"><div style="font-size:28px;font-weight:800;color:#FF5900">'+otHrs+'h '+otMins2+'m</div><div style="font-size:11px;color:#999">Total OT this month</div></div><div style="font-size:11px;color:#DC2626;font-weight:600;margin-bottom:8px">'+otThisMonth.length+' submissions</div>'+(otPatRows||'<div style="font-size:12px;color:#999;padding:10px 0;text-align:center">No OT this month</div>');
+  const html=`
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+    <div class="tcard" style="padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px"><i class="ti ti-clock-plus" style="margin-right:5px"></i>Submit Overtime</div>
+      <div style="display:grid;gap:10px">
+        <div class="fg"><label>Patroller</label><select id="ot-patroller"><option value="">-- Select patroller --</option>${patOptions}</select></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="fg"><label>Start Date & Time</label><input type="datetime-local" id="ot-start" style="padding:9px 10px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;width:100%"></div>
+          <div class="fg"><label>End Date & Time</label><input type="datetime-local" id="ot-end" style="padding:9px 10px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;width:100%"></div>
+        </div>
+        <div id="ot-duration-preview" style="font-size:12px;color:#FF5900;font-weight:700;min-height:18px"></div>
+        <div class="fg"><label>OT Requested By</label><input type="text" id="ot-requested-by" placeholder="e.g. Ahmed Al Mansoori" style="padding:9px 10px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;width:100%"></div>
+        <div class="fg"><label>OT Reason</label><textarea id="ot-reason" rows="3" placeholder="Describe the reason for overtime..." style="padding:9px 10px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;width:100%;resize:vertical"></textarea></div>
+        <button onclick="submitOT()" class="btn btn-primary" style="width:100%;padding:11px;justify-content:center"><i class="ti ti-circle-check"></i>Submit Overtime</button>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="tcard" style="padding:14px">
+        <div style="font-size:11px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">This Month Summary</div>
+        ${otMonthlySummaryHtml}
+      </div>
+    </div>
+  </div>
+  <div>
+    <div style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px"><i class="ti ti-list" style="font-size:12px;margin-right:5px"></i>All Overtime Records (${(D.overtimeRequests||[]).length})</div>
+    ${(D.overtimeRequests||[]).length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-clock-plus" style="font-size:36px;display:block;opacity:.2;margin-bottom:10px"></i>No overtime records yet</div>`:`
+    <div class="tcard"><div class="t-scroll"><table style="min-width:800px"><thead><tr>
+      <th class="lt">Patroller</th><th>Start</th><th>End</th><th>Total Hours</th><th>Requested By</th><th>Reason</th><th></th>
+    </tr></thead><tbody>${summaryRows}</tbody></table></div></div>`}
+  </div>`;
+  setTimeout(()=>{
+    const s=document.getElementById('ot-start');const e=document.getElementById('ot-end');
+    if(s)s.addEventListener('change',updateOTPreview);
+    if(e)e.addEventListener('change',updateOTPreview);
+  },100);
+  return html;
+}
+
+function updateOTPreview(){
+  const s=document.getElementById('ot-start')?.value;const e=document.getElementById('ot-end')?.value;
+  const el=document.getElementById('ot-duration-preview');if(!el)return;
+  if(s&&e){const ms=new Date(e)-new Date(s);if(ms>0){const h=Math.floor(ms/3600000);const m=Math.floor((ms%3600000)/60000);el.textContent='⏱ Duration: '+h+'h '+m+'m';}else el.textContent='⚠ End must be after start';}else el.textContent='';
+}
+
+async function submitOT(){
+  const patrollerId=document.getElementById('ot-patroller')?.value;
+  const startRaw=document.getElementById('ot-start')?.value;const endRaw=document.getElementById('ot-end')?.value;
+  const requestedBy=document.getElementById('ot-requested-by')?.value?.trim();const reason=document.getElementById('ot-reason')?.value?.trim();
+  if(!patrollerId){alert('Please select a patroller.');return;}
+  if(!startRaw||!endRaw){alert('Please set start and end date/time.');return;}
+  if(new Date(endRaw)<=new Date(startRaw)){alert('End time must be after start time.');return;}
+  if(!requestedBy){alert('Please enter who requested the OT.');return;}
+  if(!reason){alert('Please enter the OT reason.');return;}
+  const pat=D.patrollers.find(p=>p.id===patrollerId);
+  const btn=document.querySelector('button[onclick="submitOT()"]');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Saving...';}
+  const{error}=await sb.from('overtime_requests').insert({patroller_id:patrollerId,patroller_name:pat?.name||'',start_datetime:new Date(startRaw).toISOString(),end_datetime:new Date(endRaw).toISOString(),requested_by:requestedBy,ot_reason:reason,submitted_by:D.profile.id,submitted_by_name:D.profile.full_name});
+  if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-circle-check"></i>Submit Overtime';}return;}
+  ['ot-patroller','ot-start','ot-end','ot-requested-by','ot-reason'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const prev=document.getElementById('ot-duration-preview');if(prev)prev.textContent='';
+  await reload();addNotification(`OT submitted for ${pat?.name||'patroller'}`,'success');
+}
+
+async function deleteOT(id){
+  if(!confirm('Delete this overtime record?'))return;
+  await sb.from('overtime_requests').delete().eq('id',id);
+  await reload();addNotification('OT record deleted','info');
+}
 
 // ── GLOBAL ERROR HANDLER ──
 window.addEventListener('error', (e) => {
