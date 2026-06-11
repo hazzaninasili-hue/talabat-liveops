@@ -2036,7 +2036,7 @@ function renderModal(){
     ${m.html}
     <div class="modal-footer">
       <button class="btn" onclick="closeM()">Close</button>
-      ${!isDone?`<button class="btn btn-primary" onclick="markCoachingDone('${m.assignmentId}')"><i class="ti ti-circle-check"></i>Mark as Completed</button>`:`<span style="font-size:12px;color:#166534;font-weight:600"><i class="ti ti-circle-check"></i> Completed ${a.completed_at?new Date(a.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):''}</span>`}
+      ${!isDone?`<button id="coaching-submit-btn" class="btn btn-primary" onclick="markCoachingDone('${m.assignmentId}')"><i class="ti ti-circle-check"></i>Mark as Completed</button>`:''}
     </div>`;
     return;
   }
@@ -4151,7 +4151,7 @@ function coachingView(){
     const unassignedCases=D.coachingCases.filter(c=>!D.coachingAssignments.find(a=>a.case_id===c.id));
 
     // Cases table
-    const caseRows=D.coachingCases.slice(0,50).map(c=>{
+    const caseRows=D.coachingCases.map(c=>{
       const asgn=D.coachingAssignments.find(a=>a.case_id===c.id);
       const pat=asgn?D.patrollers.find(p=>p.id===asgn.patroller_id):null;
       const statusBg=asgn?.status==='completed'?'background:#DCFCE7;color:#166534':asgn?'background:#FEF3C7;color:#D97706':'background:#F1F5F9;color:#64748B';
@@ -4216,8 +4216,7 @@ function coachingView(){
       ${D.coachingCases.length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-school" style="font-size:40px;display:block;margin-bottom:10px;opacity:.3"></i><b>No coaching cases yet</b><div style="font-size:12px;margin-top:6px;max-width:300px;margin-left:auto;margin-right:auto">Cases will appear here automatically once data is added to the Coaching tab in Google Sheets.</div></div>`:`
       <div class="tcard" style="margin-top:8px"><div class="t-scroll"><table style="table-layout:auto;min-width:900px"><thead><tr>
         <th class="lt">Rider Name</th><th>Rider ID</th><th>Violation</th><th>Level</th><th>Date</th><th>Status</th><th>Assigned To</th><th>Completed At</th>${isAL?'<th>Reassign</th>':''}
-      </tr></thead><tbody>${caseRows}</tbody></table></div></div>
-      ${D.coachingCases.length>50?`<div style="padding:8px 14px;font-size:11px;color:var(--g3);text-align:center">Showing 50 of ${D.coachingCases.length} cases</div>`:''}`}
+      </tr></thead><tbody>${caseRows}</tbody></table></div></div>`}
     </div>`;
   }
 
@@ -4329,28 +4328,73 @@ async function reassignCase(caseId,patrollerId){
   addNotification(`Case reassigned to ${pat.name}`,'success');
 }
 
+const COACHING_OUTCOMES=[
+  {value:'rider_coached',label:'✅ Rider has been coached'},
+  {value:'rider_acknowledged',label:'✅ Rider acknowledged'},
+  {value:'no_answer',label:'📵 No answer'},
+  {value:'washing_cleaning',label:'🧺 Washing/Cleaning – Jacket or uniform being washed'},
+  {value:'no_time',label:'⏱ No Time – Long shift, rushing, in a hurry'},
+  {value:'didnt_know',label:'❓ Didn\'t Know – Unaware of policy'},
+  {value:'vendors_fault',label:'🏪 Vendor\'s Fault – Misusing ready button or no photos'},
+  {value:'health_issues',label:'🩺 Health Issues – Foot infection, injury, or medical'},
+  {value:'bad_weather',label:'🌧 Bad Weather – Rain, dust, or fog'},
+  {value:'phone_app_problems',label:'📱 Phone/App Problems – GPS, auto drop-off, broken device'},
+  {value:'prayer_time',label:'🕌 Prayer Time – Wearing slippers or left vehicle'},
+  {value:'simply_forgot',label:'🎒 Simply Forgot – Bag, shoes, or proof picture'},
+  {value:'someone_else',label:'👤 Someone Else Did It – Friend or family used account'},
+];
+
 function openCoachingCase(assignmentId){
   const a=D.coachingAssignments.find(x=>x.id===assignmentId);if(!a)return;
   const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return;
-  const row=(label,val)=>val?`<tr><td style="padding:8px 0;font-size:12px;color:var(--g3);width:160px;vertical-align:top">${label}</td><td style="padding:8px 0;font-size:12px;font-weight:600;color:#2A0D0F">${val}</td></tr>`:'';
-  openM({type:'coachingCase',assignmentId,caseId:c.id,
-    html:`<table style="width:100%;border-collapse:collapse">
-      ${row('Rider Name',c.rider_name)}
-      ${row('Rider ID',c.rider_id)}
-      ${row('Supplier',c.supplier)}
-      ${row('Contact',c.contact_number)}
-      ${row('Violation Type',c.violation_type)}
-      ${row('Level',c.level)}
-      ${row('Rooster Action',c.rooster_action)}
-      ${row('Action Category',c.action_category)}
-      ${row('Violation Summary',c.violation_summary)}
-      ${row('Violation Date',c.violation_date)}
-      ${c.proof_url?`<tr><td style="padding:8px 0;font-size:12px;color:var(--g3)">Proof</td><td style="padding:8px 0"><a href="${c.proof_url}" target="_blank" style="color:#FF5900;font-size:12px"><i class="ti ti-external-link"></i> View proof</a></td></tr>`:''}
-    </table>`,
-    status:a.status,completedAt:a.completed_at});
+  const isDone=a.status==='completed';
+
+  // Contact number with call/WhatsApp buttons
+  const contactHtml=c.contact_number?`
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:12px;font-weight:600;color:#2A0D0F">${c.contact_number}</span>
+      <a href="tel:${c.contact_number.replace(/\s/g,'')}" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:#EAF1FD;border-radius:7px;color:#1565C0;text-decoration:none" title="Call"><i class="ti ti-phone" style="font-size:14px"></i></a>
+      <a href="https://wa.me/${c.contact_number.replace(/[^0-9]/g,'')}" target="_blank" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:#DCFCE7;border-radius:7px;color:#16A34A;text-decoration:none" title="WhatsApp"><i class="ti ti-brand-whatsapp" style="font-size:14px"></i></a>
+    </div>`:'--';
+
+  const row=(label,val,custom)=>val||custom?`<tr><td style="padding:8px 0;font-size:12px;color:var(--g3);width:140px;vertical-align:middle">${label}</td><td style="padding:8px 0;font-size:12px;font-weight:600;color:#2A0D0F">${custom||val}</td></tr>`:''
+
+  const outcomeOptions=COACHING_OUTCOMES.map(o=>`<option value="${o.value}" ${a.outcome===o.value?'selected':''}>${o.label}</option>`).join('');
+
+  const html=`<table style="width:100%;border-collapse:collapse">
+    ${row('Rider Name',c.rider_name)}
+    ${row('Rider ID',c.rider_id)}
+    ${row('Supplier',c.supplier)}
+    ${c.contact_number?row('Contact',null,contactHtml):''}
+    ${row('Violation Type',c.violation_type)}
+    ${row('Level',c.level)}
+    ${row('Rooster Action',c.rooster_action)}
+    ${row('Action Category',c.action_category)}
+    ${row('Violation Summary',c.violation_summary)}
+    ${row('Violation Date',c.violation_date)}
+    ${c.proof_url?`<tr><td style="padding:8px 0;font-size:12px;color:var(--g3)">Proof</td><td style="padding:8px 0"><a href="${c.proof_url}" target="_blank" style="color:#FF5900;font-size:12px"><i class="ti ti-external-link"></i> View proof</a></td></tr>`:''}
+  </table>
+  ${!isDone?`
+  <div style="margin-top:14px;padding-top:14px;border-top:1.5px solid var(--g2)">
+    <label style="font-size:11px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Coaching outcome <span style="color:#DC2626">*</span></label>
+    <select id="coaching-outcome" style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;color:var(--g5);background:var(--sur)">
+      <option value="">-- Select outcome --</option>
+      ${outcomeOptions}
+    </select>
+  </div>`
+  :`<div style="margin-top:12px;padding:10px 13px;background:#DCFCE7;border-radius:8px;font-size:12px;color:#166534;font-weight:600">
+    ✓ Completed ${a.completed_at?new Date(a.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):''}
+    ${a.outcome?` · ${COACHING_OUTCOMES.find(o=>o.value===a.outcome)?.label||a.outcome}`:''}
+  </div>`}`;
+
+  openM({type:'coachingCase',assignmentId,caseId:c.id,html,status:a.status,completedAt:a.completed_at});
 }
 
 async function markCoachingDone(assignmentId){
+  const outcome=document.getElementById('coaching-outcome')?.value;
+  if(!outcome){alert('Please select a coaching outcome before marking complete.');return;}
+  const btn=document.getElementById('coaching-submit-btn');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Saving...';}
   const now=new Date();
   const nowBhr=getBahrainNow();
   const month=`${nowBhr.getUTCFullYear()}-${String(nowBhr.getUTCMonth()+1).padStart(2,'0')}`;
@@ -4358,16 +4402,17 @@ async function markCoachingDone(assignmentId){
     status:'completed',
     completed_at:now.toISOString(),
     completed_by_name:D.profile.full_name,
+    outcome,
     month
   }).eq('id',assignmentId);
-  if(error){alert('Error: '+error.message);return;}
-  // Mirror completion back to Google Sheets via webhook
+  if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-circle-check"></i>Mark as Completed';}return;}
   const a=D.coachingAssignments.find(x=>x.id===assignmentId);
   const c=a?D.coachingCases.find(x=>x.id===a.case_id):null;
   if(c){
     sendWebhook('coaching_completed',{
       case_id:c.id,rider_id:c.rider_id,rider_name:c.rider_name,
       patroller_name:D.profile.full_name,
+      outcome,
       completed_at:now.toISOString(),
       month
     });

@@ -935,17 +935,36 @@ function renderCoaching(){
   return html;
 }
 
+const COACHING_OUTCOMES=[
+  {value:'rider_coached',label:'✅ Rider has been coached'},
+  {value:'rider_acknowledged',label:'✅ Rider acknowledged'},
+  {value:'no_answer',label:'📵 No answer'},
+  {value:'washing_cleaning',label:'🧺 Washing/Cleaning – Jacket or uniform being washed'},
+  {value:'no_time',label:'⏱ No Time – Long shift, rushing, in a hurry'},
+  {value:'didnt_know',label:'❓ Didn\'t Know – Unaware of policy'},
+  {value:'vendors_fault',label:'🏪 Vendor\'s Fault – Misusing ready button or no photos'},
+  {value:'health_issues',label:'🩺 Health Issues – Foot infection, injury, or medical'},
+  {value:'bad_weather',label:'🌧 Bad Weather – Rain, dust, or fog'},
+  {value:'phone_app_problems',label:'📱 Phone/App Problems – GPS, auto drop-off, broken device'},
+  {value:'prayer_time',label:'🕌 Prayer Time – Wearing slippers or left vehicle'},
+  {value:'simply_forgot',label:'🎒 Simply Forgot – Bag, shoes, or proof picture'},
+  {value:'someone_else',label:'👤 Someone Else Did It – Friend or family used account'},
+];
+
 function openCoachingCase(assignmentId){
   const a=D.coachingAssignments.find(x=>x.id===assignmentId);if(!a)return;
   const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return;
   const isDone=a.status==='completed';
-  const row=(label,val)=>val?'<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid #f5f5f5"><div style="font-size:12px;color:#999;width:130px;flex-shrink:0">'+label+'</div><div style="font-size:12px;font-weight:600;color:#111;flex:1">'+val+'</div></div>':'';
+  const num=(c.contact_number||'').replace(/\s/g,'');
+  const contactHtml=c.contact_number?'<div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:600">'+c.contact_number+'</span><a href="tel:'+num+'" style="width:34px;height:34px;background:#EAF1FD;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#1565C0;text-decoration:none"><i class="ti ti-phone" style="font-size:17px"></i></a><a href="https://wa.me/'+num.replace(/[^0-9]/g,'')+'" target="_blank" style="width:34px;height:34px;background:#DCFCE7;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#16A34A;text-decoration:none"><i class="ti ti-brand-whatsapp" style="font-size:17px"></i></a></div>':'--';
+  const row=(label,val,custom)=>val||custom?'<div style="display:flex;gap:8px;padding:9px 0;border-bottom:1px solid #f5f5f5"><div style="font-size:12px;color:#999;width:130px;flex-shrink:0">'+label+'</div><div style="font-size:13px;font-weight:600;color:#111;flex:1">'+(custom||val)+'</div></div>':'';
+  const outcomeOptions=COACHING_OUTCOMES.map(o=>'<option value="'+o.value+'" '+(a.outcome===o.value?'selected':'')+'>'+o.label+'</option>').join('');
   const box=document.getElementById('modal-box');
   box.innerHTML='<div class="modal-title"><i class="ti ti-school"></i>Coaching Case</div>'
     +row('Rider Name',c.rider_name)
     +row('Rider ID',c.rider_id)
     +row('Supplier',c.supplier)
-    +row('Contact',c.contact_number)
+    +(c.contact_number?row('Contact',null,contactHtml):'')
     +row('Violation',c.violation_type)
     +row('Level',c.level)
     +row('Rooster Action',c.rooster_action)
@@ -953,29 +972,28 @@ function openCoachingCase(assignmentId){
     +row('Summary',c.violation_summary)
     +row('Date',c.violation_date)
     +(c.proof_url?'<div style="padding:10px 0"><a href="'+c.proof_url+'" target="_blank" style="color:#FF5900;font-size:13px;font-weight:600"><i class="ti ti-external-link"></i> View proof</a></div>':'')
-    +'<div class="modal-footer">'
-    +'<button class="btn" onclick="closeModal()">Close</button>'
-    +(!isDone?'<button class="btn btn-primary" onclick="markCoachingDone(\''+assignmentId+'\')"><i class="ti ti-circle-check"></i>Mark Complete</button>'
-      :'<span style="font-size:12px;color:#16A34A;font-weight:600;display:flex;align-items:center;gap:4px"><i class="ti ti-circle-check"></i>Completed</span>')
+    +(!isDone?'<div style="margin-top:14px"><div class="fg"><label>Coaching outcome</label><select id="coaching-outcome"><option value="">-- Select outcome --</option>'+outcomeOptions+'</select></div></div>'
+      :'<div style="margin-top:12px;padding:10px;background:#DCFCE7;border-radius:10px;font-size:13px;color:#166534;font-weight:600">✓ Completed '+(a.completed_at?new Date(a.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'')+' '+(a.outcome?'· '+(COACHING_OUTCOMES.find(o=>o.value===a.outcome)?.label||a.outcome):'')+'</div>')
+    +'<div class="modal-footer"><button class="btn" onclick="closeModal()">Close</button>'
+    +(!isDone?'<button id="coaching-submit-btn" class="btn btn-primary" onclick="markCoachingDone(\''+assignmentId+'\')"><i class="ti ti-circle-check"></i>Mark Complete</button>':'')
     +'</div>';
   document.getElementById('modal').classList.add('open');
 }
 
 async function markCoachingDone(assignmentId){
-  const btn=document.querySelector('#modal-box .btn-primary');
+  const outcome=document.getElementById('coaching-outcome')?.value;
+  if(!outcome){alert('Please select a coaching outcome.');return;}
+  const btn=document.getElementById('coaching-submit-btn');
   if(btn){btn.disabled=true;btn.textContent='Saving...';}
   const now=new Date();
   const nowBhr=getBahrainNow();
   const month=nowBhr.getUTCFullYear()+'-'+String(nowBhr.getUTCMonth()+1).padStart(2,'0');
   const{error}=await sb.from('coaching_assignments').update({
-    status:'completed',
-    completed_at:now.toISOString(),
-    completed_by_name:D.profile.full_name,
-    month
+    status:'completed',completed_at:now.toISOString(),
+    completed_by_name:D.profile.full_name,outcome,month
   }).eq('id',assignmentId);
   if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.textContent='Mark Complete';}return;}
-  closeModal();
-  await reload();
+  closeModal();await reload();
 }
 
 // ── MODALS ──
