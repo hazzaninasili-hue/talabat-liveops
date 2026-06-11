@@ -4144,8 +4144,9 @@ function coachingView(){
       const assigned=D.coachingAssignments.filter(a=>a.patroller_id===p.id);
       const done=assigned.filter(a=>a.status==='completed').length;
       const pending=assigned.filter(a=>a.status==='pending').length;
-      return{p,assigned:assigned.length,done,pending};
-    }).filter(x=>x.assigned>0).sort((a,b)=>b.assigned-a.assigned);
+      const transferred=D.coachingAssignments.filter(a=>a.transferred_from===p.id).length;
+      return{p,assigned:assigned.length,done,pending,transferred};
+    }).filter(x=>x.assigned>0||x.transferred>0).sort((a,b)=>b.assigned-a.assigned);
 
     // Pending unassigned cases — show assign button
     const unassignedCases=D.coachingCases.filter(c=>!D.coachingAssignments.find(a=>a.case_id===c.id));
@@ -4154,8 +4155,10 @@ function coachingView(){
     const caseRows=D.coachingCases.map(c=>{
       const asgn=D.coachingAssignments.find(a=>a.case_id===c.id);
       const pat=asgn?D.patrollers.find(p=>p.id===asgn.patroller_id):null;
+      const fromPat=asgn?.transferred_from?D.patrollers.find(p=>p.id===asgn.transferred_from):null;
       const statusBg=asgn?.status==='completed'?'background:#DCFCE7;color:#166534':asgn?'background:#FEF3C7;color:#D97706':'background:#F1F5F9;color:#64748B';
       const statusLabel=asgn?.status==='completed'?'✓ Done':asgn?'⏳ Pending':'— Unassigned';
+      const transferTag=fromPat?`<div style="font-size:9px;color:#D97706;margin-top:2px"><i class="ti ti-transfer" style="font-size:9px"></i> Transferred from ${fromPat.name}</div>`:'';
       return`<tr>
         <td class="lt" style="font-size:11px;font-weight:600">${c.rider_name||'--'}</td>
         <td style="font-size:10px;font-family:monospace">${c.rider_id||'--'}</td>
@@ -4163,7 +4166,7 @@ function coachingView(){
         <td style="font-size:10px">${c.level||'--'}</td>
         <td style="font-size:10px">${c.violation_date||'--'}</td>
         <td><span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;${statusBg}">${statusLabel}</span></td>
-        <td style="font-size:10px">${pat?pat.name:'--'}</td>
+        <td style="font-size:10px">${pat?pat.name:'--'}${transferTag}</td>
         <td style="font-size:10px;color:var(--g3)">${asgn?.completed_at?new Date(asgn.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--'}</td>
         ${isAL?`<td style="white-space:nowrap">
           <select onchange="reassignCase('${c.id}',this.value)" style="padding:3px 6px;border-radius:6px;border:1.5px solid var(--g2);font-size:10px;font-family:inherit">
@@ -4175,7 +4178,7 @@ function coachingView(){
     }).join('');
 
     // Patroller breakdown table
-    const breakdownRows=patBreakdown.map(({p,assigned,done,pending})=>{
+    const breakdownRows=patBreakdown.map(({p,assigned,done,pending,transferred})=>{
       const pct=assigned?Math.round(done/assigned*100):0;
       const barCol=pct===100?'#16A34A':pct>=50?'#D97706':'#DC2626';
       return`<tr>
@@ -4183,6 +4186,7 @@ function coachingView(){
         <td style="font-weight:700;color:#411517">${assigned}</td>
         <td style="font-weight:700;color:#166534">${done}</td>
         <td style="font-weight:700;color:#D97706">${pending}</td>
+        <td>${transferred>0?`<span style="font-size:10px;font-weight:600;background:#FEF3C7;color:#D97706;padding:2px 7px;border-radius:6px">${transferred} transferred out</span>`:'<span style="font-size:10px;color:var(--g3)">--</span>'}</td>
         <td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${barCol}"></div></div><span style="font-size:10px;font-weight:700;color:${barCol};min-width:30px">${pct}%</span></div></td>
       </tr>`;
     }).join('');
@@ -4207,7 +4211,7 @@ function coachingView(){
     <div style="margin-bottom:14px">
       <strong style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-chart-bar" style="font-size:12px;margin-right:5px"></i>Patroller Progress</strong>
       <div class="tcard" style="margin-top:8px"><div class="t-scroll"><table style="table-layout:auto"><thead><tr>
-        <th class="lt">Patroller</th><th>Assigned</th><th style="color:#166534">Done</th><th style="color:#D97706">Pending</th><th style="min-width:120px">Progress</th>
+        <th class="lt">Patroller</th><th>Assigned</th><th style="color:#166534">Done</th><th style="color:#D97706">Pending</th><th>Transferred Out</th><th style="min-width:120px">Progress</th>
       </tr></thead><tbody>${breakdownRows}</tbody></table></div></div>
     </div>`:''}
 
