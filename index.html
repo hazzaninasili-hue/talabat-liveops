@@ -4446,6 +4446,26 @@ function overtimeView(){
     </tr>`;
   }).join('');
 
+  // Pre-compute monthly summary (avoid IIFE inside template literal)
+  const otNow=getBahrainNow();
+  const otCurMonth=otNow.getUTCFullYear()+'-'+String(otNow.getUTCMonth()+1).padStart(2,'0');
+  const otThisMonth=(D.overtimeRequests||[]).filter(ot=>ot.start_datetime&&ot.start_datetime.startsWith(otCurMonth));
+  const otTotalMins=otThisMonth.reduce((s,ot)=>{const ms=new Date(ot.end_datetime)-new Date(ot.start_datetime);return s+(ms>0?Math.floor(ms/60000):0);},0);
+  const otHrs=Math.floor(otTotalMins/60);const otMins2=otTotalMins%60;
+  const otPatTotals={};
+  otThisMonth.forEach(ot=>{
+    const pat=D.patrollers.find(p=>p.id===ot.patroller_id);
+    const name=pat?.name||ot.patroller_name||'Unknown';
+    if(!otPatTotals[name])otPatTotals[name]=0;
+    const ms=new Date(ot.end_datetime)-new Date(ot.start_datetime);
+    if(ms>0)otPatTotals[name]+=Math.floor(ms/60000);
+  });
+  const otPatRows=Object.entries(otPatTotals).sort((a,b)=>b[1]-a[1]).map(([name,m])=>{
+    const h=Math.floor(m/60);const mn=m%60;
+    return'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f5f0ea"><span style="font-size:12px;font-weight:600">'+name+'</span><span style="font-size:12px;font-weight:700;color:#FF5900">'+h+'h '+mn+'m</span></div>';
+  }).join('');
+  const otMonthlySummaryHtml='<div style="text-align:center;margin-bottom:12px"><div style="font-size:28px;font-weight:800;color:#FF5900">'+otHrs+'h '+otMins2+'m</div><div style="font-size:11px;color:#999">Total OT this month</div></div><div style="font-size:11px;color:#DC2626;font-weight:600;margin-bottom:8px">'+otThisMonth.length+' submissions</div>'+(otPatRows||'<div style="font-size:12px;color:#999;padding:10px 0;text-align:center">No OT this month</div>');
+
   const html=`
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
     <!-- Submission Form -->
@@ -4486,34 +4506,7 @@ function overtimeView(){
     <div style="display:flex;flex-direction:column;gap:10px">
       <div class="tcard" style="padding:14px">
         <div style="font-size:11px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">This Month Summary</div>
-        ${(()=>{
-          const now=getBahrainNow();
-          const curMonth=`${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}`;
-          const thisMonth=(D.overtimeRequests||[]).filter(ot=>ot.start_datetime?.startsWith(curMonth));
-          const totalMins=thisMonth.reduce((s,ot)=>{
-            const ms=new Date(ot.end_datetime)-new Date(ot.start_datetime);
-            return s+(ms>0?Math.floor(ms/60000):0);
-          },0);
-          const hrs=Math.floor(totalMins/60);const mins=totalMins%60;
-          const patTotals={};
-          thisMonth.forEach(ot=>{
-            const pat=D.patrollers.find(p=>p.id===ot.patroller_id);
-            const name=pat?.name||ot.patroller_name||'Unknown';
-            if(!patTotals[name])patTotals[name]=0;
-            const ms=new Date(ot.end_datetime)-new Date(ot.start_datetime);
-            if(ms>0)patTotals[name]+=Math.floor(ms/60000);
-          });
-          const patRows=Object.entries(patTotals).sort((a,b)=>b[1]-a[1]).map(([name,mins])=>{
-            const h=Math.floor(mins/60);const m=mins%60;
-            return`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--g1)"><span style="font-size:12px;font-weight:600">${name}</span><span style="font-size:12px;font-weight:700;color:#FF5900">${h}h ${m}m</span></div>`;
-          }).join('');
-          return`<div style="text-align:center;margin-bottom:12px">
-            <div style="font-size:28px;font-weight:800;color:#FF5900">${hrs}h ${mins}m</div>
-            <div style="font-size:11px;color:var(--g3)">Total OT this month</div>
-          </div>
-          <div style="font-size:11px;color:#DC2626;font-weight:600">${thisMonth.length} submissions</div>
-          ${patRows||'<div style="font-size:12px;color:var(--g3);padding:10px 0;text-align:center">No OT this month</div>'}`;
-        })()}
+        ${otMonthlySummaryHtml}
       </div>
     </div>
   </div>
@@ -4535,6 +4528,7 @@ function overtimeView(){
   },100);
 
   return html;
+}
 
 function updateOTPreview(){
   const s=document.getElementById('ot-start')?.value;
