@@ -3124,12 +3124,12 @@ function dlAttendance(){
 }
 
 
-const TASK_TYPES=['Task','Meeting','Training','Other'];
+const TASK_TYPES=['Task','Meeting','Training','1 on 1 Coaching','Other'];
 const TASK_COLORS={
-  'Task':'#FF5900','Meeting':'#1565C0','Training':'#166534','Other':'#7C3AED',
+  'Task':'#FF5900','Meeting':'#1565C0','Training':'#166534','1 on 1 Coaching':'#7C3AED','Other':'#92400E',
 };
 const TASK_BG={
-  'Task':'#FFF0E6','Meeting':'#E3F2FD','Training':'#DCFCE7','Other':'#EDE9FE',
+  'Task':'#FFF0E6','Meeting':'#E3F2FD','Training':'#DCFCE7','1 on 1 Coaching':'#EDE9FE','Other':'#FEF3C7',
 };
 
 // Helper to get local date string (YYYY-MM-DD) from Date object
@@ -3433,13 +3433,25 @@ function tasksView(){
     const col=TASK_COLORS[t.task_type]||'#411517';
     const bg=TASK_BG[t.task_type]||'#F4EDE3';
     const duration=t.start_time&&t.end_time?`${t.start_time} → ${t.end_time}`:t.start_time?`Started: ${t.start_time}`:'--';
+    const durMins=(()=>{
+      if(!t.start_time||!t.end_time)return 0;
+      const[sh,sm,ss]=(t.start_time+':00').split(':').map(Number);
+      const[eh,em,es]=(t.end_time+':00').split(':').map(Number);
+      let mins=(eh*60+em)-(sh*60+sm);
+      if(mins<0)mins+=24*60;
+      return mins;
+    })();
+    const durLabel=durMins>0?(durMins>=60?`${Math.floor(durMins/60)}h ${durMins%60}m`:`${durMins}m`):'';
+    const timeCell=t.start_time&&t.end_time
+      ?`${t.start_time} → ${t.end_time}${durLabel?`<div style="font-size:10px;font-weight:700;color:#FF5900;margin-top:1px">${durLabel}</div>`:''}`
+      :t.start_time?`Started: ${t.start_time}`:'--';
     const statusDisplay=t.status==='Running'?`<i class="ti ti-circle-filled" style="font-size:6px;margin-right:4px;animation:pulse 1.5s infinite"></i>${t.status}`:`${t.status==='Completed'?'✓':''} ${t.status}`;
     
     return`<tr>
       <td class="lt" style="font-weight:600">${t.patroller_name||'--'}</td>
       <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${bg};color:${col}">${t.task_type}</span></td>
       <td style="font-family:monospace;font-size:11px">${t.date||'--'}</td>
-      <td style="font-size:11px">${duration}</td>
+      <td style="font-size:11px">${timeCell}</td>
       <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.description||'--'}</td>
       <td><span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:8px;${getStatusStyle(t.status)}">${statusDisplay}</span></td>
       ${ed?`<td style="white-space:nowrap">
@@ -3475,10 +3487,17 @@ function myTasksView(){
     const col=TASK_COLORS[t.task_type]||'#411517';
     const bg=TASK_BG[t.task_type]||'#F4EDE3';
     const sc=t.status==='Approved'?'background:#DCFCE7;color:#166534':t.status==='Rejected'?'background:#FEE2E2;color:#991B1B':'background:#FEF3C7;color:#92400E';
+    const durMins2=(()=>{
+      if(!t.start_time||!t.end_time)return 0;
+      const[sh,sm]=(t.start_time+':00').split(':').map(Number);
+      const[eh,em]=(t.end_time+':00').split(':').map(Number);
+      let m=(eh*60+em)-(sh*60+sm);if(m<0)m+=24*60;return m;
+    })();
+    const durLabel2=durMins2>0?(durMins2>=60?`${Math.floor(durMins2/60)}h ${durMins2%60}m`:`${durMins2}m`):'';
     return`<tr>
       <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${bg};color:${col}">${t.task_type}</span></td>
       <td style="font-family:monospace;font-size:11px">${t.date||'--'}</td>
-      <td style="font-size:11px">${t.start_time||'--'} → ${t.end_time||'--'}</td>
+      <td style="font-size:11px">${t.start_time||'--'} → ${t.end_time||'--'}${durLabel2?`<div style="font-size:10px;font-weight:700;color:#FF5900;margin-top:1px">${durLabel2}</div>`:''}</td>
       <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.description||'--'}</td>
       <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;${sc}">${t.status}</span></td>
     </tr>`;
