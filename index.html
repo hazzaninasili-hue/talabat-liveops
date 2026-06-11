@@ -994,7 +994,44 @@ function dateView(){
         const isAdjD=effEndD&&sh&&effEndD!==sh.end_time;
         const shTime=(!io&&sh)?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}–${fmtT(effEndD)}${isAdjD?' ⚠️':''}`:'';;
         const rowBg=isAbsD?' style="background:#FEE2E2;border-color:#fca5a5"':'';
-        rows+=`<div class="dc-row${io?' off':''}"${rowBg}><div class="dc-av${sh?.shift_type==='evening'?' e':''}${io?' o':''}" style="${isAbsD?'background:#DC2626;color:#fff':''}"><${isAbsD?'span title="Absent"':'span'}>${ini(p.name)}</span></div><div style="flex:1;min-width:0"><div class="dc-name">${p.name}</div><div class="dc-zone">${(()=>{const ds2=d.toISOString().split('T')[0];const ov2=D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds2>=t.start_date&&ds2<=t.end_date);return ov2?'🌴 On Vacation':io?'Off Day':isAbsD?'<span style="color:#DC2626;font-weight:700">✗ Absent</span>':z;})()}${shTime&&!isAbsD?` · <span style="font-size:9px;color:var(--g3)">${shTime}</span>`:''}</div></div></div>`;});
+        // Build attendance status badge for daily card
+        const ps=(!io&&!isAbsD)?getPatrollerShiftStatus(p.id,di,dayStr):null;
+        let attBadge='';
+        if(ps){
+          if(ps.status==='clocked_in'){
+            const inT=new Date(ps.rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+            // calc expected end = clock_in + shift duration
+            let expEnd='';
+            if(sh&&sh.start_time&&sh.end_time){
+              const[psh,psm]=sh.start_time.split(':').map(Number);
+              const[peh,pem]=sh.end_time.split(':').map(Number);
+              let pSM=psh*60+psm;let pEM=peh*60+pem;if(pEM<=pSM)pEM+=24*60;
+              const dur=pEM-pSM;
+              const[ih,im]=inT.split(':').map(Number);
+              const actualEndM=ih*60+im+dur;
+              expEnd=`${String(Math.floor(actualEndM/60)%24).padStart(2,'0')}:${String(actualEndM%60).padStart(2,'0')}`;
+            }
+            const isEarly=sh&&ps.rec.clock_in&&(()=>{const[ih,im]=inT.split(':').map(Number);const[psh,psm]=sh.start_time.split(':').map(Number);return(ih*60+im)<(psh*60+psm);})();
+            attBadge=`<div style="margin-top:2px;display:flex;gap:3px;flex-wrap:wrap">
+              <span style="font-size:9px;font-weight:700;background:#DCFCE7;color:#166534;padding:1px 5px;border-radius:4px">🟢 In ${inT}</span>
+              ${expEnd?`<span style="font-size:9px;color:#16A34A;padding:1px 4px;border-radius:4px;background:#F0FDF4">→${fmtT(expEnd)}</span>`:''}
+              ${isEarly?`<span style="font-size:9px;font-weight:700;background:#EDE9FE;color:#7C3AED;padding:1px 5px;border-radius:4px">⚡ Early</span>`:''}
+            </div>`;
+          } else if(ps.status==='late'){
+            const h=Math.floor(ps.lateMins/60);const m=ps.lateMins%60;
+            attBadge=`<div style="margin-top:2px"><span style="font-size:9px;font-weight:700;background:#FEE2E2;color:#DC2626;padding:1px 5px;border-radius:4px;animation:pulse 2s infinite">🔴 Late ${h>0?h+'h ':''}${m}m</span></div>`;
+          } else if(ps.status==='completed'){
+            const inT=new Date(ps.rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+            const outT=new Date(ps.rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+            attBadge=`<div style="margin-top:2px"><span style="font-size:9px;font-weight:700;background:#EAF1FD;color:#1565C0;padding:1px 5px;border-radius:4px">✓ ${inT}→${outT}</span></div>`;
+          } else if(ps.status==='early_out_pending'){
+            attBadge=`<div style="margin-top:2px"><span style="font-size:9px;font-weight:700;background:#FEF3C7;color:#D97706;padding:1px 5px;border-radius:4px">⏳ Early out pending</span></div>`;
+          } else if(ps.status==='scheduled'&&dayStr===todayStr()){
+            // upcoming shift today — show scheduled time
+            attBadge=`<div style="margin-top:2px"><span style="font-size:9px;color:var(--g3);padding:1px 4px;border-radius:4px;background:var(--g1)">⏰ Upcoming</span></div>`;
+          }
+        }
+        rows+=`<div class="dc-row${io?' off':''}"${rowBg}><div class="dc-av${sh?.shift_type==='evening'?' e':''}${io?' o':''}" style="${isAbsD?'background:#DC2626;color:#fff':''}"><${isAbsD?'span title="Absent"':'span'}>${ini(p.name)}</span></div><div style="flex:1;min-width:0"><div class="dc-name">${p.name}</div><div class="dc-zone">${(()=>{const ds2=d.toISOString().split('T')[0];const ov2=D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds2>=t.start_date&&ds2<=t.end_date);return ov2?'🌴 On Vacation':io?'Off Day':isAbsD?'<span style="color:#DC2626;font-weight:700">✗ Absent</span>':z;})()}${shTime&&!isAbsD?` · <span style="font-size:9px;color:var(--g3)">${shTime}</span>`:''}</div>${attBadge}</div></div>`;});
     }
     // Coordinator rows
     if(coordinators.length){
@@ -3088,14 +3125,32 @@ function hourlyView(){
     const sh=getDayShift(p.id,selIdx);
     if(!sh||sh.start_time==='?')return null;
     const[sh_h,sh_m]=sh.start_time.split(':').map(Number);
-    // Check for adj_end_time from attendance record
+    const plannedStartH=sh_h+sh_m/60;
+    // Calculate planned duration in hours
+    const[peh,pem]=sh.end_time.split(':').map(Number);
+    let plannedEndH=peh+pem/60;
+    if(plannedEndH<=plannedStartH)plannedEndH+=24;
+    const plannedDurH=plannedEndH-plannedStartH;
+
     const rec=getAttRecordForDate(p.id,selDay);
+    // If clocked in (early or late), use actual clock-in as bar start
+    // and preserve shift duration for bar end
+    if(rec&&rec.clock_in){
+      const inT=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+      const[ih,im]=inT.split(':').map(Number);
+      const actualStartH=ih+im/60;
+      const actualEndH=actualStartH+plannedDurH;
+      // early_mins: how many mins before planned start (positive = early)
+      const earlyMins=Math.max(0,Math.round((plannedStartH-actualStartH)*60));
+      const lateMins=Math.max(0,Math.round((actualStartH-plannedStartH)*60));
+      return{start:actualStartH,end:actualEndH,plannedStart:plannedStartH,type:sh.shift_type,name:sh.name,adjEnd:rec.adj_end_time||null,lateMins,earlyMins};
+    }
+    // Not yet clocked in — use planned times + adj_end if any
     let endStr=getEffectiveEndTime(p.id,sh,selDay)||sh.end_time;
     const[eh,em]=endStr.split(':').map(Number);
-    const startH=sh_h+sh_m/60;
     let endH=eh+em/60;
-    if(endH<=startH)endH+=24;
-    return{start:startH,end:endH,type:sh.shift_type,name:sh.name,adjEnd:rec?.adj_end_time||null,lateMins:rec?.late_mins||0};
+    if(endH<=plannedStartH)endH+=24;
+    return{start:plannedStartH,end:endH,plannedStart:plannedStartH,type:sh.shift_type,name:sh.name,adjEnd:rec?.adj_end_time||null,lateMins:rec?.late_mins||0,earlyMins:0};
   }
 
   function getTasksForDay(pid){
@@ -3143,23 +3198,39 @@ function hourlyView(){
         } else if(ps.status==='clocked_in'){
           bg='#DCFCE7';col='#166534';border='2px solid #16A34A';
           const inT=new Date(ps.rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
-          const adjEnd=ps.rec.adj_end_time||(ps.rec.late_mins>0?`${String(Math.floor((getShiftEndMins(ps.sh)+ps.rec.late_mins)/60)%24).padStart(2,'0')}:${String((getShiftEndMins(ps.sh)+ps.rec.late_mins)%60).padStart(2,'0')}`:null);
-          // Add a "late period" red overlay from shift start to clock-in time
-          if(ps.rec.late_mins>0){
-            const lateStart=sh.start; // shift start hour
-            const lateEnd=lateStart+(ps.rec.late_mins/60);
-            const lateLeft=lateStart*hourW;
-            const lateWidth=(lateEnd-lateStart)*hourW;
-            bars+=`<div style="position:absolute;left:${lateLeft}px;width:${lateWidth}px;top:4px;bottom:4px;background:#FEE2E2;border:1.5px dashed #DC2626;border-radius:6px 0 0 6px;display:flex;align-items:center;justify-content:center;z-index:3"><span style="font-size:8px;color:#DC2626;font-weight:700">🔴 Late</span></div>`;
+          // Calculate actual end time = clock_in + planned shift duration
+          const[ih2,im2]=inT.split(':').map(Number);
+          const actualStartMins=ih2*60+im2;
+          const sh2=getDayShift(p.id,selIdx);
+          let shDurMins=0;
+          if(sh2&&sh2.start_time&&sh2.end_time){
+            const[psh2,psm2]=sh2.start_time.split(':').map(Number);
+            const[peh2,pem2]=sh2.end_time.split(':').map(Number);
+            let pStartM=psh2*60+psm2;let pEndM=peh2*60+pem2;
+            if(pEndM<=pStartM)pEndM+=24*60;
+            shDurMins=pEndM-pStartM;
           }
-          statusOverlay=`<span style="background:#166534;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px">🟢 ${inT}${adjEnd&&ps.rec.late_mins>0?`→${adjEnd}`:''}</span>`;
+          const adjEndMins=actualStartMins+shDurMins;
+          const adjEndStr=`${String(Math.floor(adjEndMins/60)%24).padStart(2,'0')}:${String(adjEndMins%60).padStart(2,'0')}`;
+          const adjEndFmt=fmtT(adjEndStr);
+          // Show early badge if clocked in before planned start
+          const earlyLabel=sh.earlyMins>0?`<span style="background:#7C3AED;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px">⚡ ${sh.earlyMins}m early</span>`:'';
+          // Show late dashed overlay if late (bar already shifted so overlay is from planned start to actual start — not needed now bar starts at clock-in)
+          if(ps.rec.late_mins>0){
+            // Ghost bar showing planned start window
+            const ghostLeft=sh.plannedStart*hourW;
+            const ghostWidth=(sh.start-sh.plannedStart)*hourW;
+            if(ghostWidth>0)bars+=`<div style="position:absolute;left:${ghostLeft}px;width:${ghostWidth}px;top:4px;bottom:4px;background:#FEE2E2;border:1.5px dashed #DC2626;border-radius:6px 0 0 6px;display:flex;align-items:center;justify-content:center;z-index:3"><span style="font-size:7px;color:#DC2626;font-weight:700">Late</span></div>`;
+          }
+          statusOverlay=`<span style="background:#166534;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px">🟢 ${inT}→${adjEndFmt}</span>${earlyLabel}`;
         } else if(ps.status==='completed'){
           bg='#EAF1FD';col='#1565C0';border='1.5px solid #1565C0';
           const inT=new Date(ps.rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
           const outT=new Date(ps.rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
           const mins=Math.round((new Date(ps.rec.clock_out)-new Date(ps.rec.clock_in))/60000);
           const dur=`${Math.floor(mins/60)}h${mins%60}m`;
-          statusOverlay=`<span style="background:#1565C0;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px">✓ ${inT}→${outT} ${dur}</span>`;
+          const earlyLabel=sh.earlyMins>0?`<span style="background:#7C3AED;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px">⚡ ${sh.earlyMins}m early</span>`:'';
+          statusOverlay=`<span style="background:#1565C0;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px">✓ ${inT}→${outT} ${dur}</span>${earlyLabel}`;
         } else if(ps.status==='early_out_pending'){
           bg='#FEF3C7';col='#D97706';border='2px solid #D97706';
           statusOverlay=`<span style="background:#D97706;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px">⏳ Early out</span>`;
