@@ -377,7 +377,7 @@ let D={user:null,profile:null,customRoles:[],leaveBalances:[],tab:'schedule',vie
   shifts:[],areas:[],zones:[],patrollers:[],schedules:[],users:[],
   notesAll:{id:null,content:''},notesPat:{id:null,content:''},notesCoo:{id:null,content:''},
   docs:[],history:[],timeoff:[],attendance:[],attDate:null,opsSub:'areas',locPerms:{},tasks:[],hourlyDay:null,
-  coachingCases:[],coachingAssignments:[]};
+  coachingCases:[],coachingAssignments:[],overtimeRequests:[]};
 
 function showS(n){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display=n==='login'?'flex':'none';if(np)np.style.display=n==='newpw'?'flex':'none';document.getElementById('app').style.display='none';}
 function showApp(){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display='none';if(np)np.style.display='none';document.getElementById('app').style.display='block';}
@@ -656,6 +656,7 @@ async function loadAll(){
     const{data:ca}=await wt(caQuery,5000);
     D.coachingAssignments=ca||[];
   }catch(e){D.coachingAssignments=[];}
+  try{const{data:ot}=await wt(sb.from('overtime_requests').select('*').order('created_at',{ascending:false}),5000);D.overtimeRequests=ot||[];}catch(e){D.overtimeRequests=[];}
   try{
     const{data:att,error:atterr}=await wt(sb.from('attendance').select('*').order('date',{ascending:false}).limit(500),5000);
     if(atterr){console.warn('Attendance table not ready:',atterr.message);D.attendance=[];}
@@ -1203,14 +1204,16 @@ function timeOffView(){
 function timeOffTaskView(){
   if(!D.profile)return'';
   const view=D.view||'timeoff';
+  const isAdminOrLead=canEdit()||D.profile?.role==='lead';
   return `
     <div class="toolbar">
       <div class="seg">
         <button class="seg-btn${view==='timeoff'?' active':''}" onclick="D.view='timeoff';render()"><i class="ti ti-calendar-off"></i>Time Off</button>
         <button class="seg-btn${view==='tasks'?' active':''}" onclick="D.view='tasks';render()"><i class="ti ti-checklist"></i>Tasks</button>
+        ${isAdminOrLead?`<button class="seg-btn${view==='overtime'?' active':''}" onclick="D.view='overtime';render()"><i class="ti ti-clock-plus"></i>Overtime</button>`:''}
       </div>
     </div>
-    ${view==='timeoff'?timeOffView():tasksView()}
+    ${view==='timeoff'?timeOffView():view==='overtime'?overtimeView():tasksView()}
   `;
 }
 async function reviewTO(id,status){
@@ -4144,9 +4147,11 @@ function coachingView(){
       const assigned=D.coachingAssignments.filter(a=>a.patroller_id===p.id);
       const done=assigned.filter(a=>a.status==='completed').length;
       const pending=assigned.filter(a=>a.status==='pending').length;
-      const transferred=D.coachingAssignments.filter(a=>a.transferred_from===p.id).length;
-      return{p,assigned:assigned.length,done,pending,transferred};
-    }).filter(x=>x.assigned>0||x.transferred>0).sort((a,b)=>b.assigned-a.assigned);
+      const transferredOut=D.coachingAssignments.filter(a=>a.transferred_from===p.id).length;
+      const transferredIn=assigned.filter(a=>a.transferred_from&&a.transferred_from!==p.id).length;
+      // Effective assigned = currently assigned (already reflects transfer since we reassign patroller_id)
+      return{p,assigned:assigned.length,done,pending,transferredOut,transferredIn};
+    }).filter(x=>x.assigned>0||x.transferredOut>0).sort((a,b)=>b.assigned-a.assigned);
 
     // Pending unassigned cases — show assign button
     const unassignedCases=D.coachingCases.filter(c=>!D.coachingAssignments.find(a=>a.case_id===c.id));
@@ -4178,15 +4183,18 @@ function coachingView(){
     }).join('');
 
     // Patroller breakdown table
-    const breakdownRows=patBreakdown.map(({p,assigned,done,pending,transferred})=>{
+    const breakdownRows=patBreakdown.map(({p,assigned,done,pending,transferredOut,transferredIn})=>{
       const pct=assigned?Math.round(done/assigned*100):0;
       const barCol=pct===100?'#16A34A':pct>=50?'#D97706':'#DC2626';
+      const transferCol=[];
+      if(transferredOut>0)transferCol.push(`<span style="font-size:10px;font-weight:600;background:#FEE2E2;color:#DC2626;padding:2px 6px;border-radius:5px">↑ ${transferredOut} out</span>`);
+      if(transferredIn>0)transferCol.push(`<span style="font-size:10px;font-weight:600;background:#DCFCE7;color:#166534;padding:2px 6px;border-radius:5px">↓ ${transferredIn} in</span>`);
       return`<tr>
         <td class="lt" style="font-weight:600">${p.name}</td>
         <td style="font-weight:700;color:#411517">${assigned}</td>
         <td style="font-weight:700;color:#166534">${done}</td>
         <td style="font-weight:700;color:#D97706">${pending}</td>
-        <td>${transferred>0?`<span style="font-size:10px;font-weight:600;background:#FEF3C7;color:#D97706;padding:2px 7px;border-radius:6px">${transferred} transferred out</span>`:'<span style="font-size:10px;color:var(--g3)">--</span>'}</td>
+        <td style="white-space:nowrap">${transferCol.length?transferCol.join(' '):'<span style="font-size:10px;color:var(--g3)">--</span>'}</td>
         <td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${barCol}"></div></div><span style="font-size:10px;font-weight:700;color:${barCol};min-width:30px">${pct}%</span></div></td>
       </tr>`;
     }).join('');
@@ -4410,6 +4418,184 @@ async function markCoachingDone(assignmentId){
   }
   closeM();await reload();
   addNotification('Coaching case marked complete','success');
+}
+
+// ── OVERTIME VIEW ──
+function overtimeView(){
+  const pts=activePats().filter(p=>getUtype(p)==='patroller');
+  const patOptions=pts.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+
+  // Summary rows
+  const summaryRows=(D.overtimeRequests||[]).map(ot=>{
+    const pat=D.patrollers.find(p=>p.id===ot.patroller_id);
+    const start=new Date(ot.start_datetime);
+    const end=new Date(ot.end_datetime);
+    const diffMs=end-start;
+    const hrs=Math.floor(diffMs/3600000);
+    const mins=Math.floor((diffMs%3600000)/60000);
+    const durLabel=hrs>0?`${hrs}h ${mins}m`:`${mins}m`;
+    const fmtDT=dt=>new Date(dt).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Bahrain'});
+    return`<tr>
+      <td class="lt" style="font-size:11px;font-weight:600">${pat?.name||ot.patroller_name||'--'}</td>
+      <td style="font-size:11px">${fmtDT(ot.start_datetime)}</td>
+      <td style="font-size:11px">${fmtDT(ot.end_datetime)}</td>
+      <td style="font-size:11px;font-weight:700;color:#FF5900">${durLabel}</td>
+      <td style="font-size:11px">${ot.requested_by||'--'}</td>
+      <td style="font-size:11px;max-width:200px">${ot.ot_reason||'--'}</td>
+      <td><button onclick="deleteOT('${ot.id}')" style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:13px" title="Delete"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  }).join('');
+
+  return`
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+    <!-- Submission Form -->
+    <div class="tcard" style="padding:16px">
+      <div style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px"><i class="ti ti-clock-plus" style="margin-right:5px"></i>Submit Overtime</div>
+      <div style="display:grid;gap:10px">
+        <div class="fg">
+          <label>Patroller</label>
+          <select id="ot-patroller">
+            <option value="">-- Select patroller --</option>
+            ${patOptions}
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="fg">
+            <label>Start Date & Time</label>
+            <input type="datetime-local" id="ot-start" style="padding:9px 10px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;width:100%">
+          </div>
+          <div class="fg">
+            <label>End Date & Time</label>
+            <input type="datetime-local" id="ot-end" style="padding:9px 10px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;width:100%">
+          </div>
+        </div>
+        <div id="ot-duration-preview" style="font-size:12px;color:#FF5900;font-weight:700;min-height:18px"></div>
+        <div class="fg">
+          <label>OT Requested By</label>
+          <input type="text" id="ot-requested-by" placeholder="e.g. Ahmed Al Mansoori" style="padding:9px 10px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;width:100%">
+        </div>
+        <div class="fg">
+          <label>OT Reason</label>
+          <textarea id="ot-reason" rows="3" placeholder="Describe the reason for overtime..." style="padding:9px 10px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;width:100%;resize:vertical"></textarea>
+        </div>
+        <button onclick="submitOT()" class="btn btn-primary" style="width:100%;padding:11px;justify-content:center"><i class="ti ti-circle-check"></i>Submit Overtime</button>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="tcard" style="padding:14px">
+        <div style="font-size:11px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">This Month Summary</div>
+        ${(()=>{
+          const now=getBahrainNow();
+          const curMonth=`${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}`;
+          const thisMonth=(D.overtimeRequests||[]).filter(ot=>ot.start_datetime?.startsWith(curMonth));
+          const totalMins=thisMonth.reduce((s,ot)=>{
+            const ms=new Date(ot.end_datetime)-new Date(ot.start_datetime);
+            return s+(ms>0?Math.floor(ms/60000):0);
+          },0);
+          const hrs=Math.floor(totalMins/60);const mins=totalMins%60;
+          const patTotals={};
+          thisMonth.forEach(ot=>{
+            const pat=D.patrollers.find(p=>p.id===ot.patroller_id);
+            const name=pat?.name||ot.patroller_name||'Unknown';
+            if(!patTotals[name])patTotals[name]=0;
+            const ms=new Date(ot.end_datetime)-new Date(ot.start_datetime);
+            if(ms>0)patTotals[name]+=Math.floor(ms/60000);
+          });
+          const patRows=Object.entries(patTotals).sort((a,b)=>b[1]-a[1]).map(([name,mins])=>{
+            const h=Math.floor(mins/60);const m=mins%60;
+            return`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--g1)"><span style="font-size:12px;font-weight:600">${name}</span><span style="font-size:12px;font-weight:700;color:#FF5900">${h}h ${m}m</span></div>`;
+          }).join('');
+          return`<div style="text-align:center;margin-bottom:12px">
+            <div style="font-size:28px;font-weight:800;color:#FF5900">${hrs}h ${mins}m</div>
+            <div style="font-size:11px;color:var(--g3)">Total OT this month</div>
+          </div>
+          <div style="font-size:11px;color:#DC2626;font-weight:600">${thisMonth.length} submissions</div>
+          ${patRows||'<div style="font-size:12px;color:var(--g3);padding:10px 0;text-align:center">No OT this month</div>'}`;
+        })()}
+      </div>
+    </div>
+  </div>
+
+  <!-- OT Summary Table -->
+  <div>
+    <div style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px"><i class="ti ti-list" style="margin-right:5px"></i>All Overtime Records (${(D.overtimeRequests||[]).length})</div>
+    ${(D.overtimeRequests||[]).length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-clock-plus" style="font-size:36px;display:block;opacity:.2;margin-bottom:10px"></i>No overtime records yet</div>`:`
+    <div class="tcard"><div class="t-scroll"><table style="min-width:800px"><thead><tr>
+      <th class="lt">Patroller</th><th>Start</th><th>End</th><th>Total Hours</th><th>Requested By</th><th>Reason</th><th></th>
+    </tr></thead><tbody>${summaryRows}</tbody></table></div></div>`}
+  </div>
+
+  <script>
+    // Live duration preview
+    document.getElementById('ot-start')?.addEventListener('change',updateOTPreview);
+    document.getElementById('ot-end')?.addEventListener('change',updateOTPreview);
+    function updateOTPreview(){
+      const s=document.getElementById('ot-start')?.value;
+      const e=document.getElementById('ot-end')?.value;
+      const el=document.getElementById('ot-duration-preview');
+      if(!el)return;
+      if(s&&e){
+        const ms=new Date(e)-new Date(s);
+        if(ms>0){const h=Math.floor(ms/3600000);const m=Math.floor((ms%3600000)/60000);el.textContent='Duration: '+h+'h '+m+'m';}
+        else el.textContent='⚠ End must be after start';
+      }else el.textContent='';
+    }
+  </script>`;
+}
+
+async function submitOT(){
+  const patrollerId=document.getElementById('ot-patroller')?.value;
+  const startRaw=document.getElementById('ot-start')?.value;
+  const endRaw=document.getElementById('ot-end')?.value;
+  const requestedBy=document.getElementById('ot-requested-by')?.value?.trim();
+  const reason=document.getElementById('ot-reason')?.value?.trim();
+
+  if(!patrollerId){alert('Please select a patroller.');return;}
+  if(!startRaw||!endRaw){alert('Please set start and end date/time.');return;}
+  if(new Date(endRaw)<=new Date(startRaw)){alert('End time must be after start time.');return;}
+  if(!requestedBy){alert('Please enter who requested the OT.');return;}
+  if(!reason){alert('Please enter the OT reason.');return;}
+
+  const pat=D.patrollers.find(p=>p.id===patrollerId);
+  const btn=document.querySelector('#ot-patroller')?.closest('.tcard')?.querySelector('.btn-primary');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Saving...';}
+
+  // Convert local datetime-local to ISO (treat as Bahrain time UTC+3)
+  const toBahrainISO=local=>{
+    const d=new Date(local);
+    return new Date(d.getTime()-3*60*60*1000).toISOString();
+  };
+
+  const{error}=await sb.from('overtime_requests').insert({
+    patroller_id:patrollerId,
+    patroller_name:pat?.name||'',
+    start_datetime:new Date(startRaw).toISOString(),
+    end_datetime:new Date(endRaw).toISOString(),
+    requested_by:requestedBy,
+    ot_reason:reason,
+    submitted_by:D.profile.id,
+    submitted_by_name:D.profile.full_name,
+  });
+
+  if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-circle-check"></i>Submit Overtime';}return;}
+
+  // Reset form
+  ['ot-patroller','ot-start','ot-end','ot-requested-by','ot-reason'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
+  const prev=document.getElementById('ot-duration-preview');if(prev)prev.textContent='';
+
+  await reload();
+  addNotification(`OT submitted for ${pat?.name||'patroller'}`,'success');
+}
+
+async function deleteOT(id){
+  if(!confirm('Delete this overtime record?'))return;
+  await sb.from('overtime_requests').delete().eq('id',id);
+  await reload();
+  addNotification('OT record deleted','info');
 }
 
 // ── GLOBAL ERROR HANDLER ──
