@@ -4348,46 +4348,33 @@ function openCoachingCase(assignmentId){
   const a=D.coachingAssignments.find(x=>x.id===assignmentId);if(!a)return;
   const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return;
   const isDone=a.status==='completed';
-
-  // Contact number with call/WhatsApp buttons
-  const contactHtml=c.contact_number?`
-    <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:12px;font-weight:600;color:#2A0D0F">${c.contact_number}</span>
-      <a href="tel:${c.contact_number.replace(/\s/g,'')}" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:#EAF1FD;border-radius:7px;color:#1565C0;text-decoration:none" title="Call"><i class="ti ti-phone" style="font-size:14px"></i></a>
-      <a href="https://wa.me/${c.contact_number.replace(/[^0-9]/g,'')}" target="_blank" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:#DCFCE7;border-radius:7px;color:#16A34A;text-decoration:none" title="WhatsApp"><i class="ti ti-brand-whatsapp" style="font-size:14px"></i></a>
-    </div>`:'--';
-
-  const row=(label,val,custom)=>val||custom?`<tr><td style="padding:8px 0;font-size:12px;color:var(--g3);width:140px;vertical-align:middle">${label}</td><td style="padding:8px 0;font-size:12px;font-weight:600;color:#2A0D0F">${custom||val}</td></tr>`:''
-
+  // Build clean dial/WA numbers from contact_number field
+  const rawNum=(c.contact_number||'').replace(/\s/g,'');
+  const dialNum=rawNum.replace(/[^0-9+]/g,'');
+  const waNum=dialNum.startsWith('+')?dialNum.slice(1):dialNum;
+  const contactHtml=rawNum?`<div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;font-weight:600;color:#2A0D0F">${c.contact_number}</span><a href="tel:${dialNum}" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:#EAF1FD;border-radius:7px;color:#1565C0;text-decoration:none" title="Call"><i class="ti ti-phone" style="font-size:14px"></i></a><a href="https://wa.me/${waNum}" target="_blank" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:#DCFCE7;border-radius:7px;color:#16A34A;text-decoration:none" title="WhatsApp"><i class="ti ti-brand-whatsapp" style="font-size:14px"></i></a></div>`:'--';
+  const row=(label,val,custom)=>(val||custom)?`<tr><td style="padding:7px 0;font-size:11px;color:var(--g3);width:140px;vertical-align:middle;text-transform:uppercase;letter-spacing:.04em;font-weight:600">${label}</td><td style="padding:7px 0;font-size:12px;font-weight:600;color:#2A0D0F;border-bottom:1px solid var(--g1)">${custom||val}</td></tr>`:'';
   const outcomeOptions=COACHING_OUTCOMES.map(o=>`<option value="${o.value}" ${a.outcome===o.value?'selected':''}>${o.label}</option>`).join('');
-
-  const html=`<table style="width:100%;border-collapse:collapse">
-    ${row('Rider Name',c.rider_name)}
-    ${row('Rider ID',c.rider_id)}
-    ${row('Supplier',c.supplier)}
-    ${c.contact_number?row('Contact',null,contactHtml):''}
-    ${row('Violation Type',c.violation_type)}
-    ${row('Level',c.level)}
-    ${row('Rooster Action',c.rooster_action)}
-    ${row('Action Category',c.action_category)}
-    ${row('Violation Summary',c.violation_summary)}
-    ${row('Violation Date',c.violation_date)}
-    ${c.proof_url?`<tr><td style="padding:8px 0;font-size:12px;color:var(--g3)">Proof</td><td style="padding:8px 0"><a href="${c.proof_url}" target="_blank" style="color:#FF5900;font-size:12px"><i class="ti ti-external-link"></i> View proof</a></td></tr>`:''}
-  </table>
-  ${!isDone?`
-  <div style="margin-top:14px;padding-top:14px;border-top:1.5px solid var(--g2)">
-    <label style="font-size:11px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Coaching outcome <span style="color:#DC2626">*</span></label>
-    <select id="coaching-outcome" style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;color:var(--g5);background:var(--sur)">
-      <option value="">-- Select outcome --</option>
-      ${outcomeOptions}
-    </select>
-  </div>`
-  :`<div style="margin-top:12px;padding:10px 13px;background:#DCFCE7;border-radius:8px;font-size:12px;color:#166534;font-weight:600">
-    ✓ Completed ${a.completed_at?new Date(a.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):''}
-    ${a.outcome?` · ${COACHING_OUTCOMES.find(o=>o.value===a.outcome)?.label||a.outcome}`:''}
-  </div>`}`;
-
+  // Transfer: on-duty patrollers today excluding current
+  const todayIdx=todayDayIdx();
+  const onDutyPats=activePats().filter(p=>getUtype(p)==='patroller'&&gDZ(p.id,todayIdx)&&p.id!==a.patroller_id&&!isAbsentToday(p.id)&&!isOnVacationToday(p.id));
+  const transferOptions=onDutyPats.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  const transferSection=!isDone?`<div style="margin-top:12px;padding:12px;background:#FFF0E6;border-radius:10px;border:1px solid #FFB380"><div style="font-size:11px;font-weight:700;color:#D94D00;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px"><i class="ti ti-transfer" style="margin-right:4px"></i>Language barrier — transfer case</div><select id="transfer-pat" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid #FFB380;font-family:inherit;font-size:12px;color:var(--g5);background:#fff;margin-bottom:8px"><option value="">-- Select patroller to transfer to --</option>${transferOptions}</select><button onclick="transferCoachingCase('${assignmentId}')" style="width:100%;padding:9px;background:#FF5900;color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer"><i class="ti ti-arrow-right"></i> Transfer Case</button></div>`:'';
+  const html=`<table style="width:100%;border-collapse:collapse;margin-bottom:4px">${row('Rider ID',c.rider_id)}${row('Rider Name',c.rider_name)}${row('Supplier',c.supplier)}${c.contact_number?row('Contact',null,contactHtml):''}${row('Rider Status',c.rider_status)}${row('Violation Type',c.violation_type)}${row('Level',c.level)}${row('Rooster Action',c.rooster_action)}${row('Action Category',c.action_category)}${row('Violation Summary',c.violation_summary)}${row('Violation Date',c.violation_date)}${c.proof_url?`<tr><td style="padding:7px 0;font-size:11px;color:var(--g3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Proof</td><td style="padding:7px 0"><a href="${c.proof_url}" target="_blank" style="color:#FF5900;font-size:12px;font-weight:600"><i class="ti ti-external-link"></i> View proof</a></td></tr>`:''}</table>${transferSection}${!isDone?`<div style="margin-top:12px;padding-top:12px;border-top:1.5px solid var(--g2)"><label style="font-size:11px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Coaching outcome <span style="color:#DC2626">*</span></label><select id="coaching-outcome" style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;color:var(--g5);background:var(--sur)"><option value="">-- Select outcome --</option>${outcomeOptions}</select></div>`:`<div style="margin-top:12px;padding:10px 13px;background:#DCFCE7;border-radius:8px;font-size:12px;color:#166534;font-weight:600">✓ Completed ${a.completed_at?new Date(a.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):''}${a.outcome?' · '+(COACHING_OUTCOMES.find(o=>o.value===a.outcome)?.label||a.outcome):''}</div>`}`;
   openM({type:'coachingCase',assignmentId,caseId:c.id,html,status:a.status,completedAt:a.completed_at});
+}
+
+async function transferCoachingCase(assignmentId){
+  const patId=document.getElementById('transfer-pat')?.value;
+  if(!patId){alert('Please select a patroller to transfer to.');return;}
+  const pat=D.patrollers.find(p=>p.id===patId);if(!pat)return;
+  const a=D.coachingAssignments.find(x=>x.id===assignmentId);if(!a)return;
+  const now=new Date();const nowBhr=getBahrainNow();
+  const month=`${nowBhr.getUTCFullYear()}-${String(nowBhr.getUTCMonth()+1).padStart(2,'0')}`;
+  const{error}=await sb.from('coaching_assignments').update({patroller_id:patId,patroller_name:pat.name,transferred_from:a.patroller_id,transfer_reason:'Language barrier',transferred_at:now.toISOString(),status:'pending'}).eq('id',assignmentId);
+  if(error){alert('Transfer failed: '+error.message);return;}
+  closeM();await reload();
+  addNotification(`Case transferred to ${pat.name}`,'info');
 }
 
 async function markCoachingDone(assignmentId){
