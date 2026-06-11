@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build" content="1781112282">
+<meta name="build" content="1781152228">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Talabat Operations v2.1</title>
 <meta name="version" content="2.1.0">
@@ -326,6 +326,37 @@ const SURL='https://mplkklrposicxeozinhh.supabase.co';
 const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wbGtrbHJwb3NpY3hlb3ppbmhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5OTI2MDYsImV4cCI6MjA5NjU2ODYwNn0.i4VMxfDKHjepBy1Xd-pLGAiegrH5E9tY7G397scRb5g';
 const REDIRECT='https://hazzaninasili-hue.github.io/talabat-liveops';
 const WEBHOOK='https://hook.eu1.make.com/d24akwrimt9ipf9go2ourjwalmodng98';
+const RESEND_KEY='re_WVMkqmSm_3NxyTvzKqxbxyzJCD4D57fh7';
+const FROM_EMAIL='onboarding@resend.dev';
+const ADMIN_EMAIL='hazzani.nasili@talabat.com';
+
+async function sendEmail(to,subject,html){
+  try{
+    await fetch('https://api.resend.com/emails',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+RESEND_KEY},
+      body:JSON.stringify({from:'Talabat Ops <'+FROM_EMAIL+'>',to:Array.isArray(to)?to:[to],subject,html})
+    });
+  }catch(e){console.log('Email failed:',e.message);}
+}
+
+function emailStyle(){
+  return `font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #f0e8e0`;
+}
+function emailHeader(title,color){
+  return `<div style="background:${color||'#411517'};padding:24px;text-align:center">
+    <div style="font-size:22px;font-weight:800;color:#fff;letter-spacing:-.3px">Talabat Ops</div>
+    <div style="font-size:14px;color:rgba(255,255,255,.7);margin-top:4px">${title}</div>
+  </div>`;
+}
+function emailFooter(){
+  return `<div style="background:#f8f8f8;padding:16px;text-align:center;font-size:11px;color:#999;border-top:1px solid #f0e8e0">
+    Talabat Operations · Bahrain · <a href="https://hazzaninasili-hue.github.io/talabat-liveops/" style="color:#FF5900">Open App</a>
+  </div>`;
+}
+function emailRow(label,value,color){
+  return `<tr><td style="padding:8px 0;font-size:13px;color:#666;width:140px">${label}</td><td style="padding:8px 0;font-size:13px;font-weight:600;color:${color||'#111'}">${value}</td></tr>`;
+}
 const sb=supabase.createClient(SURL,SKEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true,flowType:'implicit'}});
 
 const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -1139,8 +1170,34 @@ async function reviewTO(id,status){
   await sb.from('time_off_requests').update({status,reviewed_by:D.profile.id,updated_at:new Date().toISOString()}).eq('id',id);
   addNotification(`Time off request ${status.toLowerCase()}`,'success');
   const req=(D.timeoff||[]).find(r=>r.id===id);
-  if(req){const pat=D.patrollers.find(p=>p.id===req.patroller_id);const patUser=pat?D.users.find(u=>u.id===pat.user_id):null;
-    sendWebhook('timeoff_reviewed',{patroller_name:req.patroller_name,patroller_email:patUser?.email||'',leave_type:req.request_type,start_date:req.start_date,end_date:req.end_date,status,reviewed_by_name:D.profile.full_name,app_url:REDIRECT});}
+  if(req){
+    const pat=D.patrollers.find(p=>p.id===req.patroller_id);
+    const patUser=pat?D.users.find(u=>u.id===pat.user_id):null;
+    sendWebhook('timeoff_reviewed',{patroller_name:req.patroller_name,patroller_email:patUser?.email||'',leave_type:req.request_type,start_date:req.start_date,end_date:req.end_date,status,reviewed_by_name:D.profile.full_name,app_url:REDIRECT});
+    // Send email to patroller
+    const isApproved=status==='Approved';
+    const color=isApproved?'#16A34A':'#DC2626';
+    const icon=isApproved?'✅':'❌';
+    const days=req.start_date&&req.end_date?Math.round((new Date(req.end_date)-new Date(req.start_date))/86400000)+1:1;
+    const html=`<div style="${emailStyle()}">
+      ${emailHeader(`${icon} Time Off Request ${status}`)}
+      <div style="padding:24px">
+        <p style="font-size:15px;font-weight:700;color:#411517;margin:0 0 16px">Hi ${req.patroller_name},</p>
+        <p style="font-size:14px;color:#666;margin:0 0 20px">Your time off request has been <strong style="color:${color}">${status}</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;border-top:1px solid #f0e8e0;padding-top:16px">
+          ${emailRow('Type',req.request_type)}
+          ${emailRow('From',req.start_date)}
+          ${emailRow('To',req.end_date)}
+          ${emailRow('Days',days+' day'+(days>1?'s':''))}
+          ${emailRow('Status',status,color)}
+          ${emailRow('Reviewed by',D.profile.full_name)}
+        </table>
+        ${!isApproved?'<p style="font-size:13px;color:#666;margin-top:16px">If you have questions, please contact your team lead.</p>':''}
+      </div>
+      ${emailFooter()}
+    </div>`;
+    if(patUser?.email)sendEmail([patUser.email,ADMIN_EMAIL],`${icon} Time Off ${status} — ${req.patroller_name}`,html);
+  }
   await reload();
 }
 function delTO(id){openM({type:'confirm',msg:'Delete this time-off request?',cb:async()=>{await sb.from('time_off_requests').delete().eq('id',id);closeM();await reload();}});}
@@ -2272,6 +2329,26 @@ async function saveCreateSchedule(){
       shift_3:dayShifts[3]||null,shift_4:dayShifts[4]||null,shift_5:dayShifts[5]||null,shift_6:dayShifts[6]||null
     });
   }
+  // Email patroller about updated schedule
+  try{
+    const patId=document.getElementById('cs-pat')?document.getElementById('cs-pat').value:'';
+    const pat=patId?D.patrollers.find(function(p){return p.id===patId;}):null;
+    const patUser=pat?D.users.find(function(u){return u.id===pat.user_id;}):null;
+    if(patUser&&patUser.email&&pat){
+      const ws=wStart();const dates=wDates();
+      const DAYNAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      var schedRows='';
+      dates.forEach(function(d,i){
+        var el=document.getElementById('cs-day-'+i);
+        var z=el?el.value:'';
+        if(z)schedRows+=emailRow(DAYNAMES[i]+' '+d.getUTCDate()+'/'+(d.getUTCMonth()+1),z);
+      });
+      if(schedRows){
+        var sHtml='<div style="'+emailStyle()+'">'+emailHeader('&#128197; Your Schedule Has Been Updated')+'<div style="padding:24px"><p style="font-size:15px;font-weight:700;color:#411517;margin:0 0 16px">Hi '+pat.name+',</p><p style="font-size:14px;color:#666;margin:0 0 16px">Your schedule has been updated.</p><table style="width:100%;border-collapse:collapse;border-top:1px solid #f0e8e0;padding-top:12px">'+schedRows+'</table></div>'+emailFooter()+'</div>';
+        sendEmail([patUser.email,ADMIN_EMAIL],'&#128197; Schedule Updated — '+pat.name,sHtml);
+      }
+    }
+  }catch(emailErr){console.log('Schedule email error:',emailErr);}
   closeM();await reload();
 }
 
@@ -2615,6 +2692,27 @@ async function doClockIn(){
     }
 
     sendWebhook('clock_in',{patroller_name:pat.name,patroller_id:pat.id,date:today,clock_in_time:clockInTimeStr,late_mins:lateMins,adj_end_time:adjEndTime||'',clock_in_location:mapUrl,accuracy_meters:Math.round(loc.accuracy),app_url:REDIRECT});
+    // Email admin if late
+    if(lateMins>0){
+      const lH=Math.floor(lateMins/60);const lM=lateMins%60;
+      const lLabel=lH>0?`${lH}h ${lM}m`:`${lM}m`;
+      const html=`<div style="${emailStyle()}">
+        ${emailHeader('⚠️ Late Clock-In Alert','#D97706')}
+        <div style="padding:24px">
+          <table style="width:100%;border-collapse:collapse">
+            ${emailRow('Patroller',pat.name)}
+            ${emailRow('Date',today)}
+            ${emailRow('Clock-in time',clockInTimeStr,'#DC2626')}
+            ${emailRow('Late by',lLabel,'#DC2626')}
+            ${emailRow('Shift start',sh?sh.start_time:'')}
+            ${emailRow('Adjusted end',adjEndTime||'')}
+            ${emailRow('Location','<a href="'+mapUrl+'" style="color:#FF5900">View on map</a>')}
+          </table>
+        </div>
+        ${emailFooter()}
+      </div>`;
+      sendEmail(ADMIN_EMAIL,`⚠️ Late Clock-In — ${pat.name} (${lLabel} late)`,html);
+    }
     await reload();
   }catch(e){
     if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-clock-play"></i> Clock In';}
@@ -2670,6 +2768,28 @@ async function _doNormalClockOut(){
     const hrs=Math.floor(mins/60);const remMins=mins%60;
     const duration=`${hrs}h ${remMins}m`;
     sendWebhook('clock_out',{patroller_name:pat.name,patroller_id:pat.id,date:today,clock_in_time:new Date(existing.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}),clock_out_time:new Date(now).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}),duration,clock_in_location:existing.clock_in_map,clock_out_location:mapUrl,app_url:REDIRECT});
+    // Email admin attendance summary
+    const inT2=new Date(existing.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+    const outT2=new Date(now).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+    const mins2=Math.round((new Date(now)-new Date(existing.clock_in))/60000);
+    const dur2=Math.floor(mins2/60)+'h '+(mins2%60)+'m';
+    const late2=existing.late_mins||0;
+    const co_html=`<div style="${emailStyle()}">
+      ${emailHeader('🕐 Shift Completed')}
+      <div style="padding:24px">
+        <table style="width:100%;border-collapse:collapse">
+          ${emailRow('Patroller',pat.name)}
+          ${emailRow('Date',today2)}
+          ${emailRow('Clock in',inT2)}
+          ${emailRow('Clock out',outT2)}
+          ${emailRow('Duration',dur2,late2>0?'#DC2626':'#16A34A')}
+          ${late2>0?emailRow('Late by',Math.floor(late2/60)>0?Math.floor(late2/60)+'h '+(late2%60)+'m':late2+'m','#DC2626'):''}
+          ${emailRow('Location','<a href="'+mapUrl2+'" style="color:#FF5900">View on map</a>')}
+        </table>
+      </div>
+      ${emailFooter()}
+    </div>`;
+    sendEmail(ADMIN_EMAIL,'🕐 Shift Complete — '+pat.name+' ('+dur2+')',co_html);
     await reload();
   }catch(e){
     if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-clock-stop"></i> Clock Out';}
@@ -3223,6 +3343,30 @@ function myTasksView(){
 
 async function reviewTask(id,status){
   await sb.from('task_requests').update({status,reviewed_by:D.profile.id,updated_at:new Date().toISOString()}).eq('id',id);
+  const task=(D.tasks||[]).find(t=>t.id===id);
+  if(task){
+    const pat=D.patrollers.find(p=>p.id===task.patroller_id);
+    const patUser=pat?D.users.find(u=>u.id===pat.user_id):null;
+    const isApproved=status==='Approved';
+    const color=isApproved?'#16A34A':'#DC2626';
+    const icon=isApproved?'✅':'❌';
+    const html=`<div style="${emailStyle()}">
+      ${emailHeader(`${icon} Task Request ${status}`)}
+      <div style="padding:24px">
+        <p style="font-size:15px;font-weight:700;color:#411517;margin:0 0 16px">Hi ${task.patroller_name||''},</p>
+        <p style="font-size:14px;color:#666;margin:0 0 20px">Your task request has been <strong style="color:${color}">${status}</strong>.</p>
+        <table style="width:100%;border-collapse:collapse;border-top:1px solid #f0e8e0;padding-top:16px">
+          ${emailRow('Task',task.task_type||task.description||'Task')}
+          ${emailRow('Date',task.date||'')}
+          ${task.start_time?emailRow('Time',task.start_time+(task.end_time?' → '+task.end_time:'')):''}
+          ${emailRow('Status',status,color)}
+          ${emailRow('Reviewed by',D.profile.full_name)}
+        </table>
+      </div>
+      ${emailFooter()}
+    </div>`;
+    if(patUser?.email)sendEmail([patUser.email,ADMIN_EMAIL],`${icon} Task ${status} — ${task.patroller_name}`,html);
+  }
   await reload();
 }
 function delTask(id){openM({type:'confirm',msg:'Delete this task request?',cb:async()=>{await sb.from('task_requests').delete().eq('id',id);closeM();await reload();}});}
