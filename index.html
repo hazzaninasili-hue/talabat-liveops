@@ -377,7 +377,9 @@ let D={user:null,profile:null,customRoles:[],leaveBalances:[],tab:'schedule',vie
   shifts:[],areas:[],zones:[],patrollers:[],schedules:[],users:[],
   notesAll:{id:null,content:''},notesPat:{id:null,content:''},notesCoo:{id:null,content:''},
   docs:[],history:[],timeoff:[],attendance:[],attDate:null,opsSub:'areas',locPerms:{},tasks:[],hourlyDay:null,
-  coachingCases:[],coachingAssignments:[],overtimeRequests:[],evaluations:[],coachingMonth:null,coachingShowOlder:false};
+  coachingCases:[],coachingAssignments:[],overtimeRequests:[],evaluations:[],
+  coachingMonth:null,coachingShowOlder:false,evalMonth:null,
+  perfTab:'evaluation',perfSettings:null};
 
 function showS(n){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display=n==='login'?'flex':'none';if(np)np.style.display=n==='newpw'?'flex':'none';document.getElementById('app').style.display='none';}
 function showApp(){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display='none';if(np)np.style.display='none';document.getElementById('app').style.display='block';}
@@ -665,6 +667,7 @@ async function loadAll(){
     const{data:ev}=await wt(evQ,5000);
     D.evaluations=ev||[];
   }catch(e){D.evaluations=[];}
+  try{const{data:ps}=await wt(sb.from('performance_settings').select('*').limit(1),5000);D.perfSettings=(ps&&ps[0])||null;}catch(e){D.perfSettings=null;}
   try{
     const{data:att,error:atterr}=await wt(sb.from('attendance').select('*').order('date',{ascending:false}).limit(500),5000);
     if(atterr){console.warn('Attendance table not ready:',atterr.message);D.attendance=[];}
@@ -1442,7 +1445,7 @@ function operationsView(){
   // ROLES
   if(sub === 'roles'){
     var roles = D.customRoles || [];
-    var ALL_TABS = ['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents','Coaching','Evaluation'];
+    var ALL_TABS = ['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents','Performance'];
     var alBg = {viewer:'#EAF1FD', editor:'#FFF0E6', admin:'#DCFCE7'};
     var alCol = {viewer:'#0C4FB3', editor:'#FF5900', admin:'#166534'};
     var alLbl = {viewer:'👁 Viewer', editor:'✏️ Editor', admin:'🔐 Admin'};
@@ -1876,16 +1879,14 @@ function renderTabs(){
     if(visTabs.includes('Time off & Tasks'))tabs.push({id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'});
     if(visTabs.includes('Leave Balance'))tabs.push({id:'myleavebalance',icon:'ti-calendar-stats',label:'Leave Balance'});
     if(visTabs.includes('Documents'))tabs.push({id:'documents',icon:'ti-files',label:'Documents'});
-    if(visTabs.includes('Coaching')||isFullAdmin)tabs.push({id:'coaching',icon:'ti-school',label:'Coaching'});
-    if(visTabs.includes('Evaluation')||isFullAdmin)tabs.push({id:'evaluation',icon:'ti-clipboard-check',label:'Evaluation'});
+    if(visTabs.includes('Performance')||isFullAdmin)tabs.push({id:'performance',icon:'ti-chart-dots',label:'Performance'});
     if(isFullAdmin){tabs.push({id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'});tabs.push({id:'access',icon:'ti-lock',label:'Access control'});}
     document.getElementById('tabs').innerHTML=tabs.map(t=>`<button class="tab${D.tab===t.id?' active':''}" onclick="setTab('${t.id}')"><i class="ti ${t.icon}"></i>${t.label}</button>`).join('');
     return;
   }
   const tabs=(role==='patroller'||role==='coordinator')?[
     {id:'myschedule',icon:'ti-user',label:'My schedule'},
-    {id:'coaching',icon:'ti-school',label:'Coaching'},
-    {id:'evaluation',icon:'ti-clipboard-check',label:'Evaluation'},
+    {id:'performance',icon:'ti-chart-dots',label:'Performance'},
     {id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'},
     {id:'myleavebalance',icon:'ti-calendar-stats',label:'Leave Balance'},
     {id:'documents',icon:'ti-files',label:'Documents'},
@@ -1893,8 +1894,7 @@ function renderTabs(){
     {id:'schedule',icon:'ti-calendar',label:'Schedule'},
     {id:'summary',icon:'ti-chart-bar',label:'Summary'},
     {id:'attendance',icon:'ti-clock-check',label:'Attendance'},
-    {id:'coaching',icon:'ti-school',label:'Coaching'},
-    {id:'evaluation',icon:'ti-clipboard-check',label:'Evaluation'},
+    {id:'performance',icon:'ti-chart-dots',label:'Performance'},
     {id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'},
     {id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'},
     {id:'leavebalance',icon:'ti-calendar-stats',label:'Leave Balance'},
@@ -1988,8 +1988,7 @@ function render(){
   else if(D.tab==='myschedule')html=safeRender(()=>mySchedView(),'My Schedule');
   else if(D.tab==='attendance')html=safeRender(()=>attendanceView(),'Attendance');
   else if(D.tab==='myattendance')html=safeRender(()=>myAttendanceView(),'My Attendance');
-  else if(D.tab==='coaching')html=safeRender(()=>coachingView(),'Coaching');
-  else if(D.tab==='evaluation')html=safeRender(()=>evaluationView(),'Evaluation');
+  else if(D.tab==='performance')html=safeRender(()=>performanceView(),'Performance');
   document.getElementById('main').innerHTML=`<div class="fade-in">${html}</div>`;
 }
 function setTab(t){D.tab=t;D.ne=false;render();}
@@ -2062,6 +2061,29 @@ function renderModal(){
     <div class="modal-footer">
       <button class="btn" onclick="closeM()">Cancel</button>
       <button id="eval-save-btn" class="btn btn-primary" onclick="saveEvalEdit('${m.evalId}')"><i class="ti ti-circle-check"></i>Save changes</button>
+    </div>`;
+    return;
+  }
+
+  if(m.type==='perfSettings'){
+    const s=D.perfSettings||{};
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-settings" style="color:#FF5900"></i>Performance settings</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="fg"><label>Monthly total target</label><input type="number" id="ps-total" value="${s.target_total||2200}"></div>
+      <div class="fg"><label>Monthly unique target</label><input type="number" id="ps-unique" value="${s.target_unique||2000}"></div>
+      <div class="fg"><label>Working hrs / month</label><input type="number" id="ps-hours" value="${s.working_hours||208}"></div>
+      <div class="fg"><label>Audits / hr (total)</label><input type="number" id="ps-rate-total" value="${s.rate_total||11}"></div>
+      <div class="fg"><label>Audits / hr (unique)</label><input type="number" id="ps-rate-unique" value="${s.rate_unique||10}"></div>
+      <div class="fg"><label>Task threshold (hrs)</label><input type="number" id="ps-threshold" value="${s.task_threshold||40}"></div>
+    </div>
+    <div class="fg" style="margin-top:4px">
+      <label>Eval weight %</label>
+      <input type="number" id="ps-eval-weight" value="${s.eval_weight||60}" min="0" max="100">
+      <div style="font-size:11px;color:var(--g3);margin-top:3px">Coaching weight = 100 − eval weight. Currently coaching = ${100-(s.eval_weight||60)}%</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeM()">Cancel</button>
+      <button class="btn btn-primary" onclick="savePerfSettings()"><i class="ti ti-circle-check"></i>Save settings</button>
     </div>`;
     return;
   }
@@ -2299,7 +2321,7 @@ function renderModal(){
     const isEdit=m.type==='editrole';const r=isEdit?m.role:{};
     let savedTabs=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
     if(isEdit&&r.visible_tabs){try{savedTabs=JSON.parse(r.visible_tabs);}catch(e){}}
-    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents','Coaching','Evaluation'];
+    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents','Performance'];
     const tabChecks=ALL_TABS.map(t=>{const checked=savedTabs.includes(t);
       return`<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid ${checked?'#FF5900':'#E8DDD4'};border-radius:8px;cursor:pointer;background:#fff" onclick="const cb=this.querySelector('input');setTimeout(()=>{this.style.borderColor=cb.checked?'#FF5900':'#E8DDD4';},0)">
         <input type="checkbox" name="role-tab" value="${t}" ${checked?'checked':''} style="accent-color:#FF5900;width:14px;height:14px">
@@ -4168,805 +4190,573 @@ function toggleNotifications(){
 function clearNotifications(){D_notifs=[];renderNotifications();}
 
 // ── COACHING VIEW ──
-function coachingView(){
-  const isAL=canEdit();
-  const myPat=D.patrollers.find(p=>p.user_id===D.profile.id);
-  const now=getBahrainNow();
-  const curMonth=now.getUTCFullYear()+'-'+String(now.getUTCMonth()+1).padStart(2,'0');
+// ── PERFORMANCE VIEW (replaces Coaching + Evaluation) ──
 
-  if(isAL){
-    const pts=activePats().filter(p=>getUtype(p)==='patroller');
-    // Month filter
-    const allMonths=[...new Set([
-      ...D.coachingAssignments.map(a=>a.month||a.assigned_date?.slice(0,7)).filter(Boolean),
-      curMonth
-    ])].sort().reverse();
-    const selMonth=D.coachingMonth||curMonth;
-    const monthOptions=allMonths.map(m=>'<option value="'+m+'" '+(m===selMonth?'selected':'')+'>'+m+'</option>').join('');
-
-    // Filter cases + assignments by selected month
-    const monthAssignments=D.coachingAssignments.filter(a=>(a.month||a.assigned_date?.slice(0,7))===selMonth);
-    const monthCaseIds=new Set(monthAssignments.map(a=>a.case_id));
-    const filteredCases=D.coachingCases.filter(c=>
-      monthCaseIds.has(c.id)||(c.batch_date&&c.batch_date.startsWith(selMonth)&&!D.coachingAssignments.find(a=>a.case_id===c.id))
-    );
-
-    const totalCases=filteredCases.length;
-    const totalDone=monthAssignments.filter(a=>a.status==='completed').length;
-    const totalPending=monthAssignments.filter(a=>a.status==='pending').length;
-    const unassigned=filteredCases.filter(c=>!D.coachingAssignments.find(a=>a.case_id===c.id)).length;
-    const unassignedCases=filteredCases.filter(c=>!D.coachingAssignments.find(a=>a.case_id===c.id));
-
-    const patBreakdown=pts.map(p=>{
-      const assigned=monthAssignments.filter(a=>a.patroller_id===p.id);
-      const done=assigned.filter(a=>a.status==='completed').length;
-      const pending=assigned.filter(a=>a.status==='pending').length;
-      const transferredOut=monthAssignments.filter(a=>a.transferred_from===p.id).length;
-      const transferredIn=assigned.filter(a=>a.transferred_from&&a.transferred_from!==p.id).length;
-      return{p,assigned:assigned.length,done,pending,transferredOut,transferredIn};
-    }).filter(x=>x.assigned>0||x.transferredOut>0).sort((a,b)=>b.assigned-a.assigned);
-
-    const caseRows=filteredCases.map(c=>{
-      const asgn=D.coachingAssignments.find(a=>a.case_id===c.id);
-      const pat=asgn?D.patrollers.find(p=>p.id===asgn.patroller_id):null;
-      const fromPat=asgn?.transferred_from?D.patrollers.find(p=>p.id===asgn.transferred_from):null;
-      const statusBg=asgn?.status==='completed'?'background:#DCFCE7;color:#166534':asgn?'background:#FEF3C7;color:#D97706':'background:#F1F5F9;color:#64748B';
-      const statusLabel=asgn?.status==='completed'?'✓ Done':asgn?'⏳ Pending':'— Unassigned';
-      const transferTag=fromPat?'<div style="font-size:9px;color:#D97706;margin-top:2px"><i class="ti ti-transfer" style="font-size:9px"></i> From '+fromPat.name+'</div>':'';
-      return'<tr>'+
-        '<td class="lt" style="font-size:11px;font-weight:600">'+(c.rider_name||'--')+'</td>'+
-        '<td style="font-size:10px;font-family:monospace">'+(c.rider_id||'--')+'</td>'+
-        '<td style="font-size:10px">'+(c.violation_type||'--')+'</td>'+
-        '<td style="font-size:10px">'+(c.level||'--')+'</td>'+
-        '<td style="font-size:10px">'+(c.violation_date||'--')+'</td>'+
-        '<td><span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;'+statusBg+'">'+statusLabel+'</span></td>'+
-        '<td style="font-size:10px">'+(pat?pat.name:'--')+transferTag+'</td>'+
-        '<td style="font-size:10px;color:var(--g3)">'+(asgn?.completed_at?new Date(asgn.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--')+'</td>'+
-        '<td style="white-space:nowrap"><select onchange="reassignCase(\''+c.id+'\',this.value)" style="padding:3px 6px;border-radius:6px;border:1.5px solid var(--g2);font-size:10px;font-family:inherit"><option value="">-- Reassign --</option>'+
-        pts.map(p=>'<option value="'+p.id+'" '+(asgn?.patroller_id===p.id?'selected':'')+'>'+p.name+'</option>').join('')+'</select></td></tr>';
-    }).join('');
-
-    const breakdownRows=patBreakdown.map(({p,assigned,done,pending,transferredOut,transferredIn})=>{
-      const pct=assigned?Math.round(done/assigned*100):0;
-      const barCol=pct===100?'#16A34A':pct>=50?'#D97706':'#DC2626';
-      const tc=[];
-      if(transferredOut>0)tc.push('<span style="font-size:10px;font-weight:600;background:#FEE2E2;color:#DC2626;padding:2px 6px;border-radius:5px">↑ '+transferredOut+' out</span>');
-      if(transferredIn>0)tc.push('<span style="font-size:10px;font-weight:600;background:#DCFCE7;color:#166534;padding:2px 6px;border-radius:5px">↓ '+transferredIn+' in</span>');
-      return'<tr><td class="lt" style="font-weight:600">'+p.name+'</td><td style="font-weight:700;color:#411517">'+assigned+'</td><td style="font-weight:700;color:#166534">'+done+'</td><td style="font-weight:700;color:#D97706">'+pending+'</td><td style="white-space:nowrap">'+(tc.length?tc.join(' '):'<span style="font-size:10px;color:var(--g3)">--</span>')+'</td><td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:'+pct+'%;background:'+barCol+'"></div></div><span style="font-size:10px;font-weight:700;color:'+barCol+';min-width:30px">'+pct+'%</span></div></td></tr>';
-    }).join('');
-
-    return'<div class="stats">'+
-      '<div class="stat blue"><div class="stat-label">Cases this month</div><div class="stat-value">'+totalCases+'</div></div>'+
-      '<div class="stat green"><div class="stat-label">Completed</div><div class="stat-value">'+totalDone+'</div></div>'+
-      '<div class="stat amber"><div class="stat-label">Pending</div><div class="stat-value">'+totalPending+'</div></div>'+
-      '<div class="stat red"><div class="stat-label">Unassigned</div><div class="stat-value">'+unassigned+'</div></div>'+
-      '</div>'+
-      '<div class="toolbar">'+
-      (unassignedCases.length>0?'<button class="btn btn-primary" onclick="autoAssignCoaching()"><i class="ti ti-users"></i>Auto-assign '+unassignedCases.length+' cases</button>':'')+
-      '<button class="btn" onclick="doRefresh()"><i class="ti ti-refresh"></i>Sync from Sheet</button>'+
-      '<div style="display:flex;align-items:center;gap:6px;margin-left:auto"><label style="font-size:11px;color:var(--g3)">Month:</label>'+
-      '<select onchange="D.coachingMonth=this.value;render()" style="padding:5px 8px;border-radius:7px;border:1.5px solid var(--g2);font-size:11px;font-family:inherit">'+monthOptions+'</select></div>'+
-      '</div>'+
-      (unassignedCases.length>0?'<div class="info-box info-blue" style="margin-bottom:14px"><i class="ti ti-info-circle" style="margin-right:6px"></i><strong>'+unassignedCases.length+' unassigned cases</strong> — click "Auto-assign" to split among today\'s duty patrollers, or reassign individually below.</div>':'')+
-      (patBreakdown.length>0?
-        '<div style="margin-bottom:14px"><strong style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-chart-bar" style="font-size:12px;margin-right:5px"></i>Patroller Progress — '+selMonth+'</strong>'+
-        '<div class="tcard" style="margin-top:8px"><div class="t-scroll"><table style="table-layout:auto"><thead><tr>'+
-        '<th class="lt">Patroller</th><th>Assigned</th><th style="color:#166534">Done</th><th style="color:#D97706">Pending</th><th>Transfers</th><th style="min-width:120px">Progress</th>'+
-        '</tr></thead><tbody>'+breakdownRows+'</tbody></table></div></div></div>':'')+
-      '<div><strong style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-list" style="font-size:12px;margin-right:5px"></i>Cases — '+selMonth+'</strong>'+
-      (filteredCases.length===0?
-        '<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-school" style="font-size:40px;display:block;margin-bottom:10px;opacity:.3"></i><b>No cases for '+selMonth+'</b><div style="font-size:12px;margin-top:6px">Use the month selector above to view other months.</div></div>':
-        '<div class="tcard" style="margin-top:8px"><div class="t-scroll"><table style="table-layout:auto;min-width:900px"><thead><tr>'+
-        '<th class="lt">Rider Name</th><th>Rider ID</th><th>Violation</th><th>Level</th><th>Date</th><th>Status</th><th>Assigned To</th><th>Completed At</th><th>Reassign</th>'+
-        '</tr></thead><tbody>'+caseRows+'</tbody></table></div></div>')+
-      '</div>';
-  }
-
-  // PATROLLER VIEW
-  const myAssignments=myPat?D.coachingAssignments.filter(a=>a.patroller_id===myPat.id):[];
-  const myPending=myAssignments.filter(a=>a.status==='pending');
-  const myDoneAll=myAssignments.filter(a=>a.status==='completed');
-  const myDoneCur=myDoneAll.filter(a=>(a.month||a.completed_at?.slice(0,7))===curMonth);
-  const myDoneOlder=myDoneAll.filter(a=>(a.month||a.completed_at?.slice(0,7))!==curMonth);
-  const showOlder=D.coachingShowOlder||false;
-  const myDoneVisible=showOlder?myDoneAll:myDoneCur;
-  const myTotal=myAssignments.length;
-
-  if(!myPat||myTotal===0){
-    return'<div style="padding:60px;text-align:center;color:var(--g3)"><i class="ti ti-school" style="font-size:48px;display:block;margin-bottom:14px;opacity:.3"></i><b style="font-size:15px;color:#411517">No coaching cases assigned</b><div style="font-size:12px;margin-top:8px">Your assigned cases will appear here when your team lead uploads new coaching data.</div></div>';
-  }
-
-  const donePct=myTotal?Math.round(myDoneAll.length/myTotal*100):0;
-
-  const pendingRows=myPending.map(a=>{
-    const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return'';
-    return'<div class="card" style="cursor:pointer;border-left:3px solid #FF5900" onclick="openCoachingCase(\''+a.id+'\')">'+
-      '<div class="card-ico blue"><i class="ti ti-user-check" style="font-size:16px"></i></div>'+
-      '<div class="card-info"><div class="card-name">'+(c.rider_name||'Rider')+' <span style="font-size:10px;font-weight:400;color:var(--g3)">#'+(c.rider_id||'--')+'</span></div>'+
-      '<div class="card-meta">'+(c.violation_type||'--')+' · Level '+(c.level||'--')+' · '+(c.violation_date||'--')+'</div></div>'+
-      '<span style="font-size:10px;font-weight:700;background:#FEF3C7;color:#D97706;padding:3px 8px;border-radius:6px;white-space:nowrap">⏳ Pending</span></div>';
-  }).join('');
-
-  const doneRows=myDoneVisible.map(a=>{
-    const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return'';
-    const doneAt=a.completed_at?new Date(a.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
-    return'<div class="card" style="opacity:.75">'+
-      '<div class="card-ico" style="background:#DCFCE7"><i class="ti ti-circle-check" style="font-size:16px;color:#16A34A"></i></div>'+
-      '<div class="card-info"><div class="card-name">'+(c.rider_name||'Rider')+' <span style="font-size:10px;font-weight:400;color:var(--g3)">#'+(c.rider_id||'--')+'</span></div>'+
-      '<div class="card-meta">'+(c.violation_type||'--')+' · Completed '+doneAt+'</div></div>'+
-      '<span style="font-size:10px;font-weight:700;background:#DCFCE7;color:#166534;padding:3px 8px;border-radius:6px;white-space:nowrap">✓ Done</span></div>';
-  }).join('');
-
-  return'<div class="my-card">'+
-    '<div class="my-av" style="background:#FFF0E6;color:#FF5900"><i class="ti ti-school" style="font-size:20px"></i></div>'+
-    '<div style="flex:1"><div class="my-name">My Coaching Cases</div>'+
-    '<div class="my-meta">'+myDoneAll.length+' of '+myTotal+' completed · '+curMonth+'</div>'+
-    '<div class="bar-wrap" style="margin-top:8px;max-width:260px"><div class="bar-bg" style="height:7px"><div class="bar-fill" style="width:'+donePct+'%;background:'+(donePct===100?'#16A34A':donePct>=50?'#D97706':'#FF5900')+'"></div></div>'+
-    '<span style="font-size:11px;font-weight:700;color:'+(donePct===100?'#16A34A':'#FF5900')+'">'+donePct+'%</span></div></div></div>'+
-
-    (myPending.length>0?'<div style="margin-bottom:14px"><strong style="font-size:11px;font-weight:700;color:#D97706;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-clock" style="margin-right:5px"></i>Pending ('+myPending.length+')</strong><div class="card-grid" style="margin-top:8px">'+pendingRows+'</div></div>':'')+
-
-    (myDoneAll.length>0?
-      '<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
-      '<strong style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-circle-check" style="margin-right:5px"></i>Completed this month ('+myDoneCur.length+')'+(myDoneOlder.length>0?' · '+myDoneOlder.length+' older':'')+'</strong>'+
-      (myDoneOlder.length>0?'<button onclick="D.coachingShowOlder='+(!showOlder)+';render()" style="font-size:10px;padding:3px 9px;border-radius:6px;border:1px solid var(--g2);background:var(--sur);cursor:pointer;font-family:inherit;color:var(--g4)">'+(showOlder?'Hide older cases':'Show '+myDoneOlder.length+' older')+'</button>':'')+
-      '</div><div class="card-grid">'+doneRows+'</div></div>':'');
-}
-
-
-async function autoAssignCoaching(){
-  if(!confirm('Auto-assign all unassigned cases equally among today\'s duty patrollers?'))return;
-  const today=todayStr();
-  const todayIdx=todayDayIdx();
-  // Get patrollers on duty today
-  const onDuty=activePats().filter(p=>getUtype(p)==='patroller'&&gDZ(p.id,todayIdx)&&!isAbsentToday(p.id)&&!isOnVacationToday(p.id));
-  if(!onDuty.length){alert('No patrollers on duty today. Use the reassign dropdown to assign manually.');return;}
-  const unassigned=D.coachingCases.filter(c=>!D.coachingAssignments.find(a=>a.case_id===c.id));
-  if(!unassigned.length){addNotification('All cases already assigned','info');return;}
-  const now=getBahrainNow();
-  const month=`${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}`;
-  const inserts=unassigned.map((c,i)=>({
-    case_id:c.id,
-    patroller_id:onDuty[i%onDuty.length].id,
-    patroller_name:onDuty[i%onDuty.length].name,
-    status:'pending',
-    month,
-    assigned_date:today,
-    assigned_by:D.profile.id
-  }));
-  const{error}=await sb.from('coaching_assignments').insert(inserts);
-  if(error){alert('Error assigning: '+error.message);return;}
-  await reload();
-  addNotification(`${inserts.length} cases assigned to ${onDuty.length} patrollers`,'success');
-}
-
-async function reassignCase(caseId,patrollerId){
-  if(!patrollerId)return;
-  const pat=D.patrollers.find(p=>p.id===patrollerId);if(!pat)return;
-  const now=getBahrainNow();
-  const month=`${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}`;
-  const existing=D.coachingAssignments.find(a=>a.case_id===caseId);
-  if(existing){
-    await sb.from('coaching_assignments').update({patroller_id:patrollerId,patroller_name:pat.name,status:'pending'}).eq('id',existing.id);
-  }else{
-    await sb.from('coaching_assignments').insert({case_id:caseId,patroller_id:patrollerId,patroller_name:pat.name,status:'pending',month,assigned_date:todayStr(),assigned_by:D.profile.id});
-  }
-  await reload();
-  addNotification(`Case reassigned to ${pat.name}`,'success');
-}
-
-const COACHING_OUTCOMES=[
-  {value:'rider_coached',label:'✅ Rider has been coached'},
-  {value:'rider_acknowledged',label:'✅ Rider acknowledged'},
-  {value:'no_answer',label:'📵 No answer'},
-  {value:'washing_cleaning',label:'🧺 Washing/Cleaning – Jacket or uniform being washed'},
-  {value:'no_time',label:'⏱ No Time – Long shift, rushing, in a hurry'},
-  {value:'didnt_know',label:'❓ Didn\'t Know – Unaware of policy'},
-  {value:'vendors_fault',label:'🏪 Vendor\'s Fault – Misusing ready button or no photos'},
-  {value:'health_issues',label:'🩺 Health Issues – Foot infection, injury, or medical'},
-  {value:'bad_weather',label:'🌧 Bad Weather – Rain, dust, or fog'},
-  {value:'phone_app_problems',label:'📱 Phone/App Problems – GPS, auto drop-off, broken device'},
-  {value:'prayer_time',label:'🕌 Prayer Time – Wearing slippers or left vehicle'},
-  {value:'simply_forgot',label:'🎒 Simply Forgot – Bag, shoes, or proof picture'},
-  {value:'someone_else',label:'👤 Someone Else Did It – Friend or family used account'},
-];
-
-function openCoachingCase(assignmentId){
-  const a=D.coachingAssignments.find(x=>x.id===assignmentId);if(!a)return;
-  const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return;
-  const isDone=a.status==='completed';
-  // Build clean dial/WA numbers from contact_number field
-  const rawNum=(c.contact_number||'').replace(/\s/g,'');
-  const dialNum=rawNum.replace(/[^0-9+]/g,'');
-  const waNum=dialNum.startsWith('+')?dialNum.slice(1):dialNum;
-  const contactHtml=rawNum?`<div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;font-weight:600;color:#2A0D0F">${c.contact_number}</span><a href="tel:${dialNum}" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:#EAF1FD;border-radius:7px;color:#1565C0;text-decoration:none" title="Call"><i class="ti ti-phone" style="font-size:14px"></i></a><a href="https://wa.me/${waNum}" target="_blank" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:#DCFCE7;border-radius:7px;color:#16A34A;text-decoration:none" title="WhatsApp"><i class="ti ti-brand-whatsapp" style="font-size:14px"></i></a></div>`:'--';
-  const row=(label,val,custom)=>(val||custom)?`<tr><td style="padding:7px 0;font-size:11px;color:var(--g3);width:140px;vertical-align:middle;text-transform:uppercase;letter-spacing:.04em;font-weight:600">${label}</td><td style="padding:7px 0;font-size:12px;font-weight:600;color:#2A0D0F;border-bottom:1px solid var(--g1)">${custom||val}</td></tr>`:'';
-  const outcomeOptions=COACHING_OUTCOMES.map(o=>`<option value="${o.value}" ${a.outcome===o.value?'selected':''}>${o.label}</option>`).join('');
-  // Transfer: on-duty patrollers today excluding current
-  const todayIdx=todayDayIdx();
-  const onDutyPats=activePats().filter(p=>getUtype(p)==='patroller'&&gDZ(p.id,todayIdx)&&p.id!==a.patroller_id&&!isAbsentToday(p.id)&&!isOnVacationToday(p.id));
-  const transferOptions=onDutyPats.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-  const transferSection=!isDone?`<div style="margin-top:12px;padding:12px;background:#FFF0E6;border-radius:10px;border:1px solid #FFB380"><div style="font-size:11px;font-weight:700;color:#D94D00;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px"><i class="ti ti-transfer" style="margin-right:4px"></i>Language barrier — transfer case</div><select id="transfer-pat" style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid #FFB380;font-family:inherit;font-size:12px;color:var(--g5);background:#fff;margin-bottom:8px"><option value="">-- Select patroller to transfer to --</option>${transferOptions}</select><button onclick="transferCoachingCase('${assignmentId}')" style="width:100%;padding:9px;background:#FF5900;color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer"><i class="ti ti-arrow-right"></i> Transfer Case</button></div>`:'';
-  const html=`<table style="width:100%;border-collapse:collapse;margin-bottom:4px">${row('Rider ID',c.rider_id)}${row('Rider Name',c.rider_name)}${row('Supplier',c.supplier)}${c.contact_number?row('Contact',null,contactHtml):''}${row('Rider Status',c.rider_status)}${row('Violation Type',c.violation_type)}${row('Level',c.level)}${row('Rooster Action',c.rooster_action)}${row('Action Category',c.action_category)}${row('Violation Summary',c.violation_summary)}${row('Violation Date',c.violation_date)}${c.proof_url?`<tr><td style="padding:7px 0;font-size:11px;color:var(--g3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Proof</td><td style="padding:7px 0"><a href="${c.proof_url}" target="_blank" style="color:#FF5900;font-size:12px;font-weight:600"><i class="ti ti-external-link"></i> View proof</a></td></tr>`:''}</table>${transferSection}${!isDone?`<div style="margin-top:12px;padding-top:12px;border-top:1.5px solid var(--g2)"><label style="font-size:11px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Coaching outcome <span style="color:#DC2626">*</span></label><select id="coaching-outcome" style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;color:var(--g5);background:var(--sur)"><option value="">-- Select outcome --</option>${outcomeOptions}</select></div>`:`<div style="margin-top:12px;padding:10px 13px;background:#DCFCE7;border-radius:8px;font-size:12px;color:#166534;font-weight:600">✓ Completed ${a.completed_at?new Date(a.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):''}${a.outcome?' · '+(COACHING_OUTCOMES.find(o=>o.value===a.outcome)?.label||a.outcome):''}</div>`}`;
-  openM({type:'coachingCase',assignmentId,caseId:c.id,html,status:a.status,completedAt:a.completed_at});
-}
-
-async function transferCoachingCase(assignmentId){
-  const patId=document.getElementById('transfer-pat')?.value;
-  if(!patId){alert('Please select a patroller to transfer to.');return;}
-  const pat=D.patrollers.find(p=>p.id===patId);if(!pat)return;
-  const a=D.coachingAssignments.find(x=>x.id===assignmentId);if(!a)return;
-  const now=new Date();const nowBhr=getBahrainNow();
-  const month=`${nowBhr.getUTCFullYear()}-${String(nowBhr.getUTCMonth()+1).padStart(2,'0')}`;
-  const{error}=await sb.from('coaching_assignments').update({patroller_id:patId,patroller_name:pat.name,transferred_from:a.patroller_id,transfer_reason:'Language barrier',transferred_at:now.toISOString(),status:'pending'}).eq('id',assignmentId);
-  if(error){alert('Transfer failed: '+error.message);return;}
-  closeM();await reload();
-  addNotification(`Case transferred to ${pat.name}`,'info');
-}
-
-async function markCoachingDone(assignmentId){
-  const outcome=document.getElementById('coaching-outcome')?.value;
-  if(!outcome){alert('Please select a coaching outcome before marking complete.');return;}
-  const btn=document.getElementById('coaching-submit-btn');
-  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Saving...';}
-  const now=new Date();
-  const nowBhr=getBahrainNow();
-  const month=`${nowBhr.getUTCFullYear()}-${String(nowBhr.getUTCMonth()+1).padStart(2,'0')}`;
-  const{error}=await sb.from('coaching_assignments').update({
-    status:'completed',
-    completed_at:now.toISOString(),
-    completed_by_name:D.profile.full_name,
-    outcome,
-    month
-  }).eq('id',assignmentId);
-  if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-circle-check"></i>Mark as Completed';}return;}
-  const a=D.coachingAssignments.find(x=>x.id===assignmentId);
-  const c=a?D.coachingCases.find(x=>x.id===a.case_id):null;
-  if(c){
-    sendWebhook('coaching_completed',{
-      case_id:c.id,rider_id:c.rider_id,rider_name:c.rider_name,
-      patroller_name:D.profile.full_name,
-      outcome,
-      completed_at:now.toISOString(),
-      month
-    });
-  }
-  closeM();await reload();
-  addNotification('Coaching case marked complete','success');
-}
-
-// ── OVERTIME VIEW ──
-function overtimeView(){
-  const pts=activePats().filter(p=>getUtype(p)==='patroller');
-  const patOptions=pts.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-
-  // Summary rows
-  const summaryRows=(D.overtimeRequests||[]).map(ot=>{
-    const pat=D.patrollers.find(p=>p.id===ot.patroller_id);
-    const start=new Date(ot.start_datetime);
-    const end=new Date(ot.end_datetime);
-    const diffMs=end-start;
-    const hrs=Math.floor(diffMs/3600000);
-    const mins=Math.floor((diffMs%3600000)/60000);
-    const durLabel=hrs>0?`${hrs}h ${mins}m`:`${mins}m`;
-    const fmtDT=dt=>new Date(dt).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Bahrain'});
-    return`<tr>
-      <td class="lt" style="font-size:11px;font-weight:600">${pat?.name||ot.patroller_name||'--'}</td>
-      <td style="font-size:11px">${fmtDT(ot.start_datetime)}</td>
-      <td style="font-size:11px">${fmtDT(ot.end_datetime)}</td>
-      <td style="font-size:11px;font-weight:700;color:#FF5900">${durLabel}</td>
-      <td style="font-size:11px">${ot.requested_by||'--'}</td>
-      <td style="font-size:11px;max-width:200px">${ot.ot_reason||'--'}</td>
-      <td><button onclick="deleteOT('${ot.id}')" style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:13px" title="Delete"><i class="ti ti-trash"></i></button></td>
-    </tr>`;
-  }).join('');
-
-  // Pre-compute monthly summary (avoid IIFE inside template literal)
-  const otNow=getBahrainNow();
-  const otCurMonth=otNow.getUTCFullYear()+'-'+String(otNow.getUTCMonth()+1).padStart(2,'0');
-  const otThisMonth=(D.overtimeRequests||[]).filter(ot=>ot.start_datetime&&ot.start_datetime.startsWith(otCurMonth));
-  const otTotalMins=otThisMonth.reduce((s,ot)=>{const ms=new Date(ot.end_datetime)-new Date(ot.start_datetime);return s+(ms>0?Math.floor(ms/60000):0);},0);
-  const otHrs=Math.floor(otTotalMins/60);const otMins2=otTotalMins%60;
-  const otPatTotals={};
-  otThisMonth.forEach(ot=>{
-    const pat=D.patrollers.find(p=>p.id===ot.patroller_id);
-    const name=pat?.name||ot.patroller_name||'Unknown';
-    if(!otPatTotals[name])otPatTotals[name]=0;
-    const ms=new Date(ot.end_datetime)-new Date(ot.start_datetime);
-    if(ms>0)otPatTotals[name]+=Math.floor(ms/60000);
-  });
-  const otPatRows=Object.entries(otPatTotals).sort((a,b)=>b[1]-a[1]).map(([name,m])=>{
-    const h=Math.floor(m/60);const mn=m%60;
-    return'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f5f0ea"><span style="font-size:12px;font-weight:600">'+name+'</span><span style="font-size:12px;font-weight:700;color:#FF5900">'+h+'h '+mn+'m</span></div>';
-  }).join('');
-  const otMonthlySummaryHtml='<div style="text-align:center;margin-bottom:12px"><div style="font-size:28px;font-weight:800;color:#FF5900">'+otHrs+'h '+otMins2+'m</div><div style="font-size:11px;color:#999">Total OT this month</div></div><div style="font-size:11px;color:#DC2626;font-weight:600;margin-bottom:8px">'+otThisMonth.length+' submissions</div>'+(otPatRows||'<div style="font-size:12px;color:#999;padding:10px 0;text-align:center">No OT this month</div>');
-
-  const html=`
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
-    <!-- Submission Form -->
-    <div class="tcard" style="padding:16px">
-      <div style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px"><i class="ti ti-clock-plus" style="margin-right:5px"></i>Submit Overtime</div>
-      <div style="display:grid;gap:10px">
-        <div class="fg">
-          <label>Patroller</label>
-          <select id="ot-patroller">
-            <option value="">-- Select patroller --</option>
-            ${patOptions}
-          </select>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div class="fg">
-            <label>Start Date & Time</label>
-            <input type="datetime-local" id="ot-start" style="padding:9px 10px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;width:100%">
-          </div>
-          <div class="fg">
-            <label>End Date & Time</label>
-            <input type="datetime-local" id="ot-end" style="padding:9px 10px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;width:100%">
-          </div>
-        </div>
-        <div id="ot-duration-preview" style="font-size:12px;color:#FF5900;font-weight:700;min-height:18px"></div>
-        <div class="fg">
-          <label>OT Requested By</label>
-          <input type="text" id="ot-requested-by" placeholder="e.g. Ahmed Al Mansoori" style="padding:9px 10px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;width:100%">
-        </div>
-        <div class="fg">
-          <label>OT Reason</label>
-          <textarea id="ot-reason" rows="3" placeholder="Describe the reason for overtime..." style="padding:9px 10px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;font-size:13px;width:100%;resize:vertical"></textarea>
-        </div>
-        <button onclick="submitOT()" class="btn btn-primary" style="width:100%;padding:11px;justify-content:center"><i class="ti ti-circle-check"></i>Submit Overtime</button>
-      </div>
-    </div>
-
-    <!-- Quick Stats -->
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div class="tcard" style="padding:14px">
-        <div style="font-size:11px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">This Month Summary</div>
-        ${otMonthlySummaryHtml}
-      </div>
-    </div>
-  </div>
-
-  <!-- OT Summary Table -->
-  <div>
-    <div style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px"><i class="ti ti-list" style="margin-right:5px"></i>All Overtime Records (${(D.overtimeRequests||[]).length})</div>
-    ${(D.overtimeRequests||[]).length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-clock-plus" style="font-size:36px;display:block;opacity:.2;margin-bottom:10px"></i>No overtime records yet</div>`:`
-    <div class="tcard"><div class="t-scroll"><table style="min-width:800px"><thead><tr>
-      <th class="lt">Patroller</th><th>Start</th><th>End</th><th>Total Hours</th><th>Requested By</th><th>Reason</th><th></th>
-    </tr></thead><tbody>${summaryRows}</tbody></table></div></div>`}
-  </div>`;
-
-  setTimeout(()=>{
-    const s=document.getElementById('ot-start');
-    const e=document.getElementById('ot-end');
-    if(s)s.addEventListener('change',updateOTPreview);
-    if(e)e.addEventListener('change',updateOTPreview);
-  },100);
-
-  return html;
-}
-
-function updateOTPreview(){
-  const s=document.getElementById('ot-start')?.value;
-  const e=document.getElementById('ot-end')?.value;
-  const el=document.getElementById('ot-duration-preview');
-  if(!el)return;
-  if(s&&e){
-    const ms=new Date(e)-new Date(s);
-    if(ms>0){const h=Math.floor(ms/3600000);const m=Math.floor((ms%3600000)/60000);el.textContent='⏱ Duration: '+h+'h '+m+'m';}
-    else el.textContent='⚠ End must be after start';
-  }else el.textContent='';
-}
-
-async function submitOT(){
-  const patrollerId=document.getElementById('ot-patroller')?.value;
-  const startRaw=document.getElementById('ot-start')?.value;
-  const endRaw=document.getElementById('ot-end')?.value;
-  const requestedBy=document.getElementById('ot-requested-by')?.value?.trim();
-  const reason=document.getElementById('ot-reason')?.value?.trim();
-
-  if(!patrollerId){alert('Please select a patroller.');return;}
-  if(!startRaw||!endRaw){alert('Please set start and end date/time.');return;}
-  if(new Date(endRaw)<=new Date(startRaw)){alert('End time must be after start time.');return;}
-  if(!requestedBy){alert('Please enter who requested the OT.');return;}
-  if(!reason){alert('Please enter the OT reason.');return;}
-
-  const pat=D.patrollers.find(p=>p.id===patrollerId);
-  const btn=document.querySelector('#ot-patroller')?.closest('.tcard')?.querySelector('.btn-primary');
-  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Saving...';}
-
-  // Convert local datetime-local to ISO (treat as Bahrain time UTC+3)
-  const toBahrainISO=local=>{
-    const d=new Date(local);
-    return new Date(d.getTime()-3*60*60*1000).toISOString();
+function getPerfSettings(){
+  const s=D.perfSettings||{};
+  return{
+    targetTotal:s.target_total||2200,
+    targetUnique:s.target_unique||2000,
+    workingHours:s.working_hours||208,
+    rateTotal:s.rate_total||11,
+    rateUnique:s.rate_unique||10,
+    taskThreshold:s.task_threshold||40,
+    evalWeight:s.eval_weight||60,
   };
+}
 
-  const{error}=await sb.from('overtime_requests').insert({
-    patroller_id:patrollerId,
-    patroller_name:pat?.name||'',
-    start_datetime:new Date(startRaw).toISOString(),
-    end_datetime:new Date(endRaw).toISOString(),
-    requested_by:requestedBy,
-    ot_reason:reason,
-    submitted_by:D.profile.id,
-    submitted_by_name:D.profile.full_name,
+function coachingScore(patrollerId,month){
+  const assignments=D.coachingAssignments.filter(a=>
+    a.patroller_id===patrollerId&&(a.month||a.assigned_date?.slice(0,7))===month
+  );
+  if(!assignments.length)return null;
+  let score=100;
+  // SLA: -1 per case not completed within 24h of case created_at
+  assignments.forEach(a=>{
+    const c=D.coachingCases.find(x=>x.id===a.case_id);
+    if(!c)return;
+    const batchTime=new Date(c.created_at).getTime();
+    if(a.status==='completed'&&a.completed_at){
+      const completedTime=new Date(a.completed_at).getTime();
+      if(completedTime-batchTime>24*60*60*1000)score-=1;
+    }else if(a.status==='pending'){
+      // not done = SLA breached
+      const now=new Date().getTime();
+      if(now-batchTime>24*60*60*1000)score-=1;
+    }
   });
-
-  if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-circle-check"></i>Submit Overtime';}return;}
-
-  // Reset form
-  ['ot-patroller','ot-start','ot-end','ot-requested-by','ot-reason'].forEach(id=>{
-    const el=document.getElementById(id);if(el)el.value='';
+  // Duplicate: -2 per same rider+violation coached twice in same month
+  const completed=assignments.filter(a=>a.status==='completed');
+  const seen={};
+  completed.forEach(a=>{
+    const c=D.coachingCases.find(x=>x.id===a.case_id);
+    if(!c)return;
+    const key=c.rider_id+'|'+c.violation_type;
+    seen[key]=(seen[key]||0)+1;
   });
-  const prev=document.getElementById('ot-duration-preview');if(prev)prev.textContent='';
-
-  await reload();
-  addNotification(`OT submitted for ${pat?.name||'patroller'}`,'success');
+  Object.values(seen).forEach(count=>{if(count>1)score-=(count-1)*2;});
+  return Math.max(0,score);
 }
 
-async function deleteOT(id){
-  if(!confirm('Delete this overtime record?'))return;
-  await sb.from('overtime_requests').delete().eq('id',id);
-  await reload();
-  addNotification('OT record deleted','info');
+function getPatrollerTaskHours(patrollerId,month){
+  const tasks=(D.tasks||[]).filter(t=>
+    t.patroller_id===patrollerId&&
+    t.date&&t.date.startsWith(month)&&
+    t.status==='Completed'&&
+    t.start_time&&t.end_time
+  );
+  let mins=0;
+  tasks.forEach(t=>{
+    const[sh,sm]=(t.start_time+':00').split(':').map(Number);
+    const[eh,em]=(t.end_time+':00').split(':').map(Number);
+    let d=(eh*60+em)-(sh*60+sm);
+    if(d<0)d+=24*60;
+    mins+=d;
+  });
+  return+(mins/60).toFixed(1);
 }
 
-// ── EVALUATION VIEW ──
-const EVAL_QUESTIONS=[
-  {key:'q_availability',label:'Availability at duty and zone'},
-  {key:'q_appearance',label:'Appearance and approaching riders'},
-  {key:'q_id_wearing',label:'Wearing ID'},
-  {key:'q_car',label:'Maintaining car'},
-  {key:'q_equipment',label:'Rider equipment and uniform'},
-  {key:'q_road_safety',label:'Vehicle check and road safety'},
-  {key:'q_hygiene',label:'Hygiene and appearance coaching'},
-  {key:'q_critical',label:'Critical compliance coaching'},
-  {key:'q_busy_areas',label:'Busy areas check'},
-  {key:'q_vendor',label:'Vendor awareness'},
-  {key:'q_professionalism',label:'Professionalism and problem solving'},
-];
-const RATING_LABELS={1:'Not performing',2:'Low performing',3:'Performing',4:'Good performing'};
-const RC={1:['#FEE2E2','#991B1B','#FCA5A5'],2:['#FEF3C7','#92400E','#FCD34D'],3:['#DCFCE7','#166534','#86EFAC'],4:['#DBEAFE','#1E40AF','#93C5FD']};
-
-function evalScore(ev){
-  const s=EVAL_QUESTIONS.map(q=>ev[q.key]).filter(v=>v>0);
-  if(!s.length)return 0;
-  return Math.round((s.reduce((a,b)=>a+b,0)/s.length/4)*100);
-}
-function evalAvgRating(ev){
-  const s=EVAL_QUESTIONS.map(q=>ev[q.key]).filter(v=>v>0);
-  if(!s.length)return 0;
-  return+(s.reduce((a,b)=>a+b,0)/s.length).toFixed(2);
-}
-function evalMonthStr(d){
-  const dt=new Date(d);
-  return dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0');
-}
-function scoreBadge(pct){
-  const s=pct>=75?'background:#DBEAFE;color:#1E40AF':pct>=50?'background:#DCFCE7;color:#166534':pct>=25?'background:#FEF3C7;color:#92400E':'background:#FEE2E2;color:#991B1B';
-  return'<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;'+s+'">'+pct+'%</span>';
-}
-function ratingBadge(v){
-  if(!v)return'<span style="font-size:10px;color:var(--g3)">--</span>';
-  return'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:12px;background:'+RC[v][0]+';color:'+RC[v][1]+'">'+v+' — '+RATING_LABELS[v]+'</span>';
-}
-function rbBtn(key,n,cur,pfx){
-  pfx=pfx||'rb';
-  const isSel=cur===n;
-  const bg=isSel?RC[n][0]:'var(--sur)';
-  const col=isSel?RC[n][1]:'var(--g3)';
-  const bdr=isSel?RC[n][2]:'var(--g2)';
-  return'<button type="button" data-key="'+key+'" data-val="'+n+'" id="'+pfx+'-'+key+'-'+n+'" onclick="setRating(\''+key+'\','+n+',this,\''+pfx+'\')" style="width:30px;height:30px;border-radius:7px;border:0.5px solid '+bdr+';background:'+bg+';cursor:pointer;font-size:11px;font-weight:600;color:'+col+';font-family:inherit">'+n+'</button>';
-}
-function qFormRow(q,cur,pfx){
-  pfx=pfx||'rb';
-  return'<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--g1)"><span style="font-size:11px;flex:1;color:var(--g4)">'+q.label+'</span><div style="display:flex;gap:3px" id="'+pfx+'-wrap-'+q.key+'">'+[1,2,3,4].map(n=>rbBtn(q.key,n,cur,pfx)).join('')+'</div></div>';
+function getAdjustedTarget(taskHours,ps){
+  const over=Math.max(0,taskHours-ps.taskThreshold);
+  const adjTotal=Math.max(0,Math.round(ps.targetTotal-over*ps.rateTotal));
+  const adjUnique=Math.max(0,Math.round(ps.targetUnique-over*ps.rateUnique));
+  return{adjTotal,adjUnique,over:+over.toFixed(1)};
 }
 
-function evaluationView(){
+function perfScore(evalPct,coachPct,ps){
+  const ew=ps.evalWeight/100;
+  const cw=1-ew;
+  return Math.round(evalPct*ew+coachPct*cw);
+}
+
+function pScoreBadge(pct){
+  const s=pct>=75?'background:#DBEAFE;color:#1E40AF':pct>=60?'background:#DCFCE7;color:#166534':pct>=40?'background:#FEF3C7;color:#92400E':'background:#FEE2E2;color:#991B1B';
+  return'<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;'+s+'">'+pct+'%</span>';
+}
+
+function performanceView(){
   const isAL=canEdit();
   const myPat=D.patrollers.find(p=>p.user_id===D.profile?.id);
   const now=getBahrainNow();
   const curMonth=now.getUTCFullYear()+'-'+String(now.getUTCMonth()+1).padStart(2,'0');
+  const ps=getPerfSettings();
+  const subTab=D.perfTab||(isAL?'overview':'myperformance');
 
-  // ── ADMIN / LEAD VIEW ──
+  // sub-tab pills builder
+  const adminTabs=[
+    {id:'overview',icon:'ti-gauge',label:'Overview'},
+    {id:'evaluation',icon:'ti-clipboard-check',label:'Evaluation'},
+    {id:'coaching',icon:'ti-school',label:'Coaching'},
+    {id:'audit',icon:'ti-target',label:'Audit Targets'},
+  ];
+  const patTabs=[
+    {id:'myperformance',icon:'ti-gauge',label:'My Score'},
+    {id:'mycoaching',icon:'ti-school',label:'My Coaching'},
+    {id:'mytarget',icon:'ti-target',label:'My Target'},
+  ];
+  const tabs=isAL?adminTabs:patTabs;
+  const segHtml='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'+
+    tabs.map(t=>'<button onclick="D.perfTab=\''+t.id+'\';render()" style="padding:5px 14px;border-radius:20px;border:0.5px solid var(--g2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;'+
+      (subTab===t.id?'background:#411517;color:#fff;border-color:#411517':'background:var(--sur);color:var(--g3)')+'">'+
+      '<i class="ti '+t.icon+'" style="font-size:11px;margin-right:4px"></i>'+t.label+'</button>'
+    ).join('')+
+    '</div>';
+
+  // ── HELPERS ──
+  const months=[...new Set([
+    ...D.evaluations.map(e=>e.month||e.eval_date?.slice(0,7)).filter(Boolean),
+    curMonth
+  ])].sort().reverse();
+  const selMonth=D.evalMonth||curMonth;
+  const monthSel='<select onchange="D.evalMonth=this.value;render()" style="padding:4px 8px;border-radius:7px;border:1.5px solid var(--g2);font-size:11px;font-family:inherit">'+
+    months.map(m=>'<option value="'+m+'" '+(m===selMonth?'selected':'')+'>'+m+'</option>').join('')+'</select>';
+
+  const pill=(pct,bg,col)=>'<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:'+bg+';color:'+col+'">'+pct+'%</span>';
+  const pPill=pct=>pct>=75?pill(pct,'#DBEAFE','#1E40AF'):pct>=60?pill(pct,'#DCFCE7','#166534'):pct>=40?pill(pct,'#FEF3C7','#92400E'):pill(pct,'#FEE2E2','#991B1B');
+  const ePill=pct=>pct>=75?pill(pct,'#DBEAFE','#1E40AF'):pct>=50?pill(pct,'#DCFCE7','#166534'):pct>=25?pill(pct,'#FEF3C7','#92400E'):pill(pct,'#FEE2E2','#991B1B');
+  const ini=n=>(n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const trendBar=(val,col)=>'<div style="height:44px;background:var(--g1);border-radius:6px;display:flex;align-items:flex-end;padding:2px"><div style="width:100%;height:'+Math.max(4,val)+'%;background:'+col+';border-radius:3px;max-height:40px"></div></div>';
+  const monthLabel=m=>new Date(m+'-01').toLocaleString('en-GB',{month:'short'});
+
   if(isAL){
     const pts=activePats().filter(p=>getUtype(p)==='patroller');
-    const patOptions=pts.map(p=>'<option value="'+p.id+'">'+p.name+'</option>').join('');
 
-    // Month selector
-    const months=[...new Set(D.evaluations.map(e=>evalMonthStr(e.eval_date)))].sort().reverse();
-    if(!months.includes(curMonth))months.unshift(curMonth);
-    const selMonth=D.evalMonth||curMonth;
-    const monthOptions=months.map(m=>'<option value="'+m+'" '+( m===selMonth?'selected':'')+'>'+m+'</option>').join('');
+    // Per-patroller data for selected month
+    const perfData=pts.map(p=>{
+      const evals=D.evaluations.filter(e=>e.patroller_id===p.id&&(e.month||e.eval_date?.slice(0,7))===selMonth);
+      const evalAvg=evals.length?Math.round(evals.reduce((s,e)=>s+evalScore(e),0)/evals.length):null;
+      const evalAvgRaw=evals.length?+(evals.reduce((s,e)=>s+evalAvgRating(e),0)/evals.length).toFixed(2):null;
+      const cScore=coachingScore(p.id,selMonth);
+      const pScore=(evalAvg!==null&&cScore!==null)?perfScore(evalAvg,cScore,ps):null;
+      const taskHrs=getPatrollerTaskHours(p.id,selMonth);
+      const adj=getAdjustedTarget(taskHrs,ps);
+      return{p,evalAvg,evalAvgRaw,cScore,pScore,evals:evals.length,taskHrs,adj};
+    });
+    const hasData=perfData.filter(x=>x.pScore!==null||x.cScore!==null);
+    const sorted=hasData.slice().sort((a,b)=>(b.pScore||0)-(a.pScore||0));
+    const best=sorted[0];
+    const worst=sorted[sorted.length-1]!==best?sorted[sorted.length-1]:null;
 
-    // Filter for selected month
-    const monthEvals=D.evaluations.filter(e=>evalMonthStr(e.eval_date)===selMonth);
+    const teamAvgPerf=hasData.length?Math.round(hasData.filter(r=>r.pScore!==null).reduce((s,r)=>s+(r.pScore||0),0)/hasData.filter(r=>r.pScore!==null).length):0;
+    const teamAvgEval=hasData.length?Math.round(hasData.filter(r=>r.evalAvg!==null).reduce((s,r)=>s+(r.evalAvg||0),0)/hasData.filter(r=>r.evalAvg!==null).length):0;
+    const teamAvgCoach=hasData.length?Math.round(hasData.filter(r=>r.cScore!==null).reduce((s,r)=>s+(r.cScore||0),0)/hasData.filter(r=>r.cScore!==null).length):0;
 
-    // Per-patroller summary
-    const patSummary=pts.map(p=>{
-      const pEvals=monthEvals.filter(e=>e.patroller_id===p.id);
-      if(!pEvals.length)return null;
-      const avgScore=Math.round(pEvals.reduce((s,e)=>s+evalScore(e),0)/pEvals.length);
-      const avgRating=+(pEvals.reduce((s,e)=>s+evalAvgRating(e),0)/pEvals.length).toFixed(2);
-      const qAvgs={};
-      EVAL_QUESTIONS.forEach(q=>{
-        const vals=pEvals.map(e=>e[q.key]).filter(v=>v>0);
-        qAvgs[q.key]=vals.length?+(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1):null;
-      });
-      return{p,avgScore,avgRating,qAvgs,count:pEvals.length};
-    }).filter(Boolean).sort((a,b)=>b.avgScore-a.avgScore);
+    // Last month comparison
+    const prevMonth=months[months.indexOf(selMonth)+1];
+    const prevEvals=prevMonth?D.evaluations.filter(e=>(e.month||e.eval_date?.slice(0,7))===prevMonth):[];
+    const prevAvg=prevEvals.length?Math.round(prevEvals.reduce((s,e)=>s+evalScore(e),0)/prevEvals.length):null;
+    const diff=prevAvg!==null?teamAvgPerf-prevAvg:null;
+    const diffLabel=diff!==null?(diff>=0?'+'+diff+'%':diff+'%'):'--';
+    const diffCol=diff===null?'var(--g3)':diff>0?'#166534':'#DC2626';
 
     // 3-month trend data
-    const last3Months=months.slice(0,3);
-    function pat3MonthData(patId){
-      return last3Months.map(m=>{
-        const evals=D.evaluations.filter(e=>e.patroller_id===patId&&evalMonthStr(e.eval_date)===m);
-        if(!evals.length)return null;
-        return Math.round(evals.reduce((s,e)=>s+evalScore(e),0)/evals.length);
+    const last3=months.slice(0,3);
+    const trendRows=pts.filter(p=>perfData.find(x=>x.p.id===p.id&&(x.pScore!==null||x.cScore!==null))).map(p=>{
+      const scores=last3.map(m=>{
+        const ev=D.evaluations.filter(e=>e.patroller_id===p.id&&(e.month||e.eval_date?.slice(0,7))===m);
+        const ea=ev.length?Math.round(ev.reduce((s,e)=>s+evalScore(e),0)/ev.length):null;
+        const cs=coachingScore(p.id,m);
+        return(ea!==null&&cs!==null)?perfScore(ea,cs,ps):null;
       });
-    }
-    function trendBars(data,color){
-      const max=Math.max(...data.filter(v=>v!==null),1);
-      const monthLabels=last3Months.map(m=>{const d=new Date(m+'-01');return d.toLocaleString('en-GB',{month:'short'});});
-      return data.map((v,i)=>{
-        const h=v?Math.round((v/100)*50):4;
-        return'<div style="flex:1;text-align:center"><div style="font-size:10px;color:var(--g3);margin-bottom:4px">'+monthLabels[i]+'</div><div style="height:50px;background:var(--g1);border-radius:6px;display:flex;align-items:flex-end;padding:2px"><div style="width:100%;height:'+h+'px;background:'+color+';border-radius:4px"></div></div><div style="font-size:10px;font-weight:700;margin-top:3px;color:'+color+'">'+( v!==null?v+'%':'--')+'</div></div>';
-      }).join('');
-    }
-
-    const best3=patSummary[0];
-    const worst3=patSummary[patSummary.length-1];
-    const bestData=best3?pat3MonthData(best3.p.id):[];
-    const worstData=worst3&&worst3!==best3?pat3MonthData(worst3.p.id):[];
-    const ini=n=>(n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-
-    function perfCard(patData,color,bgColor,icon){
-      if(!patData)return'<div class="tcard" style="padding:14px;flex:1"><div style="font-size:12px;color:var(--g3);text-align:center;padding:20px">No data</div></div>';
-      const data=pat3MonthData(patData.p.id);
-      return'<div class="tcard" style="padding:14px;flex:1">'+
-        '<div style="font-size:10px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti '+icon+'" style="margin-right:4px"></i>'+( icon==='ti-trophy'?'Best performer':'Lowest performer')+' — 3 months</div>'+
-        '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--g1);margin-bottom:10px">'+
-        '<div style="width:38px;height:38px;border-radius:50%;background:'+bgColor+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:'+color+';flex-shrink:0">'+ini(patData.p.name)+'</div>'+
-        '<div style="flex:1"><div style="font-size:13px;font-weight:700">'+patData.p.name+'</div><div style="font-size:10px;color:var(--g3);margin-top:2px">3-month average</div></div>'+
-        '<span style="font-size:14px;font-weight:700;padding:5px 10px;border-radius:20px;background:'+bgColor+';color:'+color+'">'+patData.avgScore+'%</span>'+
-        '</div>'+
-        '<div style="display:flex;gap:6px">'+trendBars(data,color)+'</div></div>';
-    }
-
-    // Summary table rows
-    const summaryRows=patSummary.map(({p,avgScore,avgRating,qAvgs,count},i)=>{
-      const isBest=i===0;
-      const qCells=EVAL_QUESTIONS.map(q=>{
-        const v=qAvgs[q.key];
-        if(!v)return'<td style="font-size:10px;color:var(--g3)">--</td>';
-        const pct=Math.round((v/4)*100);
-        const bg=pct>=75?'background:#DBEAFE;color:#1E40AF':pct>=50?'background:#DCFCE7;color:#166534':pct>=25?'background:#FEF3C7;color:#92400E':'background:#FEE2E2;color:#991B1B';
-        return'<td><span style="font-size:10px;font-weight:700;padding:2px 5px;border-radius:8px;'+bg+'">'+v+'</span></td>';
-      }).join('');
-      return'<tr '+( isBest?'style="background:rgba(255,89,0,.04)"':'')+ '>'+
-        '<td class="lt" style="font-weight:600">'+( isBest?'<i class="ti ti-trophy" style="color:#FF5900;font-size:11px;margin-right:3px"></i>':'')+p.name+'</td>'+
-        '<td style="font-size:11px;color:var(--g3)">'+count+'</td>'+
-        qCells+
-        '<td style="font-weight:700;font-size:11px">'+avgRating+' / 4</td>'+
-        '<td>'+scoreBadge(avgScore)+'</td>'+
-        '</tr>';
+      const first=scores.find(s=>s!==null);
+      const last=scores.filter(s=>s!==null).pop();
+      const diff2=first!==null&&last!==null&&first!==last?last-first:null;
+      const trend2=diff2===null?'--':diff2>0?'↑ +'+diff2+'%':'↓ '+diff2+'%';
+      const trendCol=diff2===null?'var(--g3)':diff2>0?'#166534':'#DC2626';
+      return'<tr><td class="lt" style="font-weight:600">'+p.name+'</td>'+
+        scores.map((s,i)=>s!==null?'<td>'+pPill(s)+'</td>':'<td style="color:var(--g3);font-size:10px">--</td>').join('')+
+        '<td style="font-weight:700;color:'+trendCol+'">'+trend2+'</td></tr>';
     }).join('');
 
-    // Recent evals table
-    const recentRows=D.evaluations.slice(0,20).map(e=>{
-      const pat=D.patrollers.find(p=>p.id===e.patroller_id);
-      const pct=evalScore(e);
-      const avg=evalAvgRating(e);
-      const dt=new Date(e.eval_date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-      return'<tr><td class="lt" style="font-size:11px;font-weight:600">'+( pat?.name||'--')+'</td><td style="font-size:11px">'+dt+'</td><td style="font-size:11px;color:var(--g3)">'+( e.location||'--')+'</td><td style="font-size:11px;font-weight:600">'+avg+' / 4</td><td>'+scoreBadge(pct)+'</td><td style="font-size:11px;color:var(--g3)">'+( e.evaluator_name||'--')+'</td><td style="font-size:11px;color:var(--g3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+( e.comment||'--')+'</td><td><button onclick="openEvalEdit(\''+e.id+'\')" style="background:none;border:0.5px solid var(--g2);border-radius:6px;padding:3px 7px;cursor:pointer;font-size:10px;color:var(--g3);font-family:inherit"><i class="ti ti-edit" style="font-size:10px"></i> Edit</button></td></tr>';
-    }).join('');
+    // ── OVERVIEW ──
+    if(subTab==='overview'){
+      const patCards=sorted.map((d,i)=>{
+        const isBest=i===0;
+        const isWorst=d===worst;
+        const borderTop=isBest?'border-top:3px solid #FF5900;':isWorst?'border-top:3px solid #DC2626;':'';
+        const borderR=isBest?'0 0 12px 12px':'12px';
+        const avatarBg=isBest?'#FFF0E6':isWorst?'#FEE2E2':'var(--g1)';
+        const avatarCol=isBest?'#FF5900':isWorst?'#991B1B':'var(--g3)';
+        const scoreCol=d.pScore>=75?'#1E40AF':d.pScore>=60?'#166534':d.pScore>=40?'#D97706':'#DC2626';
+        const subLabel=isBest?'Best performer':isWorst?'<span style="color:#DC2626">Needs attention</span>':'Patroller';
+        return'<div class="tcard" style="'+borderTop+'border-radius:'+borderR+';padding:14px">'+
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+            '<div style="width:36px;height:36px;border-radius:50%;background:'+avatarBg+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:'+avatarCol+';flex-shrink:0">'+ini(d.p.name)+'</div>'+
+            '<div><div style="font-size:12px;font-weight:700">'+d.p.name+'</div><div style="font-size:10px;color:var(--g3)">'+subLabel+'</div></div>'+
+          '</div>'+
+          '<div style="font-size:28px;font-weight:700;color:'+(d.pScore!==null?scoreCol:'var(--g3)')+';margin-bottom:6px">'+(d.pScore!==null?d.pScore+'%':'--')+'</div>'+
+          '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--g3);margin-bottom:3px"><span>Eval</span><span style="font-weight:700;color:'+( d.evalAvg!==null?'#166534':'var(--g3)')+'">'+(d.evalAvg!==null?d.evalAvg+'%':'--')+'</span></div>'+
+          '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--g3)"><span>Coaching</span><span style="font-weight:700;color:'+(d.cScore!==null?'#1E40AF':'var(--g3)')+'">'+(d.cScore!==null?d.cScore+'%':'--')+'</span></div>'+
+          '</div>';
+      }).join('');
 
-    // Team avg this month vs last
-    const teamAvg=monthEvals.length?Math.round(monthEvals.reduce((s,e)=>s+evalScore(e),0)/monthEvals.length):0;
-    const lastMonthIdx=months.indexOf(selMonth)+1;
-    const lastMonth=months[lastMonthIdx];
-    const lastMonthEvals=lastMonth?D.evaluations.filter(e=>evalMonthStr(e.eval_date)===lastMonth):[];
-    const lastAvg=lastMonthEvals.length?Math.round(lastMonthEvals.reduce((s,e)=>s+evalScore(e),0)/lastMonthEvals.length):0;
-    const diff=teamAvg-lastAvg;
-    const diffLabel=lastAvg?( diff>=0?'+'+diff+'%':''+diff+'%'):'--';
-    const diffCol=diff>0?'#166534':diff<0?'#DC2626':'var(--g3)';
+      const teamBars=last3.map(m=>{
+        const allEvals=D.evaluations.filter(e=>(e.month||e.eval_date?.slice(0,7))===m);
+        const sc=allEvals.length?Math.round(allEvals.reduce((s,e)=>s+evalScore(e),0)/allEvals.length):0;
+        const col=sc>=75?'#3B82F6':sc>=60?'#16A34A':sc>=40?'#D97706':'#DC2626';
+        return'<div style="flex:1;text-align:center">'+
+          '<div style="font-size:10px;color:var(--g3);margin-bottom:3px">'+monthLabel(m)+'</div>'+
+          trendBar(sc,col)+
+          '<div style="font-size:10px;font-weight:700;margin-top:3px;color:'+col+'">'+sc+'%</div></div>';
+      }).join('');
 
-    // Build the form questions in 2 columns
-    const half=Math.ceil(EVAL_QUESTIONS.length/2);
-    const col1=EVAL_QUESTIONS.slice(0,half).map(q=>qFormRow(q,0,'rb')).join('');
-    const col2=EVAL_QUESTIONS.slice(half).map(q=>qFormRow(q,0,'rb')).join('');
-
-    return'<div class="stats">'+
-      '<div class="stat blue"><div class="stat-label">This month evals</div><div class="stat-value">'+monthEvals.length+'</div></div>'+
-      '<div class="stat"><div class="stat-label">Patrollers rated</div><div class="stat-value">'+patSummary.length+'</div></div>'+
-      '<div class="stat green"><div class="stat-label">Team avg ('+selMonth+')</div><div class="stat-value">'+( teamAvg||'--')+'%</div></div>'+
-      '<div class="stat"><div class="stat-label">vs last month</div><div class="stat-value" style="font-size:15px;margin-top:3px;color:'+diffCol+'">'+diffLabel+'</div></div>'+
-      '</div>'+
-
-      '<div style="display:flex;gap:12px;margin-bottom:12px">'+
-      perfCard(best3,'#1E40AF','#DBEAFE','ti-trophy')+
-      perfCard(worst3,'#991B1B','#FEE2E2','ti-trending-down')+
-      '</div>'+
-
-      '<div class="tcard" style="margin-bottom:12px;padding:14px">'+
-        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
-          '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-chart-bar" style="margin-right:4px"></i>Monthly summary</div>'+
-          '<select onchange="D.evalMonth=this.value;render()" style="padding:4px 8px;border-radius:6px;border:0.5px solid var(--g2);font-size:11px;font-family:inherit;margin-left:auto">'+monthOptions+'</select>'+
+      return segHtml+
+        '<div class="stats" style="margin-bottom:14px">'+
+          '<div class="stat" style="background:#FFF0E6;border:1px solid #FFB380"><div class="stat-label" style="color:#D94D00">Team performance</div><div class="stat-value" style="color:#FF5900">'+teamAvgPerf+'%</div></div>'+
+          '<div class="stat green"><div class="stat-label">Avg evaluation</div><div class="stat-value">'+teamAvgEval+'%<span style="font-size:11px;color:var(--g3);font-weight:400;margin-left:4px">×'+ps.evalWeight+'%</span></div></div>'+
+          '<div class="stat blue"><div class="stat-label">Avg coaching</div><div class="stat-value">'+teamAvgCoach+'%<span style="font-size:11px;color:var(--g3);font-weight:400;margin-left:4px">×'+(100-ps.evalWeight)+'%</span></div></div>'+
+          '<div class="stat"><div class="stat-label">vs last month</div><div class="stat-value" style="font-size:18px;margin-top:3px;color:'+diffCol+'">'+diffLabel+'</div></div>'+
         '</div>'+
-        ( patSummary.length===0?'<div style="padding:30px;text-align:center;color:var(--g3)">No evaluations for this month</div>':
-          '<div class="t-scroll"><table style="min-width:900px"><thead><tr>'+
-          '<th class="lt">Patroller</th><th>Evals</th>'+
-          EVAL_QUESTIONS.map(q=>'<th style="font-size:8px;max-width:55px;white-space:normal;line-height:1.2">'+q.label.split(' ').slice(0,3).join(' ')+'</th>').join('')+
-          '<th style="background:#FFF0E6;color:#D94D00">Avg rating</th><th style="background:#FFF0E6;color:#D94D00">Score %</th>'+
-          '</tr></thead><tbody>'+summaryRows+'</tbody></table></div>')+
-      '</div>'+
+        '<div style="display:grid;grid-template-columns:repeat('+Math.min(sorted.length,4)+',1fr);gap:10px;margin-bottom:14px">'+patCards+'</div>'+
+        '<div class="tcard" style="padding:14px">'+
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
+            '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">3-month performance trend</div>'+
+            monthSel+
+          '</div>'+
+          '<div style="display:flex;gap:12px;align-items:flex-start">'+
+            '<div style="display:flex;gap:6px;width:120px;flex-shrink:0">'+teamBars+'</div>'+
+            '<div style="width:1px;background:var(--g2);align-self:stretch"></div>'+
+            '<div style="flex:1;overflow-x:auto"><table style="min-width:400px"><thead><tr><th class="lt">Patroller</th>'+
+            last3.map(m=>'<th>'+monthLabel(m)+'</th>').join('')+
+            '<th>Trend</th></tr></thead><tbody>'+trendRows+'</tbody></table></div>'+
+          '</div>'+
+        '</div>';
+    }
 
-      '<div class="tcard" style="margin-bottom:12px;padding:14px">'+
-        '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px"><i class="ti ti-clipboard-plus" style="margin-right:4px"></i>New evaluation</div>'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">'+
-          '<div class="fg"><label>Patroller</label><select id="ev-patroller"><option value="">-- Select patroller --</option>'+patOptions+'</select></div>'+
-          '<div class="fg"><label>Location</label><input type="text" id="ev-location" placeholder="e.g. Seef District, HRC"></div>'+
-          '<div class="fg"><label>Date</label><input type="date" id="ev-date" value="'+todayStr()+'"></div>'+
-        '</div>'+
-        '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--g3);margin-bottom:6px">Rating guide</div>'+
-        '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">'+
-          '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;background:#FEE2E2;color:#991B1B">1 Not performing</span>'+
-          '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;background:#FEF3C7;color:#92400E">2 Low performing</span>'+
-          '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;background:#DCFCE7;color:#166534">3 Performing</span>'+
-          '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;background:#DBEAFE;color:#1E40AF">4 Good performing</span>'+
-        '</div>'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px">'+
-          '<div>'+col1+'</div><div>'+col2+'</div>'+
-        '</div>'+
-        '<div class="fg" style="margin-top:10px"><label>Comment</label><textarea id="ev-comment" rows="2" style="width:100%;padding:8px 10px;border-radius:8px;border:0.5px solid var(--g2);font-family:inherit;font-size:12px;resize:vertical"></textarea></div>'+
-        '<button onclick="submitEvaluation()" class="btn btn-primary" style="width:100%;padding:10px;justify-content:center"><i class="ti ti-circle-check"></i>Submit — score calculated on save</button>'+
-      '</div>'+
+    if(subTab==='evaluation'){
+      const evalTableRows=sorted.map(({p,evalAvg,evalAvgRaw,evals},i)=>{
+        const isBest=i===0&&evalAvg!==null;
+        return'<tr '+(isBest?'style="background:rgba(255,89,0,.04)"':'')+'>'+
+          '<td class="lt" style="font-weight:600">'+(isBest?'<i class="ti ti-trophy" style="color:#FF5900;font-size:10px;margin-right:3px"></i>':'')+p.name+'</td>'+
+          '<td style="color:var(--g3);font-size:11px">'+evals+'</td>'+
+          '<td style="font-size:11px">'+(evalAvgRaw!==null?evalAvgRaw+' / 4':'--')+'</td>'+
+          '<td>'+(evalAvg!==null?ePill(evalAvg):'<span style="font-size:10px;color:var(--g3)">--</span>')+'</td>'+
+          '<td><button onclick="openEvalEdit(\''+p.id+'\')" style="font-size:10px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--g2);background:none;cursor:pointer;font-family:inherit;color:var(--g3)">Edit</button></td>'+
+          '</tr>';
+      }).join('');
 
-      '<div class="tcard" style="padding:14px">'+
-        '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-list" style="margin-right:4px"></i>All evaluations</div>'+
-        ( D.evaluations.length===0?'<div style="padding:30px;text-align:center;color:var(--g3)">No evaluations yet</div>':
-          '<div class="t-scroll"><table style="min-width:750px"><thead><tr>'+
-          '<th class="lt">Patroller</th><th>Date</th><th>Location</th><th>Avg rating</th><th>Score %</th><th>By</th><th>Comment</th><th></th>'+
-          '</tr></thead><tbody>'+recentRows+'</tbody></table></div>')+
-      '</div>';
+      const recentRows=D.evaluations.filter(e=>(e.month||e.eval_date?.slice(0,7))===selMonth).slice(0,10).map(e=>{
+        const pat=D.patrollers.find(p=>p.id===e.patroller_id);
+        const pct=evalScore(e);
+        const dt=new Date(e.eval_date).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+        return'<tr><td class="lt" style="font-weight:600">'+(pat?.name||'--')+'</td><td style="font-size:11px;color:var(--g3)">'+dt+'</td><td style="font-size:11px;color:var(--g3)">'+(e.location||'--')+'</td><td>'+ePill(pct)+'</td><td style="font-size:11px;color:var(--g3)">'+(e.evaluator_name||'--')+'</td></tr>';
+      }).join('');
+
+      return segHtml+
+        '<div style="display:grid;grid-template-columns:360px 1fr;gap:12px">'+
+          '<div class="tcard" style="padding:14px">'+
+            '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px"><i class="ti ti-clipboard-plus" style="margin-right:4px"></i>New evaluation</div>'+
+            '<div class="fg"><label>Patroller</label><select id="ev-patroller"><option value="">-- Select --</option>'+pts.map(p=>'<option value="'+p.id+'">'+p.name+'</option>').join('')+'</select></div>'+
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
+              '<div class="fg"><label>Location</label><input type="text" id="ev-location" placeholder="e.g. Seef, HRC"></div>'+
+              '<div class="fg"><label>Date</label><input type="date" id="ev-date" value="'+todayStr()+'"></div>'+
+            '</div>'+
+            '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">'+
+              '<span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:8px;background:#FEE2E2;color:#991B1B">1 Not performing</span>'+
+              '<span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:8px;background:#FEF3C7;color:#92400E">2 Low</span>'+
+              '<span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:8px;background:#DCFCE7;color:#166534">3 Performing</span>'+
+              '<span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:8px;background:#DBEAFE;color:#1E40AF">4 Good</span>'+
+            '</div>'+
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px">'+
+              '<div>'+EVAL_QUESTIONS.slice(0,6).map(q=>qFormRow(q,0,'rb')).join('')+'</div>'+
+              '<div>'+EVAL_QUESTIONS.slice(6).map(q=>qFormRow(q,0,'rb')).join('')+'</div>'+
+            '</div>'+
+            '<div class="fg" style="margin-top:8px"><label>Comment</label><textarea id="ev-comment" rows="2" style="width:100%;padding:7px 9px;border-radius:7px;border:0.5px solid var(--g2);font-family:inherit;font-size:12px;resize:vertical"></textarea></div>'+
+            '<button onclick="submitEvaluation()" class="btn btn-primary" style="width:100%;padding:10px;justify-content:center"><i class="ti ti-circle-check"></i>Submit — score on save</button>'+
+          '</div>'+
+          '<div>'+
+            '<div class="tcard" style="padding:14px;margin-bottom:10px">'+
+              '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+                '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-chart-bar" style="margin-right:4px"></i>Evaluation summary</div>'+
+                monthSel+
+              '</div>'+
+              (sorted.length===0?'<div style="padding:20px;text-align:center;color:var(--g3)">No evaluations for '+selMonth+'</div>':
+                '<div class="t-scroll"><table><thead><tr><th class="lt">Patroller</th><th>Evals</th><th>Avg rating</th><th>Eval score</th><th></th></tr></thead><tbody>'+evalTableRows+'</tbody></table></div>')+
+            '</div>'+
+            '<div class="tcard" style="padding:14px">'+
+              '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-list" style="margin-right:4px"></i>Recent evaluations</div>'+
+              (recentRows?'<div class="t-scroll"><table><thead><tr><th class="lt">Patroller</th><th>Date</th><th>Location</th><th>Score</th><th>By</th></tr></thead><tbody>'+recentRows+'</tbody></table></div>':
+                '<div style="padding:20px;text-align:center;color:var(--g3)">No evaluations for '+selMonth+'</div>')+
+            '</div>'+
+          '</div>'+
+        '</div>';
+    }
+
+    if(subTab==='coaching'){
+      const coachMonths=[...new Set([...D.coachingAssignments.map(a=>a.month||a.assigned_date?.slice(0,7)).filter(Boolean),curMonth])].sort().reverse();
+      const selCoachMonth=D.coachingMonth||curMonth;
+      const cMonthSel='<select onchange="D.coachingMonth=this.value;render()" style="padding:4px 8px;border-radius:7px;border:1.5px solid var(--g2);font-size:11px;font-family:inherit">'+
+        coachMonths.map(m=>'<option value="'+m+'" '+(m===selCoachMonth?'selected':'')+'>'+m+'</option>').join('')+'</select>';
+
+      const monthAssignments=D.coachingAssignments.filter(a=>(a.month||a.assigned_date?.slice(0,7))===selCoachMonth);
+      const monthCaseIds=new Set(monthAssignments.map(a=>a.case_id));
+      const filteredCases=D.coachingCases.filter(c=>monthCaseIds.has(c.id)||(c.batch_date&&c.batch_date.startsWith(selCoachMonth)&&!D.coachingAssignments.find(a=>a.case_id===c.id)));
+      const unassignedCases=filteredCases.filter(c=>!D.coachingAssignments.find(a=>a.case_id===c.id));
+      const totalDone=monthAssignments.filter(a=>a.status==='completed').length;
+      const totalPending=monthAssignments.filter(a=>a.status==='pending').length;
+      let totalSLA=0,totalDupe=0;
+
+      const coachBreakdown=pts.map(p=>{
+        const assigned=monthAssignments.filter(a=>a.patroller_id===p.id);
+        if(!assigned.length)return null;
+        let slaBreach=0,duplicate=0;
+        assigned.forEach(a=>{
+          const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return;
+          const batchTime=new Date(c.created_at).getTime();
+          if(a.status==='completed'&&a.completed_at){if(new Date(a.completed_at).getTime()-batchTime>24*3600000)slaBreach++;}
+          else if(a.status==='pending'){if(Date.now()-batchTime>24*3600000)slaBreach++;}
+        });
+        const completed=assigned.filter(a=>a.status==='completed');
+        const seen={};
+        completed.forEach(a=>{
+          const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return;
+          const key=c.rider_id+'|'+c.violation_type;seen[key]=(seen[key]||0)+1;
+        });
+        Object.values(seen).forEach(cnt=>{if(cnt>1)duplicate+=(cnt-1)*2;});
+        const cs=Math.max(0,100-slaBreach-duplicate);
+        totalSLA+=slaBreach;totalDupe+=duplicate;
+        return{p,assigned:assigned.length,done:assigned.filter(a=>a.status==='completed').length,slaBreach,duplicate,cs};
+      }).filter(Boolean).sort((a,b)=>b.cs-a.cs);
+
+      const coachRows=coachBreakdown.map(({p,assigned,done,slaBreach,duplicate,cs},i)=>
+        '<tr '+(i===0?'style="background:rgba(255,89,0,.04)"':'')+'>'+
+        '<td class="lt" style="font-weight:600">'+p.name+'</td>'+
+        '<td style="font-size:11px">'+assigned+'</td>'+
+        '<td style="font-weight:600;color:#166534">'+done+'</td>'+
+        '<td style="font-weight:600;color:#DC2626">'+slaBreach+'</td>'+
+        '<td style="font-weight:600;color:#D97706">'+duplicate+'</td>'+
+        '<td>'+pPill(cs)+'</td></tr>'
+      ).join('');
+
+      const caseRows=filteredCases.slice(0,15).map(c=>{
+        const asgn=D.coachingAssignments.find(a=>a.case_id===c.id);
+        const pat=asgn?D.patrollers.find(p=>p.id===asgn.patroller_id):null;
+        const batchTime=new Date(c.created_at).getTime();
+        let slaStatus,slaStyle;
+        if(asgn?.status==='completed'&&asgn.completed_at){
+          const diff=new Date(asgn.completed_at).getTime()-batchTime;
+          if(diff<=24*3600000){slaStatus='On time';slaStyle='background:#DCFCE7;color:#166534';}
+          else{const h=Math.round(diff/3600000);slaStatus='+'+h+'h breach';slaStyle='background:#FEE2E2;color:#991B1B';}
+        }else if(asgn?.status==='pending'){
+          if(Date.now()-batchTime>24*3600000){slaStatus='Breached';slaStyle='background:#FEE2E2;color:#991B1B';}
+          else{slaStatus='In SLA';slaStyle='background:#FEF3C7;color:#92400E';}
+        }else{slaStatus='Unassigned';slaStyle='background:var(--g1);color:var(--g3)';}
+        const statStyle=asgn?.status==='completed'?'background:#DCFCE7;color:#166534':asgn?.status==='pending'?'background:#FEF3C7;color:#92400E':'background:var(--g1);color:var(--g3)';
+        return'<tr><td class="lt" style="font-size:11px;font-weight:600">'+(c.rider_name||'--')+'</td>'+
+          '<td style="font-size:11px">'+(pat?.name||'--')+'</td>'+
+          '<td style="font-size:10px;color:var(--g3)">'+new Date(c.created_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'})+'</td>'+
+          '<td style="font-size:10px;color:var(--g3)">'+(asgn?.completed_at?new Date(asgn.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--')+'</td>'+
+          '<td><span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;'+slaStyle+'">'+slaStatus+'</span></td>'+
+          '<td><span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;'+statStyle+'">'+(asgn?.status==='completed'?'Done':asgn?.status==='pending'?'Pending':'Unassigned')+'</span></td>'+
+          '</tr>';
+      }).join('');
+
+      return segHtml+
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">'+
+          '<div style="background:var(--g1);border-radius:10px;padding:12px"><div style="font-size:10px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Total cases</div><div style="font-size:20px;font-weight:700;color:#FF5900">'+filteredCases.length+'</div></div>'+
+          '<div style="background:#DCFCE7;border-radius:10px;padding:12px;border:0.5px solid #86EFAC"><div style="font-size:10px;font-weight:600;color:#166534;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">On time</div><div style="font-size:20px;font-weight:700;color:#166534">'+totalDone+'</div></div>'+
+          '<div style="background:#FEE2E2;border-radius:10px;padding:12px;border:0.5px solid #FCA5A5"><div style="font-size:10px;font-weight:600;color:#DC2626;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">SLA breached</div><div style="font-size:20px;font-weight:700;color:#DC2626">'+totalSLA+'</div></div>'+
+          '<div style="background:#FEF3C7;border-radius:10px;padding:12px;border:0.5px solid #FCD34D"><div style="font-size:10px;font-weight:600;color:#92400E;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Duplicates</div><div style="font-size:20px;font-weight:700;color:#D97706">'+totalDupe+'</div></div>'+
+        '</div>'+
+        '<div class="tcard" style="padding:14px;margin-bottom:10px">'+
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+            '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-school" style="margin-right:4px"></i>Coaching score breakdown</div>'+
+            cMonthSel+
+            (unassignedCases.length>0?'<button onclick="D.coachingMonth=\''+selCoachMonth+'\';autoAssignCoaching()" class="btn btn-primary" style="margin-left:auto;padding:4px 10px;font-size:11px"><i class="ti ti-users"></i>Auto-assign '+unassignedCases.length+'</button>':'')+
+          '</div>'+
+          (coachRows?'<div class="t-scroll"><table><thead><tr><th class="lt">Patroller</th><th>Assigned</th><th style="color:#166534">On time</th><th style="color:#DC2626">SLA −1pt</th><th style="color:#D97706">Duplicate −2pt</th><th style="background:#DBEAFE;color:#0C447C">Score</th></tr></thead><tbody>'+coachRows+'</tbody></table></div>':
+            '<div style="padding:20px;text-align:center;color:var(--g3)">No coaching data for '+selCoachMonth+'</div>')+
+        '</div>'+
+        '<div class="tcard" style="padding:14px">'+
+          '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-list" style="margin-right:4px"></i>Cases with SLA status</div>'+
+          (caseRows?'<div class="t-scroll"><table style="min-width:650px"><thead><tr><th class="lt">Rider</th><th>Patroller</th><th>Assigned at</th><th>Completed at</th><th>SLA</th><th>Status</th></tr></thead><tbody>'+caseRows+'</tbody></table></div>':
+            '<div style="padding:20px;text-align:center;color:var(--g3)">No cases for '+selCoachMonth+'</div>')+
+        '</div>';
+    }
+
+    if(subTab==='audit'){
+      return segHtml+
+        '<div class="tcard" style="padding:14px;margin-bottom:10px">'+
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
+            '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-settings" style="margin-right:4px"></i>Target settings <span style="font-size:10px;color:var(--g3);font-weight:400;text-transform:none;letter-spacing:0">Admin / TL only</span></div>'+
+            '<button onclick="savePerfSettings()" class="btn btn-primary" style="padding:5px 12px;font-size:11px"><i class="ti ti-circle-check"></i>Save settings</button>'+
+          '</div>'+
+          '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">'+
+            '<div class="fg"><label>Total target</label><input type="number" id="ps-total" value="'+ps.targetTotal+'"></div>'+
+            '<div class="fg"><label>Unique target</label><input type="number" id="ps-unique" value="'+ps.targetUnique+'"></div>'+
+            '<div class="fg"><label>Working hrs</label><input type="number" id="ps-hours" value="'+ps.workingHours+'"></div>'+
+            '<div class="fg"><label>Total / hr</label><input type="number" id="ps-rate-total" value="'+ps.rateTotal+'"></div>'+
+            '<div class="fg"><label>Unique / hr</label><input type="number" id="ps-rate-unique" value="'+ps.rateUnique+'"></div>'+
+            '<div class="fg"><label>Task threshold</label><input type="number" id="ps-threshold" value="'+ps.taskThreshold+'"></div>'+
+          '</div>'+
+          '<div style="font-size:10px;color:var(--g3);margin-top:8px;padding-top:8px;border-top:0.5px solid var(--g2)"><i class="ti ti-info-circle" style="font-size:10px;margin-right:3px"></i>Eval weight is also adjustable — current: Eval <strong>'+ps.evalWeight+'%</strong> · Coaching <strong>'+(100-ps.evalWeight)+'%</strong>&nbsp;&nbsp;<input type="number" id="ps-eval-weight" value="'+ps.evalWeight+'" style="width:60px;padding:3px 6px;border-radius:5px;border:0.5px solid var(--g2);font-size:11px;font-family:inherit"> % eval weight</div>'+
+        '</div>'+
+        '<div class="tcard" style="padding:14px">'+
+          '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-target" style="margin-right:4px"></i>Adjusted audit targets — '+selMonth+'&nbsp;&nbsp;'+monthSel+'</div>'+
+          '<div class="t-scroll"><table><thead><tr>'+
+            '<th class="lt">Patroller</th>'+
+            '<th>Task hrs ('+selMonth+')</th>'+
+            '<th>Hrs above '+ps.taskThreshold+'h</th>'+
+            '<th style="color:#166534">Adj. total target</th>'+
+            '<th style="color:#1E40AF">Adj. unique target</th>'+
+            '<th>Reduction</th>'+
+          '</tr></thead><tbody>'+
+          perfData.map(({p,taskHrs,adj})=>{
+            const overLabel=adj.over>0?adj.over+'h over':'<span style="color:var(--g3)">—</span>';
+            const redLabel=adj.over>0?'<span style="font-weight:700;color:#DC2626">−'+(ps.targetTotal-adj.adjTotal)+' / −'+(ps.targetUnique-adj.adjUnique)+'</span>':'<span style="font-size:10px;color:var(--g3)">No adj.</span>';
+            return'<tr>'+
+              '<td class="lt" style="font-weight:600">'+p.name+'</td>'+
+              '<td style="font-weight:600">'+taskHrs+'h</td>'+
+              '<td style="font-weight:600;color:#D97706">'+overLabel+'</td>'+
+              '<td style="font-weight:700;color:#166534">'+adj.adjTotal.toLocaleString()+'</td>'+
+              '<td style="font-weight:700;color:#1E40AF">'+adj.adjUnique.toLocaleString()+'</td>'+
+              '<td>'+redLabel+'</td>'+
+              '</tr>';
+          }).join('')+
+          '</tbody></table></div>'+
+          '<div style="font-size:10px;color:var(--g3);margin-top:8px;padding-top:8px;border-top:0.5px solid var(--g2)">Task hours auto-pulled from completed tasks this month · Formula: Base − ((task_hrs − '+ps.taskThreshold+'h) × rate/hr)</div>'+
+        '</div>';
+    }
+    return segHtml;
   }
 
   // ── PATROLLER VIEW ──
-  const myEvals=myPat?D.evaluations.filter(e=>e.patroller_id===myPat.id):[];
-  if(!myEvals.length){
-    return'<div style="padding:60px;text-align:center;color:var(--g3)">'+
-      '<i class="ti ti-clipboard-check" style="font-size:48px;display:block;margin-bottom:14px;opacity:.3"></i>'+
-      '<b style="font-size:15px;color:#411517">No evaluations yet</b>'+
-      '<div style="font-size:12px;margin-top:8px">Your performance evaluations will appear here once your team lead submits one.</div>'+
+  const myEvals=myPat?D.evaluations.filter(e=>e.patroller_id===myPat.id&&(e.month||e.eval_date?.slice(0,7))===curMonth):[];
+  const myEvalAvg=myEvals.length?Math.round(myEvals.reduce((s,e)=>s+evalScore(e),0)/myEvals.length):null;
+  const myCScore=myPat?coachingScore(myPat.id,curMonth):null;
+  const myPScore=(myEvalAvg!==null&&myCScore!==null)?perfScore(myEvalAvg,myCScore,ps):null;
+  const myTaskHrs=myPat?getPatrollerTaskHours(myPat.id,curMonth):0;
+  const myAdj=getAdjustedTarget(myTaskHrs,ps);
+  const myMonths=[...new Set(D.evaluations.filter(e=>myPat&&e.patroller_id===myPat.id).map(e=>e.month||e.eval_date?.slice(0,7)).filter(Boolean))].sort().reverse();
+  const last3p=myMonths.slice(0,3);
+
+  if(subTab==='myperformance'){
+    const myTrendBars=last3p.map(m=>{
+      const ev=D.evaluations.filter(e=>myPat&&e.patroller_id===myPat.id&&(e.month||e.eval_date?.slice(0,7))===m);
+      const ea=ev.length?Math.round(ev.reduce((s,e)=>s+evalScore(e),0)/ev.length):null;
+      const cs=myPat?coachingScore(myPat.id,m):null;
+      const sc=(ea!==null&&cs!==null)?perfScore(ea,cs,ps):0;
+      const col=sc>=75?'#3B82F6':sc>=60?'#16A34A':sc>=40?'#D97706':'#DC2626';
+      return'<div style="flex:1;text-align:center">'+
+        '<div style="font-size:10px;color:var(--g3);margin-bottom:3px">'+monthLabel(m)+'</div>'+
+        trendBar(sc,col)+
+        '<div style="font-size:10px;font-weight:700;margin-top:3px;color:'+col+'">'+sc+'%</div></div>';
+    }).join('');
+
+    return segHtml+
+      '<div style="background:#411517;border-radius:14px;padding:18px;margin-bottom:12px;color:#fff">'+
+        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">'+
+          '<div style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700">'+ini(D.profile?.full_name)+'</div>'+
+          '<div><div style="font-size:16px;font-weight:700">'+(D.profile?.full_name||'')+'</div><div style="font-size:11px;opacity:.5;margin-top:2px">Performance report · '+curMonth+'</div></div>'+
+          '<div style="margin-left:auto;text-align:right"><div style="font-size:10px;opacity:.5;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Performance score</div>'+
+          '<div style="font-size:32px;font-weight:700;color:#FF5900">'+(myPScore!==null?myPScore+'%':'--')+'</div></div>'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'+
+          '<div style="background:rgba(255,255,255,.1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:10px;opacity:.5;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Evaluation</div><div style="font-size:22px;font-weight:700;color:#4ADE80">'+(myEvalAvg!==null?myEvalAvg+'%':'--')+'</div><div style="font-size:9px;opacity:.4;margin-top:3px">× '+ps.evalWeight+'% weight</div></div>'+
+          '<div style="background:rgba(255,255,255,.1);border-radius:10px;padding:12px;text-align:center"><div style="font-size:10px;opacity:.5;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Coaching</div><div style="font-size:22px;font-weight:700;color:#93C5FD">'+(myCScore!==null?myCScore+'%':'--')+'</div><div style="font-size:9px;opacity:.4;margin-top:3px">× '+(100-ps.evalWeight)+'% weight</div></div>'+
+          '<div style="background:rgba(255,89,0,.3);border-radius:10px;padding:12px;text-align:center;border:1px solid rgba(255,89,0,.5)"><div style="font-size:10px;color:#FFB380;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Final</div><div style="font-size:22px;font-weight:700;color:#FF5900">'+(myPScore!==null?myPScore+'%':'--')+'</div><div style="font-size:9px;color:#FFB380;margin-top:3px">'+(myEvalAvg!==null&&myCScore!==null?'('+myEvalAvg+'×.'+Math.round(ps.evalWeight/10)+')+('+myCScore+'×.'+(10-Math.round(ps.evalWeight/10))+')':'')+'</div></div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+        '<div class="tcard" style="padding:14px">'+
+          '<div style="font-size:10px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">3-month trend</div>'+
+          (last3p.length?'<div style="display:flex;gap:8px">'+myTrendBars+'</div>':'<div style="padding:16px;text-align:center;color:var(--g3);font-size:12px">No data yet</div>')+
+        '</div>'+
+        '<div class="tcard" style="padding:14px">'+
+          '<div style="font-size:10px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Score breakdown</div>'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid var(--g1);font-size:12px"><span>Evaluation ('+ps.evalWeight+'%)</span><span style="font-weight:700;color:#166534">'+(myEvalAvg!==null?myEvalAvg+'% → '+((myEvalAvg*ps.evalWeight/100).toFixed(1)):'--')+'</span></div>'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid var(--g1);font-size:12px"><span>Coaching ('+(100-ps.evalWeight)+'%)</span><span style="font-weight:700;color:#1E40AF">'+(myCScore!==null?myCScore+'% → '+((myCScore*(100-ps.evalWeight)/100).toFixed(1)):'--')+'</span></div>'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-size:13px;font-weight:700"><span>Performance score</span><span style="color:#FF5900">'+(myPScore!==null?myPScore+'%':'--')+'</span></div>'+
+        '</div>'+
       '</div>';
   }
 
-  // Monthly breakdown
-  const myMonths=[...new Set(myEvals.map(e=>evalMonthStr(e.eval_date)))].sort().reverse();
-  const curMonthEvals=myEvals.filter(e=>evalMonthStr(e.eval_date)===myMonths[0]);
-  const myMonthAvg=curMonthEvals.length?Math.round(curMonthEvals.reduce((s,e)=>s+evalScore(e),0)/curMonthEvals.length):0;
-  const myBest=Math.max(...myEvals.map(e=>evalScore(e)));
-  const last3=myMonths.slice(0,3);
-  const m3avg=last3.length?Math.round(last3.map(m=>{
-    const ev=myEvals.filter(e=>evalMonthStr(e.eval_date)===m);
-    return ev.length?myEvals.filter(e=>evalMonthStr(e.eval_date)===m).reduce((s,e)=>s+evalScore(e),0)/ev.length:0;
-  }).reduce((a,b)=>a+b,0)/last3.length):0;
+  if(subTab==='mycoaching'){
+    const myAssignments=myPat?D.coachingAssignments.filter(a=>a.patroller_id===myPat.id&&(a.month||a.assigned_date?.slice(0,7))===curMonth):[];
+    let myBreach=0,myDupe=0;
+    myAssignments.forEach(a=>{
+      const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return;
+      const bt=new Date(c.created_at).getTime();
+      if(a.status==='completed'&&a.completed_at){if(new Date(a.completed_at).getTime()-bt>24*3600000)myBreach++;}
+      else if(a.status==='pending'){if(Date.now()-bt>24*3600000)myBreach++;}
+    });
+    const completedA=myAssignments.filter(a=>a.status==='completed');
+    const seen2={};
+    completedA.forEach(a=>{const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return;const k=c.rider_id+'|'+c.violation_type;seen2[k]=(seen2[k]||0)+1;});
+    Object.values(seen2).forEach(cnt=>{if(cnt>1)myDupe+=(cnt-1)*2;});
+    const finalCS=Math.max(0,100-myBreach-myDupe);
 
-  // 3-month trend bars for patroller
-  const monthLabels3=last3.map(m=>{const d=new Date(m+'-01');return d.toLocaleString('en-GB',{month:'short'});});
-  const trendBarsPat=last3.map((m,i)=>{
-    const ev=myEvals.filter(e=>evalMonthStr(e.eval_date)===m);
-    const sc=ev.length?Math.round(ev.reduce((s,e)=>s+evalScore(e),0)/ev.length):0;
-    const col=sc>=75?'#3B82F6':sc>=50?'#16A34A':sc>=25?'#D97706':'#DC2626';
-    return'<div style="flex:1;text-align:center"><div style="font-size:10px;color:var(--g3);margin-bottom:4px">'+monthLabels3[i]+'</div><div style="height:50px;background:var(--g1);border-radius:6px;display:flex;align-items:flex-end;padding:2px"><div style="width:100%;height:'+( sc||4)+'px;background:'+col+';border-radius:4px;max-height:46px;min-height:4px"></div></div><div style="font-size:10px;font-weight:700;margin-top:3px;color:'+col+'">'+sc+'%</div></div>';
-  }).join('');
+    return segHtml+
+      '<div class="tcard" style="padding:14px">'+
+        '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px"><i class="ti ti-school" style="margin-right:4px"></i>My coaching — '+curMonth+'</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">'+
+          '<div style="background:var(--g1);border-radius:9px;padding:10px;text-align:center"><div style="font-size:10px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Assigned</div><div style="font-size:20px;font-weight:700">'+myAssignments.length+'</div></div>'+
+          '<div style="background:#DCFCE7;border-radius:9px;padding:10px;text-align:center;border:0.5px solid #86EFAC"><div style="font-size:10px;font-weight:600;color:#166534;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">On time</div><div style="font-size:20px;font-weight:700;color:#166534">'+completedA.length+'</div></div>'+
+          '<div style="background:#FEE2E2;border-radius:9px;padding:10px;text-align:center;border:0.5px solid #FCA5A5"><div style="font-size:10px;font-weight:600;color:#DC2626;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Breached</div><div style="font-size:20px;font-weight:700;color:#DC2626">'+myBreach+'</div></div>'+
+          '<div style="background:#DBEAFE;border-radius:9px;padding:10px;text-align:center;border:0.5px solid #93C5FD"><div style="font-size:10px;font-weight:600;color:#1E40AF;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">My score</div><div style="font-size:20px;font-weight:700;color:#1E40AF">'+finalCS+'%</div></div>'+
+        '</div>'+
+        '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid var(--g1);font-size:12px"><span>Base score</span><span style="font-weight:700">100</span></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid var(--g1);font-size:12px"><span>SLA breaches × −1pt</span><span style="font-weight:700;color:'+(myBreach>0?'#DC2626':'var(--g3)');'">'+(myBreach>0?'−'+myBreach:'0')+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid var(--g1);font-size:12px"><span>Duplicate coachings × −2pt</span><span style="font-weight:700;color:'+(myDupe>0?'#D97706':'var(--g3)');'">'+(myDupe>0?'−'+myDupe:'0')+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;font-weight:700"><span>Coaching score</span><span style="color:#1E40AF">'+finalCS+'%</span></div>'+
+      '</div>';
+  }
 
-  const evalCards=myEvals.map(e=>{
-    const pct=evalScore(e);
-    const avg=evalAvgRating(e);
-    const dt=new Date(e.eval_date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-    const s=pct>=75?'background:#DBEAFE;color:#1E40AF':pct>=50?'background:#DCFCE7;color:#166534':pct>=25?'background:#FEF3C7;color:#92400E':'background:#FEE2E2;color:#991B1B';
-    const qRows=EVAL_QUESTIONS.map(q=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:0.5px solid var(--g1)"><span style="font-size:12px;color:var(--g4)">'+q.label+'</span>'+ratingBadge(e[q.key])+'</div>').join('');
-    return'<div class="tcard" style="margin-bottom:10px;padding:14px">'+
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">'+
-        '<div><div style="font-size:14px;font-weight:700;color:#411517">'+dt+'</div>'+
-        '<div style="font-size:12px;color:var(--g3);margin-top:2px"><i class="ti ti-map-pin" style="font-size:11px"></i> '+( e.location||'--')+' · Evaluated by Team Lead</div></div>'+
-        '<div style="text-align:right"><span style="font-size:14px;font-weight:700;padding:5px 12px;border-radius:20px;'+s+'">'+pct+'%</span>'+
-        '<div style="font-size:10px;color:var(--g3);margin-top:3px">Avg rating: '+avg+' / 4</div></div>'+
-      '</div>'+
-      qRows+
-      ( e.comment?'<div style="margin-top:10px;padding:10px;background:var(--g1);border-radius:8px;font-size:12px;color:var(--g3)"><i class="ti ti-message" style="font-size:11px;margin-right:4px"></i>'+e.comment+'</div>':'')+
-    '</div>';
-  }).join('');
+  if(subTab==='mytarget'){
+    return segHtml+
+      '<div class="tcard" style="padding:14px">'+
+        '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px"><i class="ti ti-target" style="margin-right:4px"></i>My audit target — '+curMonth+'</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'+
+          '<div style="background:var(--g1);border-radius:10px;padding:14px">'+
+            '<div style="font-size:10px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Total audits target</div>'+
+            '<div style="font-size:28px;font-weight:700;color:#166534">'+myAdj.adjTotal.toLocaleString()+'</div>'+
+            '<div style="font-size:10px;color:var(--g3);margin-top:4px">Base '+ps.targetTotal.toLocaleString()+(myAdj.over>0?' − '+(ps.targetTotal-myAdj.adjTotal):'')+'</div>'+
+          '</div>'+
+          '<div style="background:var(--g1);border-radius:10px;padding:14px">'+
+            '<div style="font-size:10px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Unique audits target</div>'+
+            '<div style="font-size:28px;font-weight:700;color:#1E40AF">'+myAdj.adjUnique.toLocaleString()+'</div>'+
+            '<div style="font-size:10px;color:var(--g3);margin-top:4px">Base '+ps.targetUnique.toLocaleString()+(myAdj.over>0?' − '+(ps.targetUnique-myAdj.adjUnique):'')+'</div>'+
+          '</div>'+
+        '</div>'+
+        '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid var(--g1);font-size:12px"><span>Task hours this month</span><span style="font-weight:700">'+myTaskHrs+'h</span></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid var(--g1);font-size:12px"><span>Threshold</span><span style="font-weight:700">'+ps.taskThreshold+'h</span></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid var(--g1);font-size:12px"><span>Hours above threshold</span><span style="font-weight:700;color:'+(myAdj.over>0?'#D97706':'var(--g3)')+'">'+( myAdj.over>0?'+'+myAdj.over+'h':'None')+'</span></div>'+
+        (myAdj.over>0?
+          '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid var(--g1);font-size:12px"><span>Total reduction ('+myAdj.over+'h × '+ps.rateTotal+')</span><span style="font-weight:700;color:#DC2626">−'+(ps.targetTotal-myAdj.adjTotal)+'</span></div>'+
+          '<div style="display:flex;justify-content:space-between;padding:7px 0;font-size:12px"><span>Unique reduction ('+myAdj.over+'h × '+ps.rateUnique+')</span><span style="font-weight:700;color:#DC2626">−'+(ps.targetUnique-myAdj.adjUnique)+'</span></div>'
+        :'<div style="padding:10px 0;font-size:12px;color:var(--g3)">No adjustment needed — task hours ('+myTaskHrs+'h) are below the '+ps.taskThreshold+'h threshold.</div>')+
+      '</div>';
+  }
 
-  return'<div class="stats">'+
-    '<div class="stat blue"><div class="stat-label">My evaluations</div><div class="stat-value">'+myEvals.length+'</div></div>'+
-    '<div class="stat green"><div class="stat-label">This month score</div><div class="stat-value">'+myMonthAvg+'%</div></div>'+
-    '<div class="stat"><div class="stat-label">3-month avg</div><div class="stat-value">'+m3avg+'%</div></div>'+
-    '<div class="stat amber"><div class="stat-label">Best score</div><div class="stat-value">'+myBest+'%</div></div>'+
-    '</div>'+
-    '<div class="tcard" style="margin-bottom:12px;padding:14px">'+
-      '<div style="font-size:10px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-chart-bar" style="margin-right:4px"></i>My score trend — last 3 months</div>'+
-      '<div style="display:flex;gap:8px">'+trendBarsPat+'</div>'+
-    '</div>'+
-    evalCards;
+  return segHtml;
 }
 
-function setRating(key,val,btn,pfx){
-  pfx=pfx||'rb';
-  const wrap=btn.closest('div[id*="wrap"]') || btn.parentElement;
-  wrap.querySelectorAll('button[data-key]').forEach(b=>{
-    b.style.background='var(--sur)';b.style.color='var(--g3)';b.style.borderColor='var(--g2)';
-  });
-  btn.style.background=RC[val][0];btn.style.color=RC[val][1];btn.style.borderColor=RC[val][2];
-}
 
-function getEvalScores(pfx){
-  pfx=pfx||'rb';
-  const scores={};
-  EVAL_QUESTIONS.forEach(q=>{
-    const wrap=document.getElementById(pfx+'-wrap-'+q.key);
-    if(wrap){
-      wrap.querySelectorAll('button[data-val]').forEach(b=>{
-        if(b.style.background&&b.style.background!=='var(--sur)'&&b.style.background!=='')scores[q.key]=parseInt(b.dataset.val);
-      });
-    }
-    if(!scores[q.key])scores[q.key]=0;
-  });
-  return scores;
-}
 
-async function submitEvaluation(){
-  const patrollerId=document.getElementById('ev-patroller')?.value;
-  const location=document.getElementById('ev-location')?.value?.trim();
-  const evalDate=document.getElementById('ev-date')?.value;
-  const comment=document.getElementById('ev-comment')?.value?.trim();
-  if(!patrollerId){alert('Please select a patroller.');return;}
-  if(!location){alert('Please enter a location.');return;}
-  const scores=getEvalScores('rb');
-  const missing=EVAL_QUESTIONS.filter(q=>!scores[q.key]);
-  if(missing.length){alert('Please rate all questions. Missing: '+missing[0].label);return;}
-  const pat=D.patrollers.find(p=>p.id===patrollerId);
-  const now=getBahrainNow();
-  const month=now.getUTCFullYear()+'-'+String(now.getUTCMonth()+1).padStart(2,'0');
-  const payload={patroller_id:patrollerId,patroller_name:pat?.name||'',evaluator_id:D.profile.id,evaluator_name:D.profile.full_name,eval_date:evalDate||todayStr(),location,comment:comment||'',month,...scores};
-  const btn=document.querySelector('button[onclick="submitEvaluation()"]');
-  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Saving...';}
-  const{error}=await sb.from('evaluations').insert(payload);
-  if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-circle-check"></i>Submit — score calculated on save';}return;}
-  await reload();
-  addNotification('Evaluation submitted for '+( pat?.name||'patroller'),'success');
-}
-
-function openEvalEdit(evalId){
-  const ev=D.evaluations.find(e=>e.id===evalId);if(!ev)return;
-  const pts=activePats().filter(p=>getUtype(p)==='patroller');
-  const patOptions=pts.map(p=>'<option value="'+p.id+'" '+( p.id===ev.patroller_id?'selected':'')+'>'+p.name+'</option>').join('');
-  const qRows=EVAL_QUESTIONS.map(q=>qFormRow(q,ev[q.key]||0,'edrb')).join('');
-  const html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'+
-    '<div class="fg"><label>Patroller</label><select id="edit-ev-patroller">'+patOptions+'</select></div>'+
-    '<div class="fg"><label>Date</label><input type="date" id="edit-ev-date" value="'+ev.eval_date+'"></div>'+
-    '</div><div class="fg"><label>Location</label><input type="text" id="edit-ev-location" value="'+( ev.location||'')+'"></div>'+
-    '<div>'+qRows+'</div>'+
-    '<div class="fg" style="margin-top:8px"><label>Comment</label><textarea id="edit-ev-comment" rows="2" style="width:100%;padding:8px 10px;border-radius:8px;border:0.5px solid var(--g2);font-family:inherit;font-size:12px;resize:vertical">'+( ev.comment||'')+'</textarea></div>';
-  openM({type:'evalEdit',evalId,html});
-}
-
-async function saveEvalEdit(evalId){
-  const patrollerId=document.getElementById('edit-ev-patroller')?.value;
-  const location=document.getElementById('edit-ev-location')?.value?.trim();
-  const evalDate=document.getElementById('edit-ev-date')?.value;
-  const comment=document.getElementById('edit-ev-comment')?.value?.trim();
-  if(!patrollerId||!location){alert('Please fill in all required fields.');return;}
-  const scores=getEvalScores('edrb');
-  const pat=D.patrollers.find(p=>p.id===patrollerId);
-  const btn=document.getElementById('eval-save-btn');
-  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Saving...';}
-  const{error}=await sb.from('evaluations').update({patroller_id:patrollerId,patroller_name:pat?.name||'',eval_date:evalDate,location,comment:comment||'',updated_at:new Date().toISOString(),...scores}).eq('id',evalId);
-  if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-circle-check"></i>Save changes';}return;}
+async function savePerfSettings(){
+  const payload={
+    target_total:parseInt(document.getElementById('ps-total')?.value)||2200,
+    target_unique:parseInt(document.getElementById('ps-unique')?.value)||2000,
+    working_hours:parseInt(document.getElementById('ps-hours')?.value)||208,
+    rate_total:parseInt(document.getElementById('ps-rate-total')?.value)||11,
+    rate_unique:parseInt(document.getElementById('ps-rate-unique')?.value)||10,
+    task_threshold:parseInt(document.getElementById('ps-threshold')?.value)||40,
+    eval_weight:parseInt(document.getElementById('ps-eval-weight')?.value)||60,
+  };
+  const existing=D.perfSettings;
+  let error;
+  if(existing?.id){
+    const res=await sb.from('performance_settings').update(payload).eq('id',existing.id);
+    error=res.error;
+  }else{
+    const res=await sb.from('performance_settings').insert(payload);
+    error=res.error;
+  }
+  if(error){alert('Error: '+error.message);return;}
   closeM();await reload();
-  addNotification('Evaluation updated','success');
+  addNotification('Performance settings saved','success');
 }
+
 
 // ── GLOBAL ERROR HANDLER ──
 window.addEventListener('error', (e) => {
