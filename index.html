@@ -377,7 +377,7 @@ let D={user:null,profile:null,customRoles:[],leaveBalances:[],tab:'schedule',vie
   shifts:[],areas:[],zones:[],patrollers:[],schedules:[],users:[],
   notesAll:{id:null,content:''},notesPat:{id:null,content:''},notesCoo:{id:null,content:''},
   docs:[],history:[],timeoff:[],attendance:[],attDate:null,opsSub:'areas',locPerms:{},tasks:[],hourlyDay:null,
-  coachingCases:[],coachingAssignments:[],overtimeRequests:[],evaluations:[]};
+  coachingCases:[],coachingAssignments:[],overtimeRequests:[],evaluations:[],coachingMonth:null,coachingShowOlder:false};
 
 function showS(n){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display=n==='login'?'flex':'none';if(np)np.style.display=n==='newpw'?'flex':'none';document.getElementById('app').style.display='none';}
 function showApp(){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display='none';if(np)np.style.display='none';document.getElementById('app').style.display='block';}
@@ -4171,176 +4171,148 @@ function clearNotifications(){D_notifs=[];renderNotifications();}
 function coachingView(){
   const isAL=canEdit();
   const myPat=D.patrollers.find(p=>p.user_id===D.profile.id);
-  const today=todayStr();
   const now=getBahrainNow();
-  const curMonth=`${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}`;
+  const curMonth=now.getUTCFullYear()+'-'+String(now.getUTCMonth()+1).padStart(2,'0');
 
-  // ── ADMIN VIEW ──
   if(isAL){
-    // Stats
-    const totalCases=D.coachingCases.length;
-    const totalAssigned=D.coachingAssignments.length;
-    const totalDone=D.coachingAssignments.filter(a=>a.status==='completed').length;
-    const totalPending=D.coachingAssignments.filter(a=>a.status==='pending').length;
-    const unassigned=D.coachingCases.filter(c=>!D.coachingAssignments.find(a=>a.case_id===c.id)).length;
-
-    // Per-patroller breakdown
     const pts=activePats().filter(p=>getUtype(p)==='patroller');
+    // Month filter
+    const allMonths=[...new Set([
+      ...D.coachingAssignments.map(a=>a.month||a.assigned_date?.slice(0,7)).filter(Boolean),
+      curMonth
+    ])].sort().reverse();
+    const selMonth=D.coachingMonth||curMonth;
+    const monthOptions=allMonths.map(m=>'<option value="'+m+'" '+(m===selMonth?'selected':'')+'>'+m+'</option>').join('');
+
+    // Filter cases + assignments by selected month
+    const monthAssignments=D.coachingAssignments.filter(a=>(a.month||a.assigned_date?.slice(0,7))===selMonth);
+    const monthCaseIds=new Set(monthAssignments.map(a=>a.case_id));
+    const filteredCases=D.coachingCases.filter(c=>
+      monthCaseIds.has(c.id)||(c.batch_date&&c.batch_date.startsWith(selMonth)&&!D.coachingAssignments.find(a=>a.case_id===c.id))
+    );
+
+    const totalCases=filteredCases.length;
+    const totalDone=monthAssignments.filter(a=>a.status==='completed').length;
+    const totalPending=monthAssignments.filter(a=>a.status==='pending').length;
+    const unassigned=filteredCases.filter(c=>!D.coachingAssignments.find(a=>a.case_id===c.id)).length;
+    const unassignedCases=filteredCases.filter(c=>!D.coachingAssignments.find(a=>a.case_id===c.id));
+
     const patBreakdown=pts.map(p=>{
-      const assigned=D.coachingAssignments.filter(a=>a.patroller_id===p.id);
+      const assigned=monthAssignments.filter(a=>a.patroller_id===p.id);
       const done=assigned.filter(a=>a.status==='completed').length;
       const pending=assigned.filter(a=>a.status==='pending').length;
-      const transferredOut=D.coachingAssignments.filter(a=>a.transferred_from===p.id).length;
+      const transferredOut=monthAssignments.filter(a=>a.transferred_from===p.id).length;
       const transferredIn=assigned.filter(a=>a.transferred_from&&a.transferred_from!==p.id).length;
-      // Effective assigned = currently assigned (already reflects transfer since we reassign patroller_id)
       return{p,assigned:assigned.length,done,pending,transferredOut,transferredIn};
     }).filter(x=>x.assigned>0||x.transferredOut>0).sort((a,b)=>b.assigned-a.assigned);
 
-    // Pending unassigned cases — show assign button
-    const unassignedCases=D.coachingCases.filter(c=>!D.coachingAssignments.find(a=>a.case_id===c.id));
-
-    // Cases table
-    const caseRows=D.coachingCases.map(c=>{
+    const caseRows=filteredCases.map(c=>{
       const asgn=D.coachingAssignments.find(a=>a.case_id===c.id);
       const pat=asgn?D.patrollers.find(p=>p.id===asgn.patroller_id):null;
       const fromPat=asgn?.transferred_from?D.patrollers.find(p=>p.id===asgn.transferred_from):null;
       const statusBg=asgn?.status==='completed'?'background:#DCFCE7;color:#166534':asgn?'background:#FEF3C7;color:#D97706':'background:#F1F5F9;color:#64748B';
       const statusLabel=asgn?.status==='completed'?'✓ Done':asgn?'⏳ Pending':'— Unassigned';
-      const transferTag=fromPat?`<div style="font-size:9px;color:#D97706;margin-top:2px"><i class="ti ti-transfer" style="font-size:9px"></i> Transferred from ${fromPat.name}</div>`:'';
-      return`<tr>
-        <td class="lt" style="font-size:11px;font-weight:600">${c.rider_name||'--'}</td>
-        <td style="font-size:10px;font-family:monospace">${c.rider_id||'--'}</td>
-        <td style="font-size:10px">${c.violation_type||'--'}</td>
-        <td style="font-size:10px">${c.level||'--'}</td>
-        <td style="font-size:10px">${c.violation_date||'--'}</td>
-        <td><span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;${statusBg}">${statusLabel}</span></td>
-        <td style="font-size:10px">${pat?pat.name:'--'}${transferTag}</td>
-        <td style="font-size:10px;color:var(--g3)">${asgn?.completed_at?new Date(asgn.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--'}</td>
-        ${isAL?`<td style="white-space:nowrap">
-          <select onchange="reassignCase('${c.id}',this.value)" style="padding:3px 6px;border-radius:6px;border:1.5px solid var(--g2);font-size:10px;font-family:inherit">
-            <option value="">-- Reassign --</option>
-            ${pts.map(p=>`<option value="${p.id}" ${asgn?.patroller_id===p.id?'selected':''}>${p.name}</option>`).join('')}
-          </select>
-        </td>`:''}
-      </tr>`;
+      const transferTag=fromPat?'<div style="font-size:9px;color:#D97706;margin-top:2px"><i class="ti ti-transfer" style="font-size:9px"></i> From '+fromPat.name+'</div>':'';
+      return'<tr>'+
+        '<td class="lt" style="font-size:11px;font-weight:600">'+(c.rider_name||'--')+'</td>'+
+        '<td style="font-size:10px;font-family:monospace">'+(c.rider_id||'--')+'</td>'+
+        '<td style="font-size:10px">'+(c.violation_type||'--')+'</td>'+
+        '<td style="font-size:10px">'+(c.level||'--')+'</td>'+
+        '<td style="font-size:10px">'+(c.violation_date||'--')+'</td>'+
+        '<td><span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;'+statusBg+'">'+statusLabel+'</span></td>'+
+        '<td style="font-size:10px">'+(pat?pat.name:'--')+transferTag+'</td>'+
+        '<td style="font-size:10px;color:var(--g3)">'+(asgn?.completed_at?new Date(asgn.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--')+'</td>'+
+        '<td style="white-space:nowrap"><select onchange="reassignCase(\''+c.id+'\',this.value)" style="padding:3px 6px;border-radius:6px;border:1.5px solid var(--g2);font-size:10px;font-family:inherit"><option value="">-- Reassign --</option>'+
+        pts.map(p=>'<option value="'+p.id+'" '+(asgn?.patroller_id===p.id?'selected':'')+'>'+p.name+'</option>').join('')+'</select></td></tr>';
     }).join('');
 
-    // Patroller breakdown table
     const breakdownRows=patBreakdown.map(({p,assigned,done,pending,transferredOut,transferredIn})=>{
       const pct=assigned?Math.round(done/assigned*100):0;
       const barCol=pct===100?'#16A34A':pct>=50?'#D97706':'#DC2626';
-      const transferCol=[];
-      if(transferredOut>0)transferCol.push(`<span style="font-size:10px;font-weight:600;background:#FEE2E2;color:#DC2626;padding:2px 6px;border-radius:5px">↑ ${transferredOut} out</span>`);
-      if(transferredIn>0)transferCol.push(`<span style="font-size:10px;font-weight:600;background:#DCFCE7;color:#166534;padding:2px 6px;border-radius:5px">↓ ${transferredIn} in</span>`);
-      return`<tr>
-        <td class="lt" style="font-weight:600">${p.name}</td>
-        <td style="font-weight:700;color:#411517">${assigned}</td>
-        <td style="font-weight:700;color:#166534">${done}</td>
-        <td style="font-weight:700;color:#D97706">${pending}</td>
-        <td style="white-space:nowrap">${transferCol.length?transferCol.join(' '):'<span style="font-size:10px;color:var(--g3)">--</span>'}</td>
-        <td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${barCol}"></div></div><span style="font-size:10px;font-weight:700;color:${barCol};min-width:30px">${pct}%</span></div></td>
-      </tr>`;
+      const tc=[];
+      if(transferredOut>0)tc.push('<span style="font-size:10px;font-weight:600;background:#FEE2E2;color:#DC2626;padding:2px 6px;border-radius:5px">↑ '+transferredOut+' out</span>');
+      if(transferredIn>0)tc.push('<span style="font-size:10px;font-weight:600;background:#DCFCE7;color:#166534;padding:2px 6px;border-radius:5px">↓ '+transferredIn+' in</span>');
+      return'<tr><td class="lt" style="font-weight:600">'+p.name+'</td><td style="font-weight:700;color:#411517">'+assigned+'</td><td style="font-weight:700;color:#166534">'+done+'</td><td style="font-weight:700;color:#D97706">'+pending+'</td><td style="white-space:nowrap">'+(tc.length?tc.join(' '):'<span style="font-size:10px;color:var(--g3)">--</span>')+'</td><td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:'+pct+'%;background:'+barCol+'"></div></div><span style="font-size:10px;font-weight:700;color:'+barCol+';min-width:30px">'+pct+'%</span></div></td></tr>';
     }).join('');
 
-    return`
-    <div class="stats">
-      <div class="stat blue"><div class="stat-label">Total Cases</div><div class="stat-value">${totalCases}</div></div>
-      <div class="stat green"><div class="stat-label">Completed</div><div class="stat-value">${totalDone}</div></div>
-      <div class="stat amber"><div class="stat-label">Pending</div><div class="stat-value">${totalPending}</div></div>
-      <div class="stat red"><div class="stat-label">Unassigned</div><div class="stat-value">${unassigned}</div></div>
-    </div>
-
-    <div class="toolbar">
-      ${unassignedCases.length>0?`<button class="btn btn-primary" onclick="autoAssignCoaching()"><i class="ti ti-users"></i>Auto-assign ${unassignedCases.length} cases</button>`:''}
-      <button class="btn" onclick="doRefresh()"><i class="ti ti-refresh"></i>Sync from Sheet</button>
-      <span style="font-size:11px;color:var(--g3)">Cases auto-sync from Google Sheets every upload</span>
-    </div>
-
-    ${unassignedCases.length>0?`<div class="info-box info-blue" style="margin-bottom:14px"><i class="ti ti-info-circle" style="margin-right:6px"></i><strong>${unassignedCases.length} unassigned cases</strong> — click "Auto-assign" to split equally among today's duty patrollers, or reassign individually below.</div>`:''}
-
-    ${patBreakdown.length>0?`
-    <div style="margin-bottom:14px">
-      <strong style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-chart-bar" style="font-size:12px;margin-right:5px"></i>Patroller Progress</strong>
-      <div class="tcard" style="margin-top:8px"><div class="t-scroll"><table style="table-layout:auto"><thead><tr>
-        <th class="lt">Patroller</th><th>Assigned</th><th style="color:#166534">Done</th><th style="color:#D97706">Pending</th><th>Transferred Out</th><th style="min-width:120px">Progress</th>
-      </tr></thead><tbody>${breakdownRows}</tbody></table></div></div>
-    </div>`:''}
-
-    <div>
-      <strong style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-list" style="font-size:12px;margin-right:5px"></i>All Cases</strong>
-      ${D.coachingCases.length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-school" style="font-size:40px;display:block;margin-bottom:10px;opacity:.3"></i><b>No coaching cases yet</b><div style="font-size:12px;margin-top:6px;max-width:300px;margin-left:auto;margin-right:auto">Cases will appear here automatically once data is added to the Coaching tab in Google Sheets.</div></div>`:`
-      <div class="tcard" style="margin-top:8px"><div class="t-scroll"><table style="table-layout:auto;min-width:900px"><thead><tr>
-        <th class="lt">Rider Name</th><th>Rider ID</th><th>Violation</th><th>Level</th><th>Date</th><th>Status</th><th>Assigned To</th><th>Completed At</th>${isAL?'<th>Reassign</th>':''}
-      </tr></thead><tbody>${caseRows}</tbody></table></div></div>`}
-    </div>`;
+    return'<div class="stats">'+
+      '<div class="stat blue"><div class="stat-label">Cases this month</div><div class="stat-value">'+totalCases+'</div></div>'+
+      '<div class="stat green"><div class="stat-label">Completed</div><div class="stat-value">'+totalDone+'</div></div>'+
+      '<div class="stat amber"><div class="stat-label">Pending</div><div class="stat-value">'+totalPending+'</div></div>'+
+      '<div class="stat red"><div class="stat-label">Unassigned</div><div class="stat-value">'+unassigned+'</div></div>'+
+      '</div>'+
+      '<div class="toolbar">'+
+      (unassignedCases.length>0?'<button class="btn btn-primary" onclick="autoAssignCoaching()"><i class="ti ti-users"></i>Auto-assign '+unassignedCases.length+' cases</button>':'')+
+      '<button class="btn" onclick="doRefresh()"><i class="ti ti-refresh"></i>Sync from Sheet</button>'+
+      '<div style="display:flex;align-items:center;gap:6px;margin-left:auto"><label style="font-size:11px;color:var(--g3)">Month:</label>'+
+      '<select onchange="D.coachingMonth=this.value;render()" style="padding:5px 8px;border-radius:7px;border:1.5px solid var(--g2);font-size:11px;font-family:inherit">'+monthOptions+'</select></div>'+
+      '</div>'+
+      (unassignedCases.length>0?'<div class="info-box info-blue" style="margin-bottom:14px"><i class="ti ti-info-circle" style="margin-right:6px"></i><strong>'+unassignedCases.length+' unassigned cases</strong> — click "Auto-assign" to split among today\'s duty patrollers, or reassign individually below.</div>':'')+
+      (patBreakdown.length>0?
+        '<div style="margin-bottom:14px"><strong style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-chart-bar" style="font-size:12px;margin-right:5px"></i>Patroller Progress — '+selMonth+'</strong>'+
+        '<div class="tcard" style="margin-top:8px"><div class="t-scroll"><table style="table-layout:auto"><thead><tr>'+
+        '<th class="lt">Patroller</th><th>Assigned</th><th style="color:#166534">Done</th><th style="color:#D97706">Pending</th><th>Transfers</th><th style="min-width:120px">Progress</th>'+
+        '</tr></thead><tbody>'+breakdownRows+'</tbody></table></div></div></div>':'')+
+      '<div><strong style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-list" style="font-size:12px;margin-right:5px"></i>Cases — '+selMonth+'</strong>'+
+      (filteredCases.length===0?
+        '<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-school" style="font-size:40px;display:block;margin-bottom:10px;opacity:.3"></i><b>No cases for '+selMonth+'</b><div style="font-size:12px;margin-top:6px">Use the month selector above to view other months.</div></div>':
+        '<div class="tcard" style="margin-top:8px"><div class="t-scroll"><table style="table-layout:auto;min-width:900px"><thead><tr>'+
+        '<th class="lt">Rider Name</th><th>Rider ID</th><th>Violation</th><th>Level</th><th>Date</th><th>Status</th><th>Assigned To</th><th>Completed At</th><th>Reassign</th>'+
+        '</tr></thead><tbody>'+caseRows+'</tbody></table></div></div>')+
+      '</div>';
   }
 
-  // ── PATROLLER VIEW ──
+  // PATROLLER VIEW
   const myAssignments=myPat?D.coachingAssignments.filter(a=>a.patroller_id===myPat.id):[];
   const myPending=myAssignments.filter(a=>a.status==='pending');
-  const myDone=myAssignments.filter(a=>a.status==='completed');
+  const myDoneAll=myAssignments.filter(a=>a.status==='completed');
+  const myDoneCur=myDoneAll.filter(a=>(a.month||a.completed_at?.slice(0,7))===curMonth);
+  const myDoneOlder=myDoneAll.filter(a=>(a.month||a.completed_at?.slice(0,7))!==curMonth);
+  const showOlder=D.coachingShowOlder||false;
+  const myDoneVisible=showOlder?myDoneAll:myDoneCur;
   const myTotal=myAssignments.length;
 
   if(!myPat||myTotal===0){
-    return`<div style="padding:60px;text-align:center;color:var(--g3)">
-      <i class="ti ti-school" style="font-size:48px;display:block;margin-bottom:14px;opacity:.3"></i>
-      <b style="font-size:15px;color:#411517">No coaching cases assigned</b>
-      <div style="font-size:12px;margin-top:8px">Your assigned cases will appear here when your team lead uploads new coaching data.</div>
-    </div>`;
+    return'<div style="padding:60px;text-align:center;color:var(--g3)"><i class="ti ti-school" style="font-size:48px;display:block;margin-bottom:14px;opacity:.3"></i><b style="font-size:15px;color:#411517">No coaching cases assigned</b><div style="font-size:12px;margin-top:8px">Your assigned cases will appear here when your team lead uploads new coaching data.</div></div>';
   }
 
-  const donePct=myTotal?Math.round(myDone.length/myTotal*100):0;
+  const donePct=myTotal?Math.round(myDoneAll.length/myTotal*100):0;
 
   const pendingRows=myPending.map(a=>{
     const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return'';
-    return`<div class="card" style="cursor:pointer;border-left:3px solid #FF5900" onclick="openCoachingCase('${a.id}')">
-      <div class="card-ico blue"><i class="ti ti-user-check" style="font-size:16px"></i></div>
-      <div class="card-info">
-        <div class="card-name">${c.rider_name||'Rider'} <span style="font-size:10px;font-weight:400;color:var(--g3)">#${c.rider_id||'--'}</span></div>
-        <div class="card-meta">${c.violation_type||'--'} · Level ${c.level||'--'} · ${c.violation_date||'--'}</div>
-      </div>
-      <span style="font-size:10px;font-weight:700;background:#FEF3C7;color:#D97706;padding:3px 8px;border-radius:6px;white-space:nowrap">⏳ Pending</span>
-    </div>`;
+    return'<div class="card" style="cursor:pointer;border-left:3px solid #FF5900" onclick="openCoachingCase(\''+a.id+'\')">'+
+      '<div class="card-ico blue"><i class="ti ti-user-check" style="font-size:16px"></i></div>'+
+      '<div class="card-info"><div class="card-name">'+(c.rider_name||'Rider')+' <span style="font-size:10px;font-weight:400;color:var(--g3)">#'+(c.rider_id||'--')+'</span></div>'+
+      '<div class="card-meta">'+(c.violation_type||'--')+' · Level '+(c.level||'--')+' · '+(c.violation_date||'--')+'</div></div>'+
+      '<span style="font-size:10px;font-weight:700;background:#FEF3C7;color:#D97706;padding:3px 8px;border-radius:6px;white-space:nowrap">⏳ Pending</span></div>';
   }).join('');
 
-  const doneRows=myDone.map(a=>{
+  const doneRows=myDoneVisible.map(a=>{
     const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return'';
     const doneAt=a.completed_at?new Date(a.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
-    return`<div class="card" style="opacity:.75">
-      <div class="card-ico" style="background:#DCFCE7"><i class="ti ti-circle-check" style="font-size:16px;color:#16A34A"></i></div>
-      <div class="card-info">
-        <div class="card-name">${c.rider_name||'Rider'} <span style="font-size:10px;font-weight:400;color:var(--g3)">#${c.rider_id||'--'}</span></div>
-        <div class="card-meta">${c.violation_type||'--'} · Completed ${doneAt}</div>
-      </div>
-      <span style="font-size:10px;font-weight:700;background:#DCFCE7;color:#166534;padding:3px 8px;border-radius:6px;white-space:nowrap">✓ Done</span>
-    </div>`;
+    return'<div class="card" style="opacity:.75">'+
+      '<div class="card-ico" style="background:#DCFCE7"><i class="ti ti-circle-check" style="font-size:16px;color:#16A34A"></i></div>'+
+      '<div class="card-info"><div class="card-name">'+(c.rider_name||'Rider')+' <span style="font-size:10px;font-weight:400;color:var(--g3)">#'+(c.rider_id||'--')+'</span></div>'+
+      '<div class="card-meta">'+(c.violation_type||'--')+' · Completed '+doneAt+'</div></div>'+
+      '<span style="font-size:10px;font-weight:700;background:#DCFCE7;color:#166534;padding:3px 8px;border-radius:6px;white-space:nowrap">✓ Done</span></div>';
   }).join('');
 
-  return`
-  <div class="my-card">
-    <div class="my-av" style="background:#FFF0E6;color:#FF5900"><i class="ti ti-school" style="font-size:20px"></i></div>
-    <div style="flex:1">
-      <div class="my-name">My Coaching Cases</div>
-      <div class="my-meta">${myDone.length} of ${myTotal} completed · ${curMonth}</div>
-      <div class="bar-wrap" style="margin-top:8px;max-width:260px">
-        <div class="bar-bg" style="height:7px"><div class="bar-fill" style="width:${donePct}%;background:${donePct===100?'#16A34A':donePct>=50?'#D97706':'#FF5900'}"></div></div>
-        <span style="font-size:11px;font-weight:700;color:${donePct===100?'#16A34A':'#FF5900'}">${donePct}%</span>
-      </div>
-    </div>
-  </div>
+  return'<div class="my-card">'+
+    '<div class="my-av" style="background:#FFF0E6;color:#FF5900"><i class="ti ti-school" style="font-size:20px"></i></div>'+
+    '<div style="flex:1"><div class="my-name">My Coaching Cases</div>'+
+    '<div class="my-meta">'+myDoneAll.length+' of '+myTotal+' completed · '+curMonth+'</div>'+
+    '<div class="bar-wrap" style="margin-top:8px;max-width:260px"><div class="bar-bg" style="height:7px"><div class="bar-fill" style="width:'+donePct+'%;background:'+(donePct===100?'#16A34A':donePct>=50?'#D97706':'#FF5900')+'"></div></div>'+
+    '<span style="font-size:11px;font-weight:700;color:'+(donePct===100?'#16A34A':'#FF5900')+'">'+donePct+'%</span></div></div></div>'+
 
-  ${myPending.length>0?`
-  <div style="margin-bottom:14px">
-    <strong style="font-size:11px;font-weight:700;color:#D97706;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-clock" style="margin-right:5px"></i>Pending (${myPending.length})</strong>
-    <div class="card-grid" style="margin-top:8px">${pendingRows}</div>
-  </div>`:''}
+    (myPending.length>0?'<div style="margin-bottom:14px"><strong style="font-size:11px;font-weight:700;color:#D97706;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-clock" style="margin-right:5px"></i>Pending ('+myPending.length+')</strong><div class="card-grid" style="margin-top:8px">'+pendingRows+'</div></div>':'')+
 
-  ${myDone.length>0?`
-  <div>
-    <strong style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-circle-check" style="margin-right:5px"></i>Completed (${myDone.length})</strong>
-    <div class="card-grid" style="margin-top:8px">${doneRows}</div>
-  </div>`:''}`;
+    (myDoneAll.length>0?
+      '<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+      '<strong style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-circle-check" style="margin-right:5px"></i>Completed this month ('+myDoneCur.length+')'+(myDoneOlder.length>0?' · '+myDoneOlder.length+' older':'')+'</strong>'+
+      (myDoneOlder.length>0?'<button onclick="D.coachingShowOlder='+(!showOlder)+';render()" style="font-size:10px;padding:3px 9px;border-radius:6px;border:1px solid var(--g2);background:var(--sur);cursor:pointer;font-family:inherit;color:var(--g4)">'+(showOlder?'Hide older cases':'Show '+myDoneOlder.length+' older')+'</button>':'')+
+      '</div><div class="card-grid">'+doneRows+'</div></div>':'');
 }
+
 
 async function autoAssignCoaching(){
   if(!confirm('Auto-assign all unassigned cases equally among today\'s duty patrollers?'))return;
