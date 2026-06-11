@@ -1431,7 +1431,7 @@ function operationsView(){
   // ROLES
   if(sub === 'roles'){
     var roles = D.customRoles || [];
-    var ALL_TABS = ['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents'];
+    var ALL_TABS = ['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents','Coaching'];
     var alBg = {viewer:'#EAF1FD', editor:'#FFF0E6', admin:'#DCFCE7'};
     var alCol = {viewer:'#0C4FB3', editor:'#FF5900', admin:'#166534'};
     var alLbl = {viewer:'👁 Viewer', editor:'✏️ Editor', admin:'🔐 Admin'};
@@ -2274,7 +2274,7 @@ function renderModal(){
     const isEdit=m.type==='editrole';const r=isEdit?m.role:{};
     let savedTabs=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
     if(isEdit&&r.visible_tabs){try{savedTabs=JSON.parse(r.visible_tabs);}catch(e){}}
-    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents'];
+    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents','Coaching'];
     const tabChecks=ALL_TABS.map(t=>{const checked=savedTabs.includes(t);
       return`<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid ${checked?'#FF5900':'#E8DDD4'};border-radius:8px;cursor:pointer;background:#fff" onclick="const cb=this.querySelector('input');setTimeout(()=>{this.style.borderColor=cb.checked?'#FF5900':'#E8DDD4';},0)">
         <input type="checkbox" name="role-tab" value="${t}" ${checked?'checked':''} style="accent-color:#FF5900;width:14px;height:14px">
