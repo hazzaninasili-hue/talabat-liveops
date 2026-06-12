@@ -379,7 +379,7 @@ let D={user:null,profile:null,customRoles:[],leaveBalances:[],tab:'schedule',vie
   docs:[],history:[],timeoff:[],attendance:[],attDate:null,opsSub:'areas',locPerms:{},tasks:[],hourlyDay:null,
   coachingCases:[],coachingAssignments:[],overtimeRequests:[],evaluations:[],
   coachingMonth:null,coachingShowOlder:false,evalMonth:null,
-  perfTab:null,perfSettings:null};
+  incentiveData:[],incMonth:null,perfTab:null,perfSettings:null};
 
 function showS(n){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display=n==='login'?'flex':'none';if(np)np.style.display=n==='newpw'?'flex':'none';document.getElementById('app').style.display='none';}
 function showApp(){const l=document.getElementById('s-login');const np=document.getElementById('s-newpw');if(l)l.style.display='none';if(np)np.style.display='none';document.getElementById('app').style.display='block';}
@@ -668,6 +668,13 @@ async function loadAll(){
     D.evaluations=ev||[];
   }catch(e){D.evaluations=[];}
   try{const{data:ps}=await wt(sb.from('performance_settings').select('*').limit(1),5000);D.perfSettings=(ps&&ps[0])||null;}catch(e){D.perfSettings=null;}
+  try{
+    const myPat2=D.patrollers.find(p=>p.user_id===D.profile?.id);
+    const isPatOrCoord2=D.profile?.role==='patroller'||D.profile?.role==='coordinator';
+    let idQ=sb.from('incentive_data').select('*').order('month',{ascending:false});
+    if(isPatOrCoord2&&myPat2)idQ=idQ.eq('patroller_id',myPat2.id);
+    const{data:id}=await wt(idQ,5000);D.incentiveData=id||[];
+  }catch(e){D.incentiveData=[];}
   try{
     const{data:att,error:atterr}=await wt(sb.from('attendance').select('*').order('date',{ascending:false}).limit(500),5000);
     if(atterr){console.warn('Attendance table not ready:',atterr.message);D.attendance=[];}
@@ -1445,7 +1452,7 @@ function operationsView(){
   // ROLES
   if(sub === 'roles'){
     var roles = D.customRoles || [];
-    var ALL_TABS = ['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents','Performance'];
+    var ALL_TABS = ['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents','Performance','Incentive'];
     var alBg = {viewer:'#EAF1FD', editor:'#FFF0E6', admin:'#DCFCE7'};
     var alCol = {viewer:'#0C4FB3', editor:'#FF5900', admin:'#166534'};
     var alLbl = {viewer:'👁 Viewer', editor:'✏️ Editor', admin:'🔐 Admin'};
@@ -1883,6 +1890,7 @@ function renderTabs(){
     if(visTabs.includes('Leave Balance'))tabs.push({id:'myleavebalance',icon:'ti-calendar-stats',label:'Leave Balance'});
     if(visTabs.includes('Documents'))tabs.push({id:'documents',icon:'ti-files',label:'Documents'});
     if(visTabs.includes('Performance')||isFullAdmin)tabs.push({id:'performance',icon:'ti-chart-dots',label:'Performance'});
+    if(visTabs.includes('Incentive')||isFullAdmin)tabs.push({id:'incentive',icon:'ti-cash',label:'Incentive'});
     if(isFullAdmin){tabs.push({id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'});tabs.push({id:'access',icon:'ti-lock',label:'Access control'});}
     document.getElementById('tabs').innerHTML=tabs.map(t=>`<button class="tab${D.tab===t.id?' active':''}" onclick="setTab('${t.id}')"><i class="ti ${t.icon}"></i>${t.label}</button>`).join('');
     return;
@@ -1890,6 +1898,7 @@ function renderTabs(){
   const tabs=(role==='patroller'||role==='coordinator')?[
     {id:'myschedule',icon:'ti-user',label:'My schedule'},
     {id:'performance',icon:'ti-chart-dots',label:'Performance'},
+    {id:'incentive',icon:'ti-cash',label:'Incentive'},
     {id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'},
     {id:'myleavebalance',icon:'ti-calendar-stats',label:'Leave Balance'},
     {id:'documents',icon:'ti-files',label:'Documents'},
@@ -1898,6 +1907,7 @@ function renderTabs(){
     {id:'summary',icon:'ti-chart-bar',label:'Summary'},
     {id:'attendance',icon:'ti-clock-check',label:'Attendance'},
     {id:'performance',icon:'ti-chart-dots',label:'Performance'},
+    {id:'incentive',icon:'ti-cash',label:'Incentive'},
     {id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'},
     {id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'},
     {id:'leavebalance',icon:'ti-calendar-stats',label:'Leave Balance'},
@@ -1992,6 +2002,7 @@ function render(){
   else if(D.tab==='attendance')html=safeRender(()=>attendanceView(),'Attendance');
   else if(D.tab==='myattendance')html=safeRender(()=>myAttendanceView(),'My Attendance');
   else if(D.tab==='performance')html=safeRender(()=>performanceView(),'Performance');
+  else if(D.tab==='incentive')html=safeRender(()=>incentiveView(),'Incentive');
   document.getElementById('main').innerHTML=`<div class="fade-in">${html}</div>`;
 }
 function setTab(t){D.tab=t;D.ne=false;render();}
@@ -2148,7 +2159,14 @@ function renderModal(){
     <div class="msg msg-err" id="cu-e"></div><div class="msg msg-ok" id="cu-ok"></div>
     <div class="fg-row"><div class="fg"><label>Full name</label><input id="cu-name" placeholder="Name"></div><div class="fg"><label>Role</label><select id="cu-role" onchange="document.getElementById('cu-phone-row').style.display=(this.value==='patroller'||this.value==='coordinator')?'block':'none'">${(D.customRoles&&D.customRoles.length)?D.customRoles.map(r=>`<option value="cr:${r.id}">${r.name} (${r.access_level==='admin'?'Admin':r.access_level==='editor'?'Editor':'Viewer'})</option>`).join(''):'<option value="" disabled>No roles yet — create in Zone & Shifts first</option>'}</select></div></div>
     <div class="fg"><label>Email</label><input type="email" id="cu-email" placeholder="email@talabat.com"></div>
-    <div class="fg" id="cu-phone-row"><label>WhatsApp number <span style="font-weight:400;font-size:10px;color:var(--g3)">(with country code, e.g. +97333112233)</span></label><input type="tel" id="cu-phone" placeholder="+97333112233"></div>
+    <div class="fg" id="cu-phone-row">
+      <label>WhatsApp number <span style="font-weight:400;font-size:10px;color:var(--g3)">(with country code, e.g. +97333112233)</span></label>
+      <input type="tel" id="cu-phone" placeholder="+97333112233">
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>Patroller ID <span style="font-weight:400;font-size:10px;color:var(--g3)">(optional)</span></label><input id="cu-patroller-id" placeholder="e.g. 605135" type="text"></div>
+      <div class="fg"><label>Basic salary (BHD) <span style="font-weight:400;font-size:10px;color:var(--g3)">(for incentive & OT calc)</span></label><input id="cu-basic-salary" placeholder="e.g. 360" type="number" min="0"></div>
+    </div>
     <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" id="cu-btn" onclick="doCreateUser()"><i class="ti ti-check"></i>Create user</button></div>`;return;
   }
   if(m.type==='resetpw'){box.innerHTML=`<div class="modal-title"><i class="ti ti-key"></i>Reset password - ${m.name}</div><div class="msg msg-err" id="rp-e"></div><div class="msg msg-ok" id="rp-ok"></div><div class="fg"><label>New password</label><div class="pw-wrap"><input type="password" id="rp1" placeholder="Min 6 characters"><button class="pw-eye" onclick="togglePw('rp1',this)"><i class="ti ti-eye"></i></button></div></div><div class="fg"><label>Confirm</label><div class="pw-wrap"><input type="password" id="rp2" placeholder="Repeat"><button class="pw-eye" onclick="togglePw('rp2',this)"><i class="ti ti-eye"></i></button></div></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" id="rp-btn" onclick="doResetPw('${m.uid}')"><i class="ti ti-check"></i>Reset</button></div>`;return;}
@@ -2324,7 +2342,7 @@ function renderModal(){
     const isEdit=m.type==='editrole';const r=isEdit?m.role:{};
     let savedTabs=['Schedule','Summary','Attendance','Time off & Tasks','Documents'];
     if(isEdit&&r.visible_tabs){try{savedTabs=JSON.parse(r.visible_tabs);}catch(e){}}
-    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents','Performance'];
+    const ALL_TABS=['Schedule','Summary','Attendance','Time off & Tasks','Leave Balance','Documents','Performance','Incentive'];
     const tabChecks=ALL_TABS.map(t=>{const checked=savedTabs.includes(t);
       return`<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid ${checked?'#FF5900':'#E8DDD4'};border-radius:8px;cursor:pointer;background:#fff" onclick="const cb=this.querySelector('input');setTimeout(()=>{this.style.borderColor=cb.checked?'#FF5900':'#E8DDD4';},0)">
         <input type="checkbox" name="role-tab" value="${t}" ${checked?'checked':''} style="accent-color:#FF5900;width:14px;height:14px">
@@ -3659,6 +3677,8 @@ async function doCreateUser(){
   const cr2=customRoleId?(D.customRoles||[]).find(r=>r.id===customRoleId):null;
   const role=cr2?(cr2.access_level==='admin'?'admin':cr2.access_level==='editor'?'lead':'patroller'):'patroller';
   const phone=(document.getElementById('cu-phone')?.value||'').trim();
+  const patrollerId=(document.getElementById('cu-patroller-id')?.value||'').trim();
+  const basicSalary=parseFloat(document.getElementById('cu-basic-salary')?.value)||null;
   if(!name||!email){showErr('cu-e','Name and email required.');return;}
   const btn=document.getElementById('cu-btn');btn.disabled=true;btn.textContent='Creating...';
   try{
@@ -3675,7 +3695,7 @@ async function doCreateUser(){
         // Check if patroller entry already exists for this user
         const{data:existingPat}=await sb.from('patrollers').select('id').eq('user_id',uid).maybeSingle();
         if(!existingPat){
-          const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null}).select().single();
+          const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null,patroller_id_num:patrollerId||null,basic_salary:basicSalary}).select().single();
           if(np)await sb.from('schedules').insert({patroller_id:np.id,week_start:wStart(),day_0:'',day_1:'',day_2:'',day_3:'',day_4:'',day_5:'',day_6:''});
         } else {
           // Update existing patroller
@@ -5061,6 +5081,376 @@ async function deleteOT(id){
   await sb.from('overtime_requests').delete().eq('id',id);
   await reload();addNotification('OT record deleted','info');
 }
+
+// ── PAY LOOKUP TABLES (from real incentive sheet) ──
+// Pay formula: score < 70% = 0, 70%-95% linear, >=95% = max
+// Reports target: pat 26.25 / TL 30
+// Unique target: pat 15.75 / TL 18
+// Performance: pat 42 / TL 48
+// Rider quality: pat 18 / TL 21
+
+const INC_PAY={
+  reports:{pat:26.25,tl:30},
+  unique:{pat:15.75,tl:18},
+  performance:{pat:42,tl:48},
+  rider:{pat:18,tl:21}
+};
+
+function incLookup(score,comp,isTL){
+  if(score===null||score===undefined)return null;
+  if(score<0.70)return 0;
+  const max=INC_PAY[comp][isTL?'tl':'pat'];
+  if(score>=0.95)return+max.toFixed(3);
+  return+((score-0.70)/0.25*max).toFixed(3);
+}
+
+function getIncentiveMonths(){
+  const now=getBahrainNow();
+  const cur=now.getUTCFullYear()+'-'+String(now.getUTCMonth()+1).padStart(2,'0');
+  return[...new Set([...D.incentiveData.map(d=>d.month).filter(Boolean),cur])].sort().reverse();
+}
+
+// ── Performance score from system ──
+// = average of eval score + coaching score (each 0-100), divided by 100 to get 0-1
+function getSysPerfScore(patId,month){
+  const evals=D.evaluations.filter(e=>e.patroller_id===patId&&(e.month||e.eval_date?.slice(0,7))===month);
+  const evalPct=evals.length?evalScore(evals.reduce((best,e)=>evalScore(e)>evalScore(best)?e:best,evals[0])):null;
+  // Use average of all evals for this month
+  const evalAvg=evals.length?Math.round(evals.reduce((s,e)=>s+evalScore(e),0)/evals.length):null;
+  const cScore=coachingScore(patId,month); // 0-100
+  if(evalAvg===null||cScore===null)return null;
+  return Math.round((evalAvg+cScore)/2)/100; // 0-1
+}
+
+// ── OT hours from system ──
+function getSysOTHours(patId,month){
+  return(D.overtimeRequests||[]).filter(ot=>
+    ot.patroller_id===patId&&ot.start_datetime?.startsWith(month)
+  ).reduce((s,ot)=>{
+    const ms=new Date(ot.end_datetime)-new Date(ot.start_datetime);
+    return s+(ms>0?ms/3600000:0);
+  },0);
+}
+
+function getBasicSalary(patId){
+  const pat=D.patrollers.find(p=>p.id===patId);
+  return pat?.basic_salary||0;
+}
+
+// ── Adjusted targets from system ──
+function getSysTargets(patId,month){
+  const taskHrs=getPatrollerTaskHours(patId,month);
+  const ps=getPerfSettings();
+  return getAdjustedTarget(taskHrs,ps);
+}
+
+// ── Build per-patroller incentive calc row ──
+function buildIncRow(patId,month,isTL){
+  const inc=D.incentiveData.find(d=>d.patroller_id===patId&&d.month===month)||null;
+  const adj=getSysTargets(patId,month);
+  const perfScore=getSysPerfScore(patId,month);
+  const otHrs=getSysOTHours(patId,month);
+  const basic=getBasicSalary(patId);
+
+  // Scores (0-1)
+  const auditScore=adj.adjTotal>0&&inc?.achieved_total!=null?Math.min(1,inc.achieved_total/adj.adjTotal):null;
+  const uniqueScore=adj.adjUnique>0&&inc?.achieved_unique!=null?Math.min(1,inc.achieved_unique/adj.adjUnique):null;
+  const riderScore=(inc?.rider_quality!=null&&inc?.rider_coverage!=null)?(inc.rider_quality+inc.rider_coverage)/200:null;
+
+  // Pay amounts
+  const auditPay=incLookup(auditScore,'reports',isTL);
+  const uniquePay=incLookup(uniqueScore,'unique',isTL);
+  const perfPay=incLookup(perfScore,'performance',isTL);
+  const riderPay=incLookup(riderScore,'rider',isTL);
+  const otPay=otHrs>0&&basic>0?+(basic/208*1.5*otHrs).toFixed(3):0;
+
+  const incentiveTotal=[auditPay,uniquePay,perfPay,riderPay].reduce((s,v)=>s+(v||0),0);
+  const totalPay=incentiveTotal+otPay;
+
+  return{inc,adj,perfScore,otHrs,basic,auditScore,uniqueScore,riderScore,auditPay,uniquePay,perfPay,riderPay,otPay,incentiveTotal,totalPay};
+}
+
+function incentiveView(){
+  const isAL=canEdit();
+  const myPat=D.patrollers.find(p=>p.user_id===D.profile?.id);
+  const now=getBahrainNow();
+  const curMonth=now.getUTCFullYear()+'-'+String(now.getUTCMonth()+1).padStart(2,'0');
+  const months=getIncentiveMonths();
+  const selMonth=D.incMonth||curMonth;
+  const pts=activePats().filter(p=>getUtype(p)==='patroller');
+
+  const monthSel='<select onchange="D.incMonth=this.value;render()" style="padding:4px 8px;border-radius:7px;border:1.5px solid var(--g2);font-size:11px;font-family:inherit">'+
+    months.map(m=>'<option value="'+m+'" '+(m===selMonth?'selected':'')+'>'+m+'</option>').join('')+'</select>';
+
+  // Score pill
+  const sPill=(s,zero)=>{
+    if(s===null)return'<span style="font-size:10px;color:var(--g3)">--</span>';
+    if(s===0&&zero)return'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:#FEE2E2;color:#991B1B">BHD 0.000</span>';
+    const p=Math.round(s*100);
+    const ok=p>=70;
+    const bg=p>=95?'background:#DBEAFE;color:#1E40AF':p>=80?'background:#DCFCE7;color:#166534':p>=70?'background:#FEF3C7;color:#92400E':'background:#FEE2E2;color:#991B1B';
+    return'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;'+bg+'">'+p+'%'+(ok?'':' ✗')+'</span>';
+  };
+  const bhdFmt=(v,zero)=>{
+    if(v===null)return'<span style="color:var(--g3)">--</span>';
+    if(v===0)return'<span style="color:#DC2626;font-size:11px">BHD 0.000</span>';
+    return'<span style="font-weight:600;color:#166534">BHD '+v.toFixed(3)+'</span>';
+  };
+  const inp=(id,val,w)=>'<input type="number" id="'+id+'" value="'+( val!==null&&val!==undefined?val:'')+'" placeholder="--" style="width:'+w+'px;padding:4px 6px;border-radius:6px;border:0.5px solid var(--g2);font-size:12px;font-family:var(--font-sans,system-ui,sans-serif);font-weight:400;color:var(--color-text-primary);background:var(--color-background-primary);text-align:right">'+'';
+
+  if(isAL){
+    // Build all patroller rows
+    const rows=pts.map(p=>{
+      const r=buildIncRow(p.id,selMonth,false);
+      const adj=r.adj;
+      return{p,r,adj};
+    });
+
+    // TL scores = avg of eligible patrollers (>=70%) per component
+    const tlAvg=(key)=>{
+      const eligible=rows.filter(({r})=>r[key]!==null&&r[key]>=0.70);
+      if(!eligible.length)return null;
+      return eligible.reduce((s,{r})=>s+r[key],0)/eligible.length;
+    };
+    const tlAudit=tlAvg('auditScore');
+    const tlUnique=tlAvg('uniqueScore');
+    const tlPerf=tlAvg('perfScore');
+    const tlRider=tlAvg('riderScore');
+    const tlInc=D.incentiveData.find(d=>d.role==='Team Lead'&&d.month===selMonth);
+    const tlBasic=tlLead?getBasicSalary(tlLead.id):0;
+    const tlLead=D.patrollers.find(p=>getUtype(p)==='lead');
+    const tlOTHrs=tlLead?getSysOTHours(tlLead.id,selMonth):0;
+    const tlOTPay=tlOTHrs>0&&tlBasic>0?+(tlBasic/208*1.5*tlOTHrs).toFixed(3):0;
+    const tlAuditPay=incLookup(tlAudit,'reports',true);
+    const tlUniquePay=incLookup(tlUnique,'unique',true);
+    const tlPerfPay=incLookup(tlPerf,'performance',true);
+    const tlRiderPay=incLookup(tlRider,'rider',true);
+    const tlTotal=[tlAuditPay,tlUniquePay,tlPerfPay,tlRiderPay].reduce((s,v)=>s+(v||0),0)+tlOTPay;
+
+    const patTotal=rows.reduce((s,{r})=>s+r.totalPay,0);
+
+    const tableRows=rows.map(({p,r,adj})=>`
+      <tr>
+        <td class="lt" style="font-weight:600;font-size:12px">${p.name}</td>
+        <td style="font-size:11px;color:var(--g3)">${adj.adjTotal.toLocaleString()}</td>
+        <td>${inp('ach-total-'+p.id,r.inc?.achieved_total,'68')}</td>
+        <td>${sPill(r.auditScore)}</td>
+        <td>${bhdFmt(r.auditPay)}</td>
+        <td style="font-size:11px;color:var(--g3)">${adj.adjUnique.toLocaleString()}</td>
+        <td>${inp('ach-unique-'+p.id,r.inc?.achieved_unique,'68')}</td>
+        <td>${sPill(r.uniqueScore)}</td>
+        <td>${bhdFmt(r.uniquePay)}</td>
+        <td style="font-size:11px">${r.perfScore!==null?'<span style="font-size:10px;color:var(--g3)">Eval+Coach avg</span>':'<span style="font-size:10px;color:var(--g3)">No data</span>'}</td>
+        <td>${sPill(r.perfScore)}</td>
+        <td>${bhdFmt(r.perfPay)}</td>
+        <td>${inp('rider-q-'+p.id,r.inc?.rider_quality,'50')} %</td>
+        <td>${inp('rider-c-'+p.id,r.inc?.rider_coverage,'50')} %</td>
+        <td>${sPill(r.riderScore)}</td>
+        <td>${bhdFmt(r.riderPay)}</td>
+        <td style="font-size:11px;color:var(--g3)">${r.otHrs.toFixed(1)}h</td>
+        <td style="font-weight:700;font-size:12px;color:${r.totalPay>0?'#FF5900':'var(--g3)'}">${r.totalPay>0?'BHD '+r.totalPay.toFixed(3):'--'}</td>
+      </tr>`).join('');
+
+    return`
+    <div class="stats" style="margin-bottom:12px">
+      <div class="stat blue"><div class="stat-label">Month</div><div style="margin-top:4px">${monthSel}</div></div>
+      <div class="stat green"><div class="stat-label">TL incentive</div><div class="stat-value" style="font-size:16px">${tlTotal>0?'BHD '+tlTotal.toFixed(3):'--'}</div></div>
+      <div class="stat" style="background:#FFF0E6;border:1px solid #FFB380"><div class="stat-label" style="color:#D94D00">Total payout</div><div class="stat-value" style="color:#FF5900;font-size:16px">BHD ${(patTotal+tlTotal).toFixed(3)}</div></div>
+      <div class="stat amber"><div class="stat-label">Eligible patrollers</div><div class="stat-value" style="font-size:16px">${rows.filter(({r})=>r.auditScore>=0.70||r.uniqueScore>=0.70||r.perfScore>=0.70||r.riderScore>=0.70).length} / ${rows.length}</div></div>
+    </div>
+
+    <div class="tcard" style="padding:14px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-table" style="margin-right:4px"></i>Incentive calculation — ${selMonth}</div>
+        <span style="font-size:10px;padding:2px 7px;border-radius:8px;background:#EAF3DE;color:#27500A;font-weight:600"><i class="ti ti-link" style="font-size:9px;margin-right:2px"></i>green = system auto</span>
+        <span style="font-size:10px;padding:2px 7px;border-radius:8px;background:#FEF3C7;color:#78350F;font-weight:600"><i class="ti ti-edit" style="font-size:9px;margin-right:2px"></i>amber = manual input</span>
+        <button onclick="saveIncentiveData()" class="btn btn-primary" style="margin-left:auto;padding:6px 14px;font-size:11px"><i class="ti ti-circle-check"></i>Save & calculate</button>
+      </div>
+      <div class="t-scroll"><table style="min-width:1350px">
+        <thead>
+          <tr>
+            <th class="lt" rowspan="2" style="min-width:130px">Patroller</th>
+            <th colspan="4" style="background:#EAF3DE;color:#27500A;border-bottom:0.5px solid #C0DD97">Audit target 25% <span style="font-size:8px;font-weight:400">adj. target system · achieved manual</span></th>
+            <th colspan="4" style="background:#EAF3DE;color:#27500A;border-bottom:0.5px solid #C0DD97">Unique target 20% <span style="font-size:8px;font-weight:400">adj. target system · achieved manual</span></th>
+            <th colspan="3" style="background:#EDE9FE;color:#4C1D95;border-bottom:0.5px solid #C4B5FD">Performance 35% <span style="font-size:8px;font-weight:400">eval + coaching system</span></th>
+            <th colspan="4" style="background:#FEF3C7;color:#78350F;border-bottom:0.5px solid #FCD34D">Rider quality 20% <span style="font-size:8px;font-weight:400">manual input /100</span></th>
+            <th rowspan="2" style="background:#FFF0E6;color:#D94D00;font-size:9px">OT hrs<br><span style="font-size:8px;font-weight:400">system</span></th>
+            <th rowspan="2" style="background:#411517;color:#fff">Total BHD</th>
+          </tr>
+          <tr>
+            <th style="background:#EAF3DE;color:#27500A">Adj.target</th>
+            <th style="background:#EAF3DE;color:#78350F">Achieved ✎</th>
+            <th style="background:#EAF3DE;color:#27500A">Score</th>
+            <th style="background:#EAF3DE;color:#27500A">BHD</th>
+            <th style="background:#EAF3DE;color:#27500A">Adj.unique</th>
+            <th style="background:#EAF3DE;color:#78350F">Achieved ✎</th>
+            <th style="background:#EAF3DE;color:#27500A">Score</th>
+            <th style="background:#EAF3DE;color:#27500A">BHD</th>
+            <th style="background:#EDE9FE;color:#4C1D95">Source</th>
+            <th style="background:#EDE9FE;color:#4C1D95">Score</th>
+            <th style="background:#EDE9FE;color:#4C1D95">BHD</th>
+            <th style="background:#FEF3C7;color:#78350F">Quality ✎</th>
+            <th style="background:#FEF3C7;color:#78350F">Coverage ✎</th>
+            <th style="background:#FEF3C7;color:#78350F">Score</th>
+            <th style="background:#FEF3C7;color:#78350F">BHD</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table></div>
+      <div style="margin-top:8px;font-size:10px;color:var(--g3)"><i class="ti ti-info-circle" style="font-size:10px;margin-right:3px"></i>Pay formula: score ≥95% = max · 70%–95% = linear · &lt;70% = BHD 0.000. Each component independent. OT = basic ÷ 208 × 1.5 × OT hrs (always paid).</div>
+    </div>
+
+    <div class="tcard" style="padding:14px">
+      <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px"><i class="ti ti-crown" style="margin-right:4px"></i>Team lead payout — straight avg of eligible patrollers (≥70%) per component</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <table>
+          <thead><tr><th class="lt">Component</th><th class="r">Eligible avg</th><th class="r">TL max</th><th class="r">TL pay BHD</th></tr></thead>
+          <tbody>
+            <tr><td class="lt">Reports target</td><td class="r">${sPill(tlAudit)}</td><td class="r" style="color:var(--g3)">BHD 30.00</td><td class="r">${bhdFmt(tlAuditPay)}</td></tr>
+            <tr><td class="lt">Unique target</td><td class="r">${sPill(tlUnique)}</td><td class="r" style="color:var(--g3)">BHD 18.00</td><td class="r">${bhdFmt(tlUniquePay)}</td></tr>
+            <tr><td class="lt">Performance</td><td class="r">${sPill(tlPerf)}</td><td class="r" style="color:var(--g3)">BHD 48.00</td><td class="r">${bhdFmt(tlPerfPay)}</td></tr>
+            <tr><td class="lt">Rider quality</td><td class="r">${sPill(tlRider)}</td><td class="r" style="color:var(--g3)">BHD 21.00</td><td class="r">${bhdFmt(tlRiderPay)}</td></tr>
+            <tr><td class="lt">OT (${tlOTHrs.toFixed(1)}h)</td>
+              <td class="r" style="font-size:11px;color:var(--g3)">BHD ${tlBasic||'--'} basic (profile)</td>
+              <td class="r" style="color:var(--g3)">basic÷208×1.5</td>
+              <td class="r" style="font-weight:600">${tlOTPay>0?'BHD '+tlOTPay.toFixed(3):'--'}</td></tr>
+            <tr style="background:rgba(255,89,0,.04)"><td class="lt" style="font-weight:700">Total</td><td class="r"></td><td class="r"></td><td class="r" style="font-weight:700;color:#FF5900">${tlTotal>0?'BHD '+tlTotal.toFixed(3):'--'}</td></tr>
+          </tbody>
+        </table>
+        <div style="font-size:11px;line-height:1.8;background:var(--g1);border-radius:10px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Eligibility per component</div>
+          ${rows.map(({p,r})=>`
+            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:0.5px solid var(--g2)">
+              <span style="font-weight:600">${p.name}</span>
+              <span style="display:flex;gap:4px">
+                ${[{s:r.auditScore,l:'A'},{s:r.uniqueScore,l:'U'},{s:r.perfScore,l:'P'},{s:r.riderScore,l:'R'}].map(({s,l})=>`<span style="font-size:9px;padding:1px 5px;border-radius:8px;${s!==null&&s>=0.70?'background:#DCFCE7;color:#166534':'background:#FEE2E2;color:#991B1B'}">${l}</span>`).join('')}
+              </span>
+            </div>`).join('')}
+          <div style="font-size:10px;color:var(--g3);margin-top:6px">A=Audit · U=Unique · P=Performance · R=Rider</div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ── PATROLLER / TL VIEW ──
+  if(!myPat){return'<div style="padding:40px;text-align:center;color:var(--g3)">No patroller profile found.</div>';}
+  const isTL=getUtype(myPat)==='lead';
+  const r=buildIncRow(myPat.id,selMonth,isTL);
+  const adj=r.adj;
+
+  // TL view — show same breakdown
+  const perfPct=r.perfScore!==null?Math.round(r.perfScore*100):null;
+  const auditPct=r.auditScore!==null?Math.round(r.auditScore*100):null;
+  const uniquePct=r.uniqueScore!==null?Math.round(r.uniqueScore*100):null;
+  const riderPct=r.riderScore!==null?Math.round(r.riderScore*100):null;
+  const headerBg=isTL?'#1E3A5F':'#411517';
+  const totalColor=isTL?'#93C5FD':'#FF5900';
+  const ini=(D.profile?.full_name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+
+  const compCard=(icon,title,content,pay,payColor)=>`
+    <div class="tcard" style="padding:14px">
+      <div style="font-size:10px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px"><i class="ti ${icon}" style="margin-right:4px"></i>${title}</div>
+      ${content}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;margin-top:8px;border-top:1.5px solid var(--g1)">
+        <span style="font-size:12px;font-weight:700">Incentive</span>
+        <span style="font-size:14px;font-weight:700;color:${payColor||'#FF5900'}">${pay!==null&&pay>0?'BHD '+pay.toFixed(3):'BHD 0.000'}</span>
+      </div>
+    </div>`;
+
+  const auditContent=`
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:0.5px solid var(--g1)"><span style="color:var(--g3)">Adj. target</span><span style="font-weight:600">${adj.adjTotal.toLocaleString()}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:0.5px solid var(--g1)"><span>Achieved</span><span style="font-weight:600">${r.inc?.achieved_total!=null?r.inc.achieved_total.toLocaleString():'--'}</span></div>
+    <div style="height:5px;background:var(--g1);border-radius:3px;overflow:hidden;margin:5px 0"><div style="height:5px;border-radius:3px;background:${auditPct!==null&&auditPct>=70?'#16A34A':'#DC2626'};width:${auditPct!==null?Math.min(100,auditPct):0}%"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0"><span>Score</span>${sPill(r.auditScore)}</div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-top:0.5px solid var(--g1);margin-top:5px"><span style="color:var(--g3)">Adj. unique target</span><span style="font-weight:600">${adj.adjUnique.toLocaleString()}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:0.5px solid var(--g1)"><span>Achieved unique</span><span style="font-weight:600">${r.inc?.achieved_unique!=null?r.inc.achieved_unique.toLocaleString():'--'}</span></div>
+    <div style="height:5px;background:var(--g1);border-radius:3px;overflow:hidden;margin:5px 0"><div style="height:5px;border-radius:3px;background:${uniquePct!==null&&uniquePct>=70?'#16A34A':'#DC2626'};width:${uniquePct!==null?Math.min(100,uniquePct):0}%"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0"><span>Unique score</span>${sPill(r.uniqueScore)}</div>`;
+
+  const perfContent=`
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:0.5px solid var(--g1)"><span>Evaluation score</span><span style="color:var(--g3);font-size:11px">auto from app</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:0.5px solid var(--g1)"><span>Coaching score</span><span style="color:var(--g3);font-size:11px">auto from app</span></div>
+    <div style="height:5px;background:var(--g1);border-radius:3px;overflow:hidden;margin:5px 0"><div style="height:5px;border-radius:3px;background:${perfPct!==null&&perfPct>=70?'#6366F1':'#DC2626'};width:${perfPct!==null?Math.min(100,perfPct):0}%"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0"><span>Performance score</span>${sPill(r.perfScore)}</div>`;
+
+  const riderContent=`
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:0.5px solid var(--g1)"><span>Rider quality</span><span style="font-weight:600">${r.inc?.rider_quality!=null?r.inc.rider_quality+' / 100':'--'}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:0.5px solid var(--g1)"><span>Rider coverage</span><span style="font-weight:600">${r.inc?.rider_coverage!=null?r.inc.rider_coverage+' / 100':'--'}</span></div>
+    <div style="height:5px;background:var(--g1);border-radius:3px;overflow:hidden;margin:5px 0"><div style="height:5px;border-radius:3px;background:${riderPct!==null&&riderPct>=70?'#D97706':'#DC2626'};width:${riderPct!==null?Math.min(100,riderPct):0}%"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0"><span>Rider quality avg</span>${sPill(r.riderScore)}</div>`;
+
+  return`
+  <div style="background:${headerBg};border-radius:14px;padding:18px;margin-bottom:12px;color:#fff">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700">${ini}</div>
+      <div>
+        <div style="font-size:16px;font-weight:700">${D.profile?.full_name||''}</div>
+        <div style="font-size:11px;opacity:.5;margin-top:2px">Incentive summary · ${selMonth}${isTL?' · Team Lead':''}</div>
+      </div>
+      <div style="margin-left:auto;text-align:right">
+        <div style="font-size:10px;opacity:.5;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Total incentive</div>
+        <div style="font-size:30px;font-weight:700;color:${totalColor}">${r.totalPay>0?'BHD '+r.totalPay.toFixed(3):'BHD 0.000'}</div>
+        <div style="font-size:10px;opacity:.4;margin-top:2px">Incentive ${r.incentiveTotal.toFixed(3)} + OT ${r.otPay.toFixed(3)}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+      ${[
+        {label:'Reports 25%',s:r.auditScore,col:auditPct>=70?'#4ADE80':'#FCA5A5'},
+        {label:'Unique 20%',s:r.uniqueScore,col:uniquePct>=70?'#4ADE80':'#FCA5A5'},
+        {label:'Performance 35%',s:r.perfScore,col:perfPct>=70?'#93C5FD':'#FCA5A5'},
+        {label:'Rider quality 20%',s:r.riderScore,col:riderPct>=70?'#4ADE80':'#FCA5A5'},
+      ].map(({label,s,col})=>`
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px;text-align:center">
+          <div style="font-size:9px;opacity:.5;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">${label}</div>
+          <div style="font-size:18px;font-weight:700;color:${s!==null?col:'rgba(255,255,255,.3)'}">${s!==null?Math.round(s*100)+'%':'--'}</div>
+          <div style="font-size:9px;margin-top:2px;color:${s!==null?col:'rgba(255,255,255,.3)'}">${s!==null?(s>=0.70?'✓ paid':'✗ BHD 0.000'):'--'}</div>
+        </div>`).join('')}
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    ${compCard('ti-target','Audit & unique targets',auditContent,(r.auditPay||0)+(r.uniquePay||0),'#166534')}
+    ${compCard('ti-chart-dots','Performance score (eval + coaching avg)',perfContent,r.perfPay,'#4C1D95')}
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    ${compCard('ti-star','Rider quality & coverage',riderContent,r.riderPay,'#D97706')}
+    <div class="tcard" style="padding:14px">
+      <div style="font-size:10px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px"><i class="ti ti-cash" style="margin-right:4px"></i>Pay breakdown</div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:0.5px solid var(--g1)"><span>Reports target (25%)</span><span style="font-weight:600;color:${r.auditPay>0?'#166534':'#DC2626'}">${r.auditPay>0?'BHD '+r.auditPay.toFixed(3):'BHD 0.000'}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:0.5px solid var(--g1)"><span>Unique target (20%)</span><span style="font-weight:600;color:${r.uniquePay>0?'#166534':'#DC2626'}">${r.uniquePay>0?'BHD '+r.uniquePay.toFixed(3):'BHD 0.000'}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:0.5px solid var(--g1)"><span>Performance (35%)</span><span style="font-weight:600;color:${r.perfPay>0?'#4C1D95':'#DC2626'}">${r.perfPay>0?'BHD '+r.perfPay.toFixed(3):'BHD 0.000'}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:0.5px solid var(--g1)"><span>Rider quality (20%)</span><span style="font-weight:600;color:${r.riderPay>0?'#D97706':'#DC2626'}">${r.riderPay>0?'BHD '+r.riderPay.toFixed(3):'BHD 0.000'}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:0.5px solid var(--g1)"><span>OT (${r.otHrs.toFixed(1)}h)</span><span style="font-weight:600">${r.otPay>0?'BHD '+r.otPay.toFixed(3):'BHD 0.000'}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;padding:8px 0"><span>Total</span><span style="color:${totalColor}">${r.totalPay>0?'BHD '+r.totalPay.toFixed(3):'BHD 0.000'}</span></div>
+    </div>
+  </div>`;
+}
+
+async function saveIncentiveData(){
+  const pts=activePats().filter(p=>getUtype(p)==='patroller');
+  const selMonth=D.incMonth||(getBahrainNow().getUTCFullYear()+'-'+String(getBahrainNow().getUTCMonth()+1).padStart(2,'0'));
+  const btn=document.querySelector('button[onclick="saveIncentiveData()"]');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Saving...';}
+
+  for(const p of pts){
+    const achTotal=parseFloat(document.getElementById('ach-total-'+p.id)?.value);
+    const achUnique=parseFloat(document.getElementById('ach-unique-'+p.id)?.value);
+    const riderQ=parseFloat(document.getElementById('rider-q-'+p.id)?.value);
+    const riderC=parseFloat(document.getElementById('rider-c-'+p.id)?.value);
+    const existing=D.incentiveData.find(d=>d.patroller_id===p.id&&d.month===selMonth);
+    const payload={patroller_id:p.id,patroller_name:p.name,month:selMonth,role:'Patroller',
+      achieved_total:isNaN(achTotal)?null:achTotal,
+      achieved_unique:isNaN(achUnique)?null:achUnique,
+      rider_quality:isNaN(riderQ)?null:riderQ,
+      rider_coverage:isNaN(riderC)?null:riderC};
+    if(existing){await sb.from('incentive_data').update(payload).eq('id',existing.id);}
+    else{await sb.from('incentive_data').insert(payload);}
+  }
+
+  await reload();
+  if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-circle-check"></i>Save & calculate';}
+  addNotification('Incentive data saved & calculated','success');
+}
+
 
 // ── GLOBAL ERROR HANDLER ──
 window.addEventListener('error', (e) => {
