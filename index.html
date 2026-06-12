@@ -25,6 +25,8 @@ body{font-family:'Inter',sans-serif;background:#F4EDE3;color:#2A0D0F;font-size:1
 @media(max-width:768px){
   /* ── LAYOUT ── */
   .page{padding:6px 8px!important}
+  #sidebar{display:none!important}
+  #tabs{display:flex!important}
   /* ── TOPBAR ── */
   .topbar{padding:0 10px!important;height:48px!important;gap:8px!important}
   .topbar-brand{gap:6px!important}
@@ -136,7 +138,17 @@ body{font-family:'Inter',sans-serif;background:#F4EDE3;color:#2A0D0F;font-size:1
 .tabs{background:#FFFFFF;border-bottom:1.5px solid #E8DDD4;display:flex;padding:0 18px;overflow-x:auto}
 .tab{padding:11px 15px;font-size:12.5px;font-weight:500;border:none;background:transparent;cursor:pointer;color:var(--g3);border-bottom:2.5px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:5px;transition:all .13s}
 .tab i{font-size:15px}.tab:hover{color:var(--g5)}.tab.active{color:#FF5900;border-bottom-color:#FF5900;font-weight:600}
-.page{max-width:1600px;margin:0 auto;padding:18px}
+.page{padding:16px 20px}
+.sb-section{font-size:9px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.08em;padding:10px 14px 4px}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 14px;font-size:12.5px;font-weight:500;color:var(--g3);cursor:pointer;border-radius:0;transition:all .12s;user-select:none;border-left:3px solid transparent;text-decoration:none;background:none;border-top:none;border-right:none;border-bottom:none;width:100%;text-align:left;font-family:inherit}
+.sb-item i{font-size:16px;flex-shrink:0}
+.sb-item:hover{background:#F4EDE3;color:var(--g5)}
+.sb-item.sb-active{background:#FFF0E6;color:#D94D00;border-left-color:#FF5900;font-weight:600}
+.sb-item.sb-active i{color:#FF5900}
+.sb-badge{margin-left:auto;font-size:9px;padding:1px 6px;border-radius:8px;font-weight:700}
+.sb-badge.green{background:#DCFCE7;color:#166534}
+.sb-badge.amber{background:#FEF3C7;color:#92400E}
+.sb-badge.red{background:#FEE2E2;color:#991B1B}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
 .stat{background:var(--sur);border-radius:var(--r12);border:1.5px solid var(--g2);padding:13px 15px;box-shadow:var(--sh)}
 .stat-label{font-size:10.5px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
@@ -315,8 +327,16 @@ table tr:hover td{background:rgba(26,111,232,.02)}
       <button class="top-btn danger" onclick="doLogout()"><i class="ti ti-logout"></i><span>Sign out</span></button>
     </div>
   </div>
-  <div class="tabs" id="tabs"></div>
-  <div class="page"><div id="main" class="fade-in"></div></div>
+  <div class="tabs" id="tabs" style="display:none"></div>
+  <div style="display:flex;height:calc(100vh - 52px);overflow:hidden">
+    <div id="sidebar" style="width:200px;flex-shrink:0;background:var(--sur);border-right:1.5px solid #E8DDD4;display:flex;flex-direction:column;overflow-y:auto;position:sticky;top:52px;height:calc(100vh - 52px)">
+      <div id="sidebar-nav" style="flex:1;padding:8px 0;overflow-y:auto"></div>
+      <div id="sidebar-user" style="padding:10px 12px;border-top:1px solid #E8DDD4;flex-shrink:0"></div>
+    </div>
+    <div style="flex:1;overflow-y:auto;background:var(--bg)">
+      <div class="page"><div id="main" class="fade-in"></div></div>
+    </div>
+  </div>
 </div>
 
 <div class="modal-overlay" id="modal" onclick="if(event.target===this)closeM()"><div class="modal-box" id="modal-box"></div></div>
@@ -1898,52 +1918,58 @@ function mySchedView(){
   return heroCard+clockWidget+taskCards+weekNav+weekGrid+notesBar()+attHistory;
 }
 
-function renderTabs(){
-  const role=D.profile.role;
-  // Check custom role - try profile.custom_role_id first, then custom_roles relation
-  const crId=D.profile.custom_role_id||(D.profile.custom_roles?.id);
-  const cr=crId?(D.customRoles||[]).find(r=>r.id===crId)||D.profile.custom_roles||null:null;
-  if(cr&&cr.visible_tabs){
-    let visTabs=[];try{visTabs=JSON.parse(cr.visible_tabs);}catch(e){}
-    const al=cr.access_level||'viewer';
-    const canEditData=al==='editor'||al==='admin';
-    const isFullAdmin=al==='admin';
-    let tabs=[{id:'myschedule',icon:'ti-user',label:'My schedule'}];
-    if(visTabs.includes('Schedule')){
-      if(canEditData)tabs.push({id:'schedule',icon:'ti-calendar',label:'Schedule'});
-      else tabs.push({id:'myschedule',icon:'ti-user',label:'My schedule'});
-    }
-    if(visTabs.includes('Summary'))tabs.push({id:'summary',icon:'ti-chart-bar',label:'Summary'});
-    if(visTabs.includes('Attendance')){tabs.push({id:'myattendance',icon:'ti-clock-check',label:'Attendance'});if(canEditData)tabs.push({id:'attendance',icon:'ti-users',label:'Team Attendance'});}
-    if(visTabs.includes('Time off & Tasks'))tabs.push({id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'});
-    if(visTabs.includes('Leave Balance'))tabs.push({id:'myleavebalance',icon:'ti-calendar-stats',label:'Leave Balance'});
-    if(visTabs.includes('Documents'))tabs.push({id:'documents',icon:'ti-files',label:'Documents'});
-    if(visTabs.includes('Performance')||isFullAdmin)tabs.push({id:'performance',icon:'ti-chart-dots',label:'Performance'});
-    if(visTabs.includes('Incentive')||isFullAdmin)tabs.push({id:'incentive',icon:'ti-cash',label:'Incentive'});
-    if(isFullAdmin){tabs.push({id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'});tabs.push({id:'access',icon:'ti-lock',label:'Access control'});}
-    document.getElementById('tabs').innerHTML=tabs.map(t=>`<button class="tab${D.tab===t.id?' active':''}" onclick="setTab('${t.id}')"><i class="ti ${t.icon}"></i>${t.label}</button>`).join('');
-    return;
+function renderTabs(){renderSidebar();}
+
+function renderSidebar(){
+  const role=D.profile?.role||'patroller';
+  const crId=D.profile?.custom_role_id||(D.profile?.custom_roles?.id);
+  const cr=crId?(D.customRoles||[]).find(r=>r.id===crId)||D.profile?.custom_roles||null:null;
+  const al=cr?.access_level||role;
+  const isAdmin=role==='admin'||al==='admin';
+  const isLead=role==='lead'||al==='editor';
+  const isPatroller=role==='patroller'||role==='coordinator';
+  const pendingTasks=(D.tasks||[]).filter(t=>t.status==='Pending').length;
+  const pendingTO=(D.timeoff||[]).filter(t=>t.status==='Pending').length;
+
+  const item=(id,icon,label,badge)=>{
+    const isOn=D.tab===id;
+    const badgeHtml=badge?`<span class="sb-badge ${badge.cls}">${badge.txt}</span>`:'';
+    return`<button class="sb-item${isOn?' sb-active':''}" onclick="setTab('${id}')"><i class="ti ${icon}" aria-hidden="true"></i>${label}${badgeHtml}</button>`;
+  };
+
+  let html='';
+  if(!isPatroller){
+    html+=`<div class="sb-section">Operations</div>`;
+    html+=item('schedule','ti-calendar-week','Schedule');
+    html+=item('summary','ti-layout-dashboard','Summary');
+    html+=item('attendance','ti-clock-check','Attendance');
+    html+=item('timeofftask','ti-calendar-off','Time off & Tasks',(pendingTasks+pendingTO)>0?{cls:'amber',txt:pendingTasks+pendingTO}:null);
+    html+=`<div class="sb-section" style="margin-top:4px">Overall performance</div>`;
+    html+=item('performance','ti-chart-infographic','Scores & Incentive');
+    html+=item('evaluation','ti-star','Evaluation');
+    html+=item('coaching','ti-users','Coaching');
+    html+=item('audittargets','ti-target','Audit targets');
+    html+=`<div class="sb-section" style="margin-top:4px">Admin</div>`;
+    html+=item('leavebalance','ti-calendar-stats','Leave balance');
+    html+=item('documents','ti-files','Documents');
+    html+=item('zonenshift','ti-map-pin','Zone & shifts');
+    if(isAdmin)html+=item('access','ti-lock','Access control');
+  } else {
+    html+=`<div class="sb-section">My workspace</div>`;
+    html+=item('myschedule','ti-user','My schedule');
+    html+=item('myattendance','ti-clock-check','My attendance');
+    html+=item('timeofftask','ti-calendar-off','Time off & Tasks');
+    html+=item('myleavebalance','ti-calendar-stats','Leave balance');
+    html+=item('documents','ti-files','Documents');
+    html+=`<div class="sb-section" style="margin-top:4px">Performance</div>`;
+    html+=item('performance','ti-chart-infographic','My scores');
+    html+=item('incentive','ti-cash','My incentive');
   }
-  const tabs=(role==='patroller'||role==='coordinator')?[
-    {id:'myschedule',icon:'ti-user',label:'My schedule'},
-    {id:'performance',icon:'ti-chart-dots',label:'Performance'},
-    {id:'incentive',icon:'ti-cash',label:'Incentive'},
-    {id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'},
-    {id:'myleavebalance',icon:'ti-calendar-stats',label:'Leave Balance'},
-    {id:'documents',icon:'ti-files',label:'Documents'},
-  ]:[
-    {id:'schedule',icon:'ti-calendar',label:'Schedule'},
-    {id:'summary',icon:'ti-chart-bar',label:'Summary'},
-    {id:'attendance',icon:'ti-clock-check',label:'Attendance'},
-    {id:'performance',icon:'ti-chart-dots',label:'Performance'},
-    {id:'incentive',icon:'ti-cash',label:'Incentive'},
-    {id:'timeofftask',icon:'ti-calendar-off',label:'Time off and Tasks'},
-    {id:'zonenshift',icon:'ti-map-pin',label:'Zone and Shifts'},
-    {id:'leavebalance',icon:'ti-calendar-stats',label:'Leave Balance'},
-    {id:'documents',icon:'ti-files',label:'Documents'},
-    ...(role==='admin'?[{id:'access',icon:'ti-lock',label:'Access control'}]:[]),
-  ];
-  document.getElementById('tabs').innerHTML=tabs.map(t=>`<button class="tab${D.tab===t.id?' active':''}" onclick="setTab('${t.id}')"><i class="ti ${t.icon}"></i>${t.label}</button>`).join('');
+  const sb=document.getElementById('sidebar-nav');
+  if(sb)sb.innerHTML=html;
+  const u=D.profile;
+  const su=document.getElementById('sidebar-user');
+  if(su)su.innerHTML=`<div style="display:flex;align-items:center;gap:9px"><div style="width:30px;height:30px;border-radius:50%;background:#411517;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0">${(u?.full_name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div><div style="min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u?.full_name||''}</div><div style="font-size:10px;color:var(--g3)">${roleLabel(u?.role||'')}</div></div></div>`;
 }
 
 function buildRoleLiveTable(isToday){
@@ -2030,8 +2056,11 @@ function render(){
   else if(D.tab==='myschedule')html=safeRender(()=>mySchedView(),'My Schedule');
   else if(D.tab==='attendance')html=safeRender(()=>attendanceView(),'Attendance');
   else if(D.tab==='myattendance')html=safeRender(()=>myAttendanceView(),'My Attendance');
-  else if(D.tab==='performance')html=safeRender(()=>performanceView(),'Performance');
+  else if(D.tab==='performance')html=safeRender(()=>overallPerfView(),'Scores & Incentive');
   else if(D.tab==='incentive')html=safeRender(()=>incentiveView(),'Incentive');
+  else if(D.tab==='evaluation')html=safeRender(()=>evalTabView(),'Evaluation');
+  else if(D.tab==='coaching')html=safeRender(()=>coachingTabView(),'Coaching');
+  else if(D.tab==='audittargets')html=safeRender(()=>auditTargetsTabView(),'Audit targets');
   document.getElementById('main').innerHTML=`<div class="fade-in">${html}</div>`;
 }
 function setTab(t){D.tab=t;D.ne=false;render();}
@@ -4510,6 +4539,41 @@ function pScoreBadge(pct){
   return'<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;'+s+'">'+pct+'%</span>';
 }
 
+// ── SUB-TAB VIEWS ──
+function evalTabView(){
+  // Extract just the evaluation section from performanceView
+  D.perfSubTab='evaluation';
+  return performanceView();
+}
+function coachingTabView(){
+  D.perfSubTab='coaching';
+  return performanceView();
+}
+function auditTargetsTabView(){
+  D.perfSubTab='audittargets';
+  return performanceView();
+}
+
+// ── OVERALL PERFORMANCE VIEW (Scores + Incentive combined) ──
+function overallPerfView(){
+  D.perfSubTab='scores';
+  const perfHtml=performanceView();
+  const incHtml=incentiveView();
+  return`
+  <div style="margin-bottom:14px">
+    <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">
+      <i class="ti ti-chart-infographic" style="margin-right:6px;font-size:14px"></i>Scores & Incentive
+    </div>
+    ${perfHtml}
+  </div>
+  <div style="border-top:2px solid #E8DDD4;padding-top:16px;margin-top:4px">
+    <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">
+      <i class="ti ti-cash" style="margin-right:6px;font-size:14px"></i>Incentive calculator & payout log
+    </div>
+    ${incHtml}
+  </div>`;
+}
+
 function performanceView(){
   const isAL=canEdit();
   const myPat=D.patrollers.find(p=>p.user_id===D.profile?.id);
@@ -5094,7 +5158,7 @@ async function saveEvalEdit(evalId){
 }
 
 // ── COACHING VIEW ──
-function coachingView(){return performanceView();}
+function coachingView(){return coachingTabView();}
 
 // ── COACHING CASE MODAL ──
 function openCoachingCase(assignmentId){
