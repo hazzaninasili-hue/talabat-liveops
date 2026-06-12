@@ -1200,7 +1200,7 @@ function summaryView(){
       }).join('');
       const attW=dates.filter(d=>{const ds=d.toISOString().split('T')[0];const r=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);return r?.status==='Attended';}).length;
       const absW=dates.filter(d=>{const ds=d.toISOString().split('T')[0];const r=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);return r&&r.status&&r.status.startsWith('Absent');}).length;
-      return`<tr><td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">${p.patroller_id_num||''}</div><div style="font-weight:600">${p.name}</div></td><td><span class="role-badge ${getUtype(p)==='coordinator'?'rb-coord':'rb-pat'}">${getUtype(p)==='coordinator'?'Coord':'Pat'}</span></td>${cells}<td style="font-weight:700;color:#166534">${attW}</td><td style="font-weight:700;color:#DC2626">${absW}</td></tr>`;
+      return`<tr><td style="font-size:11px;font-family:monospace;color:var(--g4);white-space:nowrap">${p.patroller_id_num||'--'}</td><td class="lt" style="font-weight:600">${p.name}</td><td><span class="role-badge ${getUtype(p)==='coordinator'?'rb-coord':'rb-pat'}">${getUtype(p)==='coordinator'?'Coord':'Pat'}</span></td>${cells}<td style="font-weight:700;color:#166534">${attW}</td><td style="font-weight:700;color:#DC2626">${absW}</td></tr>`;
     }).join('')}
     </tbody></table></div></div>
   </div>`;
@@ -1568,7 +1568,7 @@ function accessView(){
         const lastCheck=lp?.last_checked?new Date(lp.last_checked).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Never';
         const device=(lp?.device||'--').substring(0,50);
         return`<tr style="border-bottom:1px solid #F4EDE3">
-          <td style="padding:8px 10px"><div style="font-size:9px;font-family:monospace;color:var(--g3)">${p.patroller_id_num||''}</div><div style="font-weight:600">${p.name}</div>
+          <td style="font-size:11px;font-family:monospace;color:var(--g4);padding:8px 4px;white-space:nowrap">${p.patroller_id_num||'--'}</td><td style="padding:8px 10px;font-weight:600">${p.name}
             ${st==='denied'?'<span style="margin-left:6px;font-size:9px;background:#DC2626;color:#fff;padding:1px 5px;border-radius:3px;font-weight:700">⚠ VIOLATION</span>':''}
             ${st==='unknown'?'<span style="margin-left:6px;font-size:9px;background:#92400E;color:#fff;padding:1px 5px;border-radius:3px;font-weight:700">NOT CHECKED</span>':''}
           </td>
@@ -3268,7 +3268,7 @@ function attendanceView(){
     const zone=gDZ(p.id,todaySelIdx)||'--';
     const sh=getDayShift(p.id,todaySelIdx);
     return`<tr>
-      <td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">${p.patroller_id_num||''}</div><div style="font-weight:600">${p.name}</div></td>
+      <td style="font-size:11px;font-family:monospace;color:var(--g4);white-space:nowrap">${p.patroller_id_num||'--'}</td><td class="lt" style="font-weight:600">${p.name}</td>
       <td style="font-size:11px">${zone}</td>
       <td style="font-size:11px">${sh?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}-${fmtT(getEffectiveEndTime(p.id,sh,today)||sh.end_time)}${(rec?.late_mins||0)>0?` <span style="color:#D97706;font-size:9px">⚠+${rec.late_mins}m</span>`:''}`:'-'}</td>
       <td>${statusBadge}</td>
@@ -4628,24 +4628,52 @@ function performanceView(){
     const diffLabel=diff!==null?(diff>=0?'+'+diff+'%':diff+'%'):'--';
     const diffCol=diff===null?'var(--g3)':diff>0?'#166534':'#DC2626';
 
-    // 3-month trend data
-    const last3=months.slice(0,3);
-    const trendRows=pts.filter(p=>perfData.find(x=>x.p.id===p.id&&(x.pScore!==null||x.cScore!==null))).map(p=>{
-      const scores=last3.map(m=>{
+    // 6-month trend data
+    const last6=months.slice(0,6);
+    const trendRows=pts.map(p=>{
+      const scores=last6.map(m=>{
         const ev=D.evaluations.filter(e=>e.patroller_id===p.id&&(e.month||e.eval_date?.slice(0,7))===m);
         const ea=ev.length?Math.round(ev.reduce((s,e)=>s+evalScore(e),0)/ev.length):null;
         const cs=coachingScore(p.id,m);
         return(ea!==null&&cs!==null)?perfScore(ea,cs,ps):null;
       });
-      const first=scores.find(s=>s!==null);
-      const last=scores.filter(s=>s!==null).pop();
-      const diff2=first!==null&&last!==null&&first!==last?last-first:null;
+      const hasAny=scores.some(s=>s!==null);
+      if(!hasAny)return'';
+      const nonNull=scores.filter(s=>s!==null);
+      const diff2=nonNull.length>1?nonNull[nonNull.length-1]-nonNull[0]:null;
       const trend2=diff2===null?'--':diff2>0?'↑ +'+diff2+'%':'↓ '+diff2+'%';
       const trendCol=diff2===null?'var(--g3)':diff2>0?'#166534':'#DC2626';
-      return'<tr><td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">'+( p.patroller_id_num||'')+'</div><div style="font-weight:600">'+p.name+'</div></td>'+
-        scores.map((s,i)=>s!==null?'<td>'+pPill(s)+'</td>':'<td style="color:var(--g3);font-size:10px">--</td>').join('')+
-        '<td style="font-weight:700;color:'+trendCol+'">'+trend2+'</td></tr>';
-    }).join('');
+      return'<tr>'+
+        '<td style="font-size:11px;font-family:monospace;color:var(--g4);white-space:nowrap">'+(p.patroller_id_num||'--')+'</td>'+
+        '<td class="lt" style="font-weight:600">'+p.name+'</td>'+
+        scores.map(s=>s!==null?'<td class="r">'+pPill(s)+'</td>':'<td class="r" style="color:var(--g3);font-size:10px">--</td>').join('')+
+        '<td class="r" style="font-weight:700;color:'+trendCol+'">'+trend2+'</td></tr>';
+    }).filter(Boolean).join('');
+
+    // Full performance log (up to 12 months × all patrollers)
+    const allMonths=months.slice(0,12);
+    const logRows=pts.map(p=>allMonths.map(m=>{
+      const ev=D.evaluations.filter(e=>e.patroller_id===p.id&&(e.month||e.eval_date?.slice(0,7))===m);
+      const ea=ev.length?Math.round(ev.reduce((s,e)=>s+evalScore(e),0)/ev.length):null;
+      const cs=coachingScore(p.id,m);
+      const ps2=(ea!==null||cs!==null)?((ea!==null&&cs!==null)?perfScore(ea,cs,ps):null):null;
+      if(ps2===null&&ea===null&&cs===null)return null;
+      return{p,m,ea,cs,ps2};
+    }).filter(Boolean)).flat().sort((a,b)=>b.m.localeCompare(a.m)||a.p.name.localeCompare(b.p.name));
+    window._downloadPerfLog=()=>{
+      const csv=['"Month","ID","Patroller","Eval %","Coaching %","Performance %"',...logRows.map(r=>[r.m,r.p.patroller_id_num||'',r.p.name,r.ea??'',r.cs??'',r.ps2??''].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','))].join('\n');
+      const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='performance-log.csv';a.click();
+    };
+    const logTableRows=logRows.slice(0,100).map(r=>
+      '<tr>'+
+      '<td style="font-size:11px;font-family:monospace;color:var(--g4)">'+r.m+'</td>'+
+      '<td style="font-size:11px;font-family:monospace;color:var(--g4)">'+(r.p.patroller_id_num||'--')+'</td>'+
+      '<td class="lt" style="font-weight:600">'+r.p.name+'</td>'+
+      '<td class="r">'+(r.ea!==null?ePill(r.ea):'<span style="color:var(--g3)">--</span>')+'</td>'+
+      '<td class="r">'+(r.cs!==null?'<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#DBEAFE;color:#1E40AF">'+r.cs+'%</span>':'<span style="color:var(--g3)">--</span>')+'</td>'+
+      '<td class="r">'+(r.ps2!==null?pPill(r.ps2):'<span style="color:var(--g3)">--</span>')+'</td>'+
+      '</tr>'
+    ).join('');
 
     // ── OVERVIEW ──
     if(subTab==='overview'){
@@ -4689,15 +4717,27 @@ function performanceView(){
         '<div style="display:grid;grid-template-columns:repeat('+Math.min(sorted.length,4)+',1fr);gap:10px;margin-bottom:14px">'+patCards+'</div>'+
         '<div class="tcard" style="padding:14px">'+
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
-            '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">3-month performance trend</div>'+
+            '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">6-month performance trend</div>'+
             monthSel+
           '</div>'+
-          '<div style="display:flex;gap:12px;align-items:flex-start">'+
-            '<div style="display:flex;gap:6px;width:120px;flex-shrink:0">'+teamBars+'</div>'+
-            '<div style="width:1px;background:var(--g2);align-self:stretch"></div>'+
-            '<div style="flex:1;overflow-x:auto"><table style="min-width:400px"><thead><tr><th class="lt">Patroller</th>'+
-            last3.map(m=>'<th>'+monthLabel(m)+'</th>').join('')+
-            '<th>Trend</th></tr></thead><tbody>'+trendRows+'</tbody></table></div>'+
+          '<div style="overflow-x:auto"><table style="min-width:600px;width:100%"><thead><tr>'+
+            '<th style="font-size:10px;white-space:nowrap">ID</th>'+
+            '<th class="lt">Patroller</th>'+
+            last6.map(m=>'<th class="r">'+monthLabel(m)+'</th>').join('')+
+            '<th class="r">Trend</th></tr></thead><tbody>'+trendRows+'</tbody></table></div>'+
+          '<div style="margin-top:16px;border-top:0.5px solid var(--g2);padding-top:14px">'+
+            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
+              '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">Full performance log</div>'+
+              '<button onclick="window._downloadPerfLog()" class="btn" style="padding:5px 12px;font-size:11px"><i class="ti ti-download"></i> Export CSV</button>'+
+            '</div>'+
+            '<div style="overflow-x:auto"><table style="min-width:500px;width:100%"><thead><tr>'+
+              '<th style="font-size:10px">Month</th>'+
+              '<th style="font-size:10px;white-space:nowrap">ID</th>'+
+              '<th class="lt">Patroller</th>'+
+              '<th class="r">Eval</th>'+
+              '<th class="r">Coaching</th>'+
+              '<th class="r">Performance</th>'+
+            '</tr></thead><tbody>'+logTableRows+(logRows.length>100?'<tr><td colspan="6" style="text-align:center;font-size:10px;color:var(--g3);padding:8px">Showing top 100 rows — export CSV for full data</td></tr>':'')+'</tbody></table></div>'+
           '</div>'+
         '</div>';
     }
@@ -4706,7 +4746,7 @@ function performanceView(){
       const evalTableRows=sorted.map(({p,evalAvg,evalAvgRaw,evals},i)=>{
         const isBest=i===0&&evalAvg!==null;
         return'<tr '+(isBest?'style="background:rgba(255,89,0,.04)"':'')+'>'+
-          '<td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">'+(p.patroller_id_num||'')+'</div><div style="font-weight:600">'+(isBest?'<i class="ti ti-trophy" style="color:#FF5900;font-size:10px;margin-right:3px"></i>':'')+p.name+'</div></td>'+
+          '<td style="font-size:11px;font-family:monospace;color:var(--g4);white-space:nowrap">'+(p.patroller_id_num||'--')+'</td><td class="lt" style="font-weight:600">'+(isBest?'<i class="ti ti-trophy" style="color:#FF5900;font-size:10px;margin-right:3px"></i>':'')+p.name+'</td>'+
           '<td style="color:var(--g3);font-size:11px">'+evals+'</td>'+
           '<td style="font-size:11px">'+(evalAvgRaw!==null?evalAvgRaw+' / 4':'--')+'</td>'+
           '<td>'+(evalAvg!==null?ePill(evalAvg):'<span style="font-size:10px;color:var(--g3)">--</span>')+'</td>'+
@@ -4798,7 +4838,7 @@ function performanceView(){
 
       const coachRows=coachBreakdown.map(({p,assigned,done,slaBreach,duplicate,cs},i)=>
         '<tr '+(i===0?'style="background:rgba(255,89,0,.04)"':'')+'>'+
-        '<td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">'+(p.patroller_id_num||'')+'</div><div style="font-weight:600">'+p.name+'</div></td>'+
+        '<td style="font-size:11px;font-family:monospace;color:var(--g4);white-space:nowrap">'+(p.patroller_id_num||'--')+'</td><td class="lt" style="font-weight:600">'+p.name+'</td>'+
         '<td style="font-size:11px">'+assigned+'</td>'+
         '<td style="font-weight:600;color:#166534">'+done+'</td>'+
         '<td style="font-weight:600;color:#DC2626">'+slaBreach+'</td>'+
@@ -4883,7 +4923,7 @@ function performanceView(){
             const overLabel=adj.over>0?adj.over+'h over':'<span style="color:var(--g3)">—</span>';
             const redLabel=adj.over>0?'<span style="font-weight:700;color:#DC2626">−'+(ps.targetTotal-adj.adjTotal)+' / −'+(ps.targetUnique-adj.adjUnique)+'</span>':'<span style="font-size:10px;color:var(--g3)">No adj.</span>';
             return'<tr>'+
-              '<td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">'+(p.patroller_id_num||'')+'</div><div style="font-weight:600">'+p.name+'</div></td>'+
+              '<td style="font-size:11px;font-family:monospace;color:var(--g4);white-space:nowrap">'+(p.patroller_id_num||'--')+'</td><td class="lt" style="font-weight:600">'+p.name+'</td>'+
               '<td style="font-weight:600">'+taskHrs+'h</td>'+
               '<td style="font-weight:600;color:#D97706">'+overLabel+'</td>'+
               '<td style="font-weight:700;color:#166534">'+adj.adjTotal.toLocaleString()+'</td>'+
@@ -5406,7 +5446,8 @@ function incentiveView(){
 
     const tableRows=rows.map(({p,r,adj})=>`
       <tr>
-        <td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">${p.patroller_id_num||''}</div><div style="font-weight:600;font-size:12px">${p.name}</div></td>
+        <td style="font-size:11px;font-family:monospace;color:var(--g4);white-space:nowrap">${p.patroller_id_num||'--'}</td>
+        <td class="lt" style="font-weight:600;font-size:12px">${p.name}</td>
         <td style="font-size:11px;color:var(--g3)">${adj.adjTotal.toLocaleString()}</td>
         <td>${inp('ach-total-'+p.id,r.inc?.achieved_total,'68')}</td>
         <td>${sPill(r.auditScore)}</td>
@@ -5656,7 +5697,7 @@ function incentiveView(){
         <table><thead><tr><th style="font-size:10px;white-space:nowrap">ID</th><th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Patroller</th><th class="r">Reports</th><th class="r">Unique</th><th class="r">Perf</th><th class="r">Rider</th></tr></thead><tbody>
         ${allRows.map(({p,r})=>{
           const pill=(s)=>s!==null?`<span style="font-size:9px;padding:1px 6px;border-radius:10px;font-weight:600;${s>=0.70?'background:#DCFCE7;color:#27500A':'background:#FCEBEB;color:#A32D2D'}">${Math.round(s*100)}%</span>`:'<span style="color:var(--g3);font-size:10px">--</span>';
-          return`<tr><td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">${p.patroller_id_num||''}</div><div style="font-size:11px;font-weight:600">${p.name}</div></td><td class="r">${pill(r.auditScore)}</td><td class="r">${pill(r.uniqueScore)}</td><td class="r">${pill(r.perfScore)}</td><td class="r">${pill(r.riderScore)}</td></tr>`;
+          return`<tr><td style="font-size:11px;font-family:monospace;color:var(--g4);white-space:nowrap">${p.patroller_id_num||'--'}</td><td class="lt" style="font-size:11px;font-weight:600">${p.name}</td><td class="r">${pill(r.auditScore)}</td><td class="r">${pill(r.uniqueScore)}</td><td class="r">${pill(r.perfScore)}</td><td class="r">${pill(r.riderScore)}</td></tr>`;
         }).join('')}
         </tbody></table>
         <div style="margin-top:8px;font-size:10px;color:var(--g3)">Each component averaged independently from eligible patrollers only</div>
