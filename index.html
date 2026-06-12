@@ -4697,7 +4697,7 @@ function performanceView(){
           '</div>';
       }).join('');
 
-      const teamBars=last3.map(m=>{
+      const teamBars=last6.map(m=>{
         const allEvals=D.evaluations.filter(e=>(e.month||e.eval_date?.slice(0,7))===m);
         const sc=allEvals.length?Math.round(allEvals.reduce((s,e)=>s+evalScore(e),0)/allEvals.length):0;
         const col=sc>=75?'#3B82F6':sc>=60?'#16A34A':sc>=40?'#D97706':'#DC2626';
