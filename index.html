@@ -2038,7 +2038,7 @@ function openAdd(){openM({type:'addpat',form:{name:'',shiftId:D.shifts[0]?.id||'
 function openEditUser(uid){
   const u=D.users.find(x=>x.id===uid);if(!u)return;
   const pat=D.patrollers.find(p=>p.user_id===uid);
-  openM({type:'edituser',uid,form:{name:u.full_name,email:u.email,role:u.role,phone:pat?.phone||''}});
+  openM({type:'edituser',uid,form:{name:u.full_name,email:u.email,role:u.role,phone:pat?.phone||'',patrollerIdNum:pat?.patroller_id_num||'',basicSalary:pat?.basic_salary||''}});
 }
 function openCreateSchedule(){
   const users=D.users.filter(u=>(u.role==='patroller'||u.role==='coordinator')&&u.is_active!==false);
@@ -2180,6 +2180,10 @@ function renderModal(){
     </div>
     <div class="fg"><label>Email</label><input type="email" id="eu-email" value="${f.email}" placeholder="email@talabat.com"></div>
     <div class="fg"><label>WhatsApp number <span style="font-weight:400;font-size:10px;color:var(--g3)">(with country code)</span></label><input type="tel" id="eu-phone" value="${f.phone}" placeholder="+97333112233"></div>
+    <div class="fg-row">
+      <div class="fg"><label>Patroller ID <span style="font-weight:400;font-size:10px;color:var(--g3)">(optional)</span></label><input id="eu-patroller-id" value="${f.patrollerIdNum}" placeholder="e.g. 605135"></div>
+      <div class="fg"><label>Basic salary (BHD) <span style="font-weight:400;font-size:10px;color:var(--g3)">(for incentive & OT)</span></label><input id="eu-basic-salary" value="${f.basicSalary}" placeholder="e.g. 360" type="number" min="0"></div>
+    </div>
     <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveEditUser('${m.uid}')"><i class="ti ti-check"></i>Save</button></div>`;return;
   }
   if(m.type==='createschedule'){
@@ -2417,16 +2421,18 @@ async function saveEditUser(uid){
   const email=document.getElementById('eu-email').value.trim().toLowerCase();
   const role=document.getElementById('eu-role').value;
   const phone=(document.getElementById('eu-phone').value||'').trim();
+  const patrollerIdNum=(document.getElementById('eu-patroller-id')?.value||'').trim();
+  const basicSalary=parseFloat(document.getElementById('eu-basic-salary')?.value)||null;
   if(!name||!email){showErr('eu-e','Name and email required.');return;}
   // Update profile
   const{error}=await sb.from('profiles').update({full_name:name,email,role}).eq('id',uid);
   if(error){showErr('eu-e',error.message);return;}
   // Update linked patroller entry if exists
   const pat=D.patrollers.find(p=>p.user_id===uid);
-  if(pat){await sb.from('patrollers').update({name,phone:phone||null,user_type:role}).eq('id',pat.id);}
+  if(pat){await sb.from('patrollers').update({name,phone:phone||null,user_type:role,patroller_id_num:patrollerIdNum||null,basic_salary:basicSalary}).eq('id',pat.id);}
   // If no patroller entry yet and role is patroller/coordinator, create one
   else if(role==='patroller'||role==='coordinator'){
-    const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null}).select().single();
+    const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null,patroller_id_num:patrollerIdNum||null,basic_salary:basicSalary}).select().single();
     if(np)await sb.from('schedules').insert({patroller_id:np.id,week_start:wStart(),day_0:'',day_1:'',day_2:'',day_3:'',day_4:'',day_5:'',day_6:''});
   }
   // If admin/lead, hide from schedule
@@ -5217,8 +5223,8 @@ function incentiveView(){
     const tlPerf=tlAvg('perfScore');
     const tlRider=tlAvg('riderScore');
     const tlInc=D.incentiveData.find(d=>d.role==='Team Lead'&&d.month===selMonth);
-    const tlBasic=tlLead?getBasicSalary(tlLead.id):0;
     const tlLead=D.patrollers.find(p=>getUtype(p)==='lead');
+    const tlBasic=tlLead?getBasicSalary(tlLead.id):0;
     const tlOTHrs=tlLead?getSysOTHours(tlLead.id,selMonth):0;
     const tlOTPay=tlOTHrs>0&&tlBasic>0?+(tlBasic/208*1.5*tlOTHrs).toFixed(3):0;
     const tlAuditPay=incLookup(tlAudit,'reports',true);
