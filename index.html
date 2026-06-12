@@ -814,9 +814,8 @@ function getPatrollerShiftStatus(pid,dayIdx,dateStr){
   const isToday=dateStr===todayStr();
   if(rec&&rec.clock_out)return{status:'completed',rec,sh,lateMins:rec.late_mins||0,adjEndTime:rec.adj_end_time||null};
   if(rec&&rec.clock_in&&!rec.clock_out){
-    // Check early clock out request — use clock-in date for overnight shifts
-    const clockInDate=rec.clock_in?new Date(rec.clock_in).toLocaleDateString('en-CA',{timeZone:'Asia/Bahrain'}):dateStr;
-    const earlyReq=(D.tasks||[]).find(t=>t.patroller_id===pid&&(t.date===dateStr||t.date===clockInDate)&&t.task_type==='Early Clock Out'&&t.status==='Pending');
+    // task.date = clock-in date (attendance date), always exact match
+    const earlyReq=(D.tasks||[]).find(t=>t.patroller_id===pid&&t.date===dateStr&&t.task_type==='Early Clock Out'&&t.status==='Pending');
     if(earlyReq)return{status:'early_out_pending',rec,sh,earlyReq};
     return{status:'clocked_in',rec,sh,lateMins:rec.late_mins||0,adjEndTime:rec.adj_end_time||null};
   }
@@ -1113,10 +1112,9 @@ function summaryView(){
       return clockInMins>getShiftStartMins(sh)+1; // 1 min grace
     }).length;
 
-    // Early clock-out: approved OR pending early clock-out tasks for this day (including overnight shifts from day before)
-    const prevDs=new Date(new Date(ds).getTime()-86400000).toISOString().split('T')[0];
+    // Early clock-out: task.date = the clock-in date (shift start date), always matches the shift day
     const earlyOutCount=(D.tasks||[]).filter(t=>
-      (t.date===ds||t.date===prevDs)&&t.task_type==='Early Clock Out'&&(t.status==='Approved'||t.status==='Pending')
+      t.date===ds&&t.task_type==='Early Clock Out'&&(t.status==='Approved'||t.status==='Pending')
     ).length;
 
     const on=amV+pmV;const pct=tot?Math.round(offV/tot*100):0;
@@ -3218,11 +3216,10 @@ function attendanceView(){
     const outT=rec?.clock_out?new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
     const dur=rec?.clock_in&&rec?.clock_out?`${Math.floor(Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000)/60)}h ${Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000)%60}m`:'--';
     const isAtt=status==='Attended';const isAbs=status==='Absent';
-    // For overnight shifts, early clock-out request may be stored with clock-in date (could be yesterday)
-    const rec2=todayRecs.find(a=>a.patroller_id===p.id);
-    const clockInDate=rec2?.clock_in?new Date(rec2.clock_in).toLocaleDateString('en-CA',{timeZone:'Asia/Bahrain'}):today;
-    const earlyReq=(D.tasks||[]).find(t=>t.patroller_id===p.id&&(t.date===today||t.date===clockInDate)&&t.task_type==='Early Clock Out'&&t.status==='Pending');
-    const earlyApproved=(D.tasks||[]).find(t=>t.patroller_id===p.id&&(t.date===today||t.date===clockInDate)&&t.task_type==='Early Clock Out'&&t.status==='Approved');
+    // task.date = attendance record date (clock-in date) — exact match
+    const attDate=rec?.date||today;
+    const earlyReq=(D.tasks||[]).find(t=>t.patroller_id===p.id&&t.date===attDate&&t.task_type==='Early Clock Out'&&t.status==='Pending');
+    const earlyApproved=(D.tasks||[]).find(t=>t.patroller_id===p.id&&t.date===attDate&&t.task_type==='Early Clock Out'&&t.status==='Approved');
     const attIdMatch=earlyReq?.description?.match(/Att ID: ([a-f0-9-]+)/);
     const attIdFromEarly=attIdMatch?attIdMatch[1]:'';
     const statusBadge=earlyReq
