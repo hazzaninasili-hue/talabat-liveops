@@ -1112,10 +1112,31 @@ function summaryView(){
       return clockInMins>getShiftStartMins(sh)+1; // 1 min grace
     }).length;
 
-    // Early clock-out: task.date = the clock-in date (shift start date), always matches the shift day
-    const earlyOutCount=(D.tasks||[]).filter(t=>
+    // Early clock-out: count from tasks (Approved/Pending) OR directly from attendance records
+    // where patroller clocked out before shift end (catches historical data with wrong task dates)
+    const taskEarlyOut=(D.tasks||[]).filter(t=>
       t.date===ds&&t.task_type==='Early Clock Out'&&(t.status==='Approved'||t.status==='Pending')
-    ).length;
+    ).map(t=>{const m=t.description?.match(/Att ID: ([a-f0-9-]+)/);return m?m[1]:null;}).filter(Boolean);
+
+    const attEarlyOut=dayAtts.filter(a=>{
+      if(taskEarlyOut.includes(a.id))return false; // already counted via task
+      if(!a.clock_in||!a.clock_out)return false;
+      const pat=D.patrollers.find(p=>p.id===a.patroller_id);if(!pat)return false;
+      const dayIdx=new Date(Date.UTC(...ds.split('-').map((v,i)=>i===1?v-1:+v))).getUTCDay();
+      const sh=getDayShift(pat.id,dayIdx);if(!sh||!sh.end_time)return false;
+      const outT=new Date(a.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+      const outMins=parseInt(outT.split(':')[0])*60+parseInt(outT.split(':')[1]);
+      const lateMins=a.late_mins||0;
+      const shiftEndRaw=getShiftEndMins(sh)+lateMins;
+      const shiftStartMins=getShiftStartMins(sh)||0;
+      const isOvernight=getShiftEndMins(sh)<shiftStartMins;
+      // For overnight shifts: if clock-out is PM side, compare with end+1440
+      const adjEnd=isOvernight&&outMins>=shiftStartMins?shiftEndRaw+1440:shiftEndRaw;
+      const adjOut=isOvernight&&outMins>=shiftStartMins?outMins+1440:outMins;
+      return adjOut<adjEnd-5; // clocked out more than 5 min early
+    }).length;
+
+    const earlyOutCount=taskEarlyOut.length+attEarlyOut;
 
     const on=amV+pmV;const pct=tot?Math.round(offV/tot*100):0;
     const pb=pct>=50?'background:var(--red-l);color:var(--red-d)':pct>=30?'background:var(--amber-l);color:var(--amber-d)':'background:var(--green-l);color:var(--green)';
