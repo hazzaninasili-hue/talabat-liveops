@@ -687,6 +687,8 @@ async function sendWebhook(event,data){
 }
 
 const ini=n=>n.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+const pid=(patObj)=>{const id=patObj?.patroller_id_num;return id?`<span style="font-size:9px;font-family:monospace;color:var(--g3);margin-right:4px">${id}</span>`:'';};
+const pidStr=(patObj)=>patObj?.patroller_id_num||'';
 const gsh=id=>D.shifts.find(s=>s.id===id)||{name:'?',start_time:'?',end_time:'?',shift_type:'morning'};
 const fmt=d=>`${d.getUTCDate()}-${d.getUTCMonth()+1}-${d.getUTCFullYear()}`;
 const wNum=d=>{
@@ -952,7 +954,7 @@ function getRunningTasks(){
         <i class="ti ti-player-play" style="margin-right:5px;font-size:12px"></i>Active Running Tasks
       </div>
       <div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr>
-        <th class="lt">Patroller</th><th>Type</th><th>Task</th><th>Status</th>${canEdit()?'<th>Actions</th>':''}
+        <th style="font-size:10px;white-space:nowrap">ID</th><th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Patroller</th><th>Type</th><th>Task</th><th>Status</th>${canEdit()?'<th>Actions</th>':''}
       </tr></thead><tbody>${rows}</tbody></table></div></div>
     </div>
   `;
@@ -1180,7 +1182,7 @@ function summaryView(){
   <div style="margin-top:20px;border-top:1.5px solid var(--g2);padding-top:16px">
     <strong style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-users" style="font-size:12px;margin-right:5px"></i>Individual Attendance This Week</strong>
     <div class="tcard" style="margin-top:10px"><div class="t-scroll"><table style="table-layout:auto"><thead><tr>
-      <th class="lt">Name</th><th>Type</th>
+      <th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Name</th><th>Type</th>
       ${dates.map((d,i)=>`<th>${SD[i]}<br><span style="font-family:monospace;font-size:9px;font-weight:400">${fmt(d)}</span></th>`).join('')}
       <th>Attended</th><th>Absent</th>
     </tr></thead><tbody>
@@ -1198,7 +1200,7 @@ function summaryView(){
       }).join('');
       const attW=dates.filter(d=>{const ds=d.toISOString().split('T')[0];const r=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);return r?.status==='Attended';}).length;
       const absW=dates.filter(d=>{const ds=d.toISOString().split('T')[0];const r=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);return r&&r.status&&r.status.startsWith('Absent');}).length;
-      return`<tr><td class="lt">${p.name}</td><td><span class="role-badge ${getUtype(p)==='coordinator'?'rb-coord':'rb-pat'}">${getUtype(p)==='coordinator'?'Coord':'Pat'}</span></td>${cells}<td style="font-weight:700;color:#166534">${attW}</td><td style="font-weight:700;color:#DC2626">${absW}</td></tr>`;
+      return`<tr><td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">${p.patroller_id_num||''}</div><div style="font-weight:600">${p.name}</div></td><td><span class="role-badge ${getUtype(p)==='coordinator'?'rb-coord':'rb-pat'}">${getUtype(p)==='coordinator'?'Coord':'Pat'}</span></td>${cells}<td style="font-weight:700;color:#166534">${attW}</td><td style="font-weight:700;color:#DC2626">${absW}</td></tr>`;
     }).join('')}
     </tbody></table></div></div>
   </div>`;
@@ -1566,7 +1568,7 @@ function accessView(){
         const lastCheck=lp?.last_checked?new Date(lp.last_checked).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Never';
         const device=(lp?.device||'--').substring(0,50);
         return`<tr style="border-bottom:1px solid #F4EDE3">
-          <td style="padding:8px 10px;font-weight:600">${p.name}
+          <td style="padding:8px 10px"><div style="font-size:9px;font-family:monospace;color:var(--g3)">${p.patroller_id_num||''}</div><div style="font-weight:600">${p.name}</div>
             ${st==='denied'?'<span style="margin-left:6px;font-size:9px;background:#DC2626;color:#fff;padding:1px 5px;border-radius:3px;font-weight:700">⚠ VIOLATION</span>':''}
             ${st==='unknown'?'<span style="margin-left:6px;font-size:9px;background:#92400E;color:#fff;padding:1px 5px;border-radius:3px;font-weight:700">NOT CHECKED</span>':''}
           </td>
@@ -3266,7 +3268,7 @@ function attendanceView(){
     const zone=gDZ(p.id,todaySelIdx)||'--';
     const sh=getDayShift(p.id,todaySelIdx);
     return`<tr>
-      <td class="lt" style="font-weight:600">${p.name}</td>
+      <td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">${p.patroller_id_num||''}</div><div style="font-weight:600">${p.name}</div></td>
       <td style="font-size:11px">${zone}</td>
       <td style="font-size:11px">${sh?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}-${fmtT(getEffectiveEndTime(p.id,sh,today)||sh.end_time)}${(rec?.late_mins||0)>0?` <span style="color:#D97706;font-size:9px">⚠+${rec.late_mins}m</span>`:''}`:'-'}</td>
       <td>${statusBadge}</td>
@@ -3298,7 +3300,7 @@ function attendanceView(){
     <span style="font-size:12px;color:var(--g3)">${workingPats.length} scheduled · ${vacPats.length} on vacation · ${offPats.length} off</span>
   </div>
   ${workingPats.length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-calendar-off" style="font-size:40px;display:block;margin-bottom:10px"></i>No one scheduled for this day.</div>`:`
-  <div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr><th class="lt">Name</th><th>Zone</th><th>Shift</th><th>Status</th><th>Clock In</th><th>Clock Out</th><th>Duration</th>${canEdit()?'<th>Actions</th>':''}</tr></thead><tbody>${workingPats.map(mkRow).join('')}</tbody></table></div></div>`}
+  <div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr><th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Name</th><th>Zone</th><th>Shift</th><th>Status</th><th>Clock In</th><th>Clock Out</th><th>Duration</th>${canEdit()?'<th>Actions</th>':''}</tr></thead><tbody>${workingPats.map(mkRow).join('')}</tbody></table></div></div>`}
   ${vacPats.length>0?`<div style="margin-top:16px"><div style="font-size:11px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🌴 On Vacation</div><div style="display:flex;gap:8px;flex-wrap:wrap">${vacPats.map(p=>`<span style="background:#EDE9FE;color:#4C1D95;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:500">${p.name}</span>`).join('')}</div></div>`:''}
   ${offPats.length>0?`<div style="margin-top:12px"><div style="font-size:11px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Off Today</div><div style="display:flex;gap:8px;flex-wrap:wrap">${offPats.map(p=>`<span style="background:var(--g1);color:var(--g4);padding:4px 12px;border-radius:20px;font-size:12px">${p.name}</span>`).join('')}</div></div>`:''}`;
 }
@@ -3653,7 +3655,7 @@ function tasksView(){
     const statusDisplay=t.status==='Running'?`<i class="ti ti-circle-filled" style="font-size:6px;margin-right:4px;animation:pulse 1.5s infinite"></i>${t.status}`:`${t.status==='Completed'?'✓':''} ${t.status}`;
     
     return`<tr>
-      <td class="lt" style="font-weight:600">${t.patroller_name||'--'}</td>
+      <td style="font-size:11px;font-family:monospace;color:var(--g4);white-space:nowrap">${(()=>{const _tp=D.patrollers.find(x=>x.id===t.patroller_id);return _tp?.patroller_id_num||'--';})()}</td><td class="lt" style="font-weight:600">${t.patroller_name||'--'}</td>
       <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${bg};color:${col}">${t.task_type}</span></td>
       <td style="font-family:monospace;font-size:11px">${t.date||'--'}</td>
       <td style="font-size:11px">${timeCell}</td>
@@ -3679,7 +3681,7 @@ function tasksView(){
   </div>
   ${all.length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-checklist" style="font-size:40px;display:block;margin-bottom:10px;opacity:.4"></i>No tasks yet.</div>`:`
   <div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr>
-    <th class="lt">Patroller</th><th>Type</th><th>Date</th><th>Time</th><th>Duration</th><th>Description</th><th>Status</th>${ed?'<th>Actions</th>':''}
+    <th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Patroller</th><th>Type</th><th>Date</th><th>Time</th><th>Duration</th><th>Description</th><th>Status</th>${ed?'<th>Actions</th>':''}
   </tr></thead><tbody>${rows}</tbody></table></div></div>`}`;
 }
 
@@ -4640,7 +4642,7 @@ function performanceView(){
       const diff2=first!==null&&last!==null&&first!==last?last-first:null;
       const trend2=diff2===null?'--':diff2>0?'↑ +'+diff2+'%':'↓ '+diff2+'%';
       const trendCol=diff2===null?'var(--g3)':diff2>0?'#166534':'#DC2626';
-      return'<tr><td class="lt" style="font-weight:600">'+p.name+'</td>'+
+      return'<tr><td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">'+( p.patroller_id_num||'')+'</div><div style="font-weight:600">'+p.name+'</div></td>'+
         scores.map((s,i)=>s!==null?'<td>'+pPill(s)+'</td>':'<td style="color:var(--g3);font-size:10px">--</td>').join('')+
         '<td style="font-weight:700;color:'+trendCol+'">'+trend2+'</td></tr>';
     }).join('');
@@ -4704,7 +4706,7 @@ function performanceView(){
       const evalTableRows=sorted.map(({p,evalAvg,evalAvgRaw,evals},i)=>{
         const isBest=i===0&&evalAvg!==null;
         return'<tr '+(isBest?'style="background:rgba(255,89,0,.04)"':'')+'>'+
-          '<td class="lt" style="font-weight:600">'+(isBest?'<i class="ti ti-trophy" style="color:#FF5900;font-size:10px;margin-right:3px"></i>':'')+p.name+'</td>'+
+          '<td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">'+(p.patroller_id_num||'')+'</div><div style="font-weight:600">'+(isBest?'<i class="ti ti-trophy" style="color:#FF5900;font-size:10px;margin-right:3px"></i>':'')+p.name+'</div></td>'+
           '<td style="color:var(--g3);font-size:11px">'+evals+'</td>'+
           '<td style="font-size:11px">'+(evalAvgRaw!==null?evalAvgRaw+' / 4':'--')+'</td>'+
           '<td>'+(evalAvg!==null?ePill(evalAvg):'<span style="font-size:10px;color:var(--g3)">--</span>')+'</td>'+
@@ -4747,11 +4749,11 @@ function performanceView(){
                 monthSel+
               '</div>'+
               (sorted.length===0?'<div style="padding:20px;text-align:center;color:var(--g3)">No evaluations for '+selMonth+'</div>':
-                '<div class="t-scroll"><table style="min-width:400px"><thead><tr><th class="lt">Patroller</th><th>Evals</th><th>Avg rating</th><th>Eval score</th><th></th></tr></thead><tbody>'+evalTableRows+'</tbody></table></div>')+
+                '<div class="t-scroll"><table style="min-width:400px"><thead><tr><th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Patroller</th><th>Evals</th><th>Avg rating</th><th>Eval score</th><th></th></tr></thead><tbody>'+evalTableRows+'</tbody></table></div>')+
             '</div>'+
             '<div class="tcard" style="padding:14px">'+
               '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-list" style="margin-right:4px"></i>Recent evaluations</div>'+
-              (recentRows?'<div class="t-scroll"><table><thead><tr><th class="lt">Patroller</th><th>Date</th><th>Location</th><th>Score</th><th>By</th></tr></thead><tbody>'+recentRows+'</tbody></table></div>':
+              (recentRows?'<div class="t-scroll"><table><thead><tr><th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Patroller</th><th>Date</th><th>Location</th><th>Score</th><th>By</th></tr></thead><tbody>'+recentRows+'</tbody></table></div>':
                 '<div style="padding:20px;text-align:center;color:var(--g3)">No evaluations for '+selMonth+'</div>')+
             '</div>'+
           '</div>'+
@@ -4796,7 +4798,7 @@ function performanceView(){
 
       const coachRows=coachBreakdown.map(({p,assigned,done,slaBreach,duplicate,cs},i)=>
         '<tr '+(i===0?'style="background:rgba(255,89,0,.04)"':'')+'>'+
-        '<td class="lt" style="font-weight:600">'+p.name+'</td>'+
+        '<td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">'+(p.patroller_id_num||'')+'</div><div style="font-weight:600">'+p.name+'</div></td>'+
         '<td style="font-size:11px">'+assigned+'</td>'+
         '<td style="font-weight:600;color:#166534">'+done+'</td>'+
         '<td style="font-weight:600;color:#DC2626">'+slaBreach+'</td>'+
@@ -4840,7 +4842,7 @@ function performanceView(){
             cMonthSel+
             (unassignedCases.length>0?'<button onclick="D.coachingMonth=\''+selCoachMonth+'\';autoAssignCoaching()" class="btn btn-primary" style="margin-left:auto;padding:4px 10px;font-size:11px"><i class="ti ti-users"></i>Auto-assign '+unassignedCases.length+'</button>':'')+
           '</div>'+
-          (coachRows?'<div class="t-scroll"><table><thead><tr><th class="lt">Patroller</th><th>Assigned</th><th style="color:#166534">On time</th><th style="color:#DC2626">SLA −1pt</th><th style="color:#D97706">Duplicate −2pt</th><th style="background:#DBEAFE;color:#0C447C">Score</th></tr></thead><tbody>'+coachRows+'</tbody></table></div>':
+          (coachRows?'<div class="t-scroll"><table><thead><tr><th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Patroller</th><th>Assigned</th><th style="color:#166534">On time</th><th style="color:#DC2626">SLA −1pt</th><th style="color:#D97706">Duplicate −2pt</th><th style="background:#DBEAFE;color:#0C447C">Score</th></tr></thead><tbody>'+coachRows+'</tbody></table></div>':
             '<div style="padding:20px;text-align:center;color:var(--g3)">No coaching data for '+selCoachMonth+'</div>')+
         '</div>'+
         '<div class="tcard" style="padding:14px">'+
@@ -4881,7 +4883,7 @@ function performanceView(){
             const overLabel=adj.over>0?adj.over+'h over':'<span style="color:var(--g3)">—</span>';
             const redLabel=adj.over>0?'<span style="font-weight:700;color:#DC2626">−'+(ps.targetTotal-adj.adjTotal)+' / −'+(ps.targetUnique-adj.adjUnique)+'</span>':'<span style="font-size:10px;color:var(--g3)">No adj.</span>';
             return'<tr>'+
-              '<td class="lt" style="font-weight:600">'+p.name+'</td>'+
+              '<td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">'+(p.patroller_id_num||'')+'</div><div style="font-weight:600">'+p.name+'</div></td>'+
               '<td style="font-weight:600">'+taskHrs+'h</td>'+
               '<td style="font-weight:600;color:#D97706">'+overLabel+'</td>'+
               '<td style="font-weight:700;color:#166534">'+adj.adjTotal.toLocaleString()+'</td>'+
@@ -5184,7 +5186,7 @@ function overtimeView(){
   const otHrs=Math.floor(otTotalMins/60);const otMins2=otTotalMins%60;
   const otPatTotals={};
   otThisMonth.forEach(ot=>{const pat=D.patrollers.find(p=>p.id===ot.patroller_id);const name=pat?.name||ot.patroller_name||'Unknown';if(!otPatTotals[name])otPatTotals[name]=0;const ms=new Date(ot.end_datetime)-new Date(ot.start_datetime);if(ms>0)otPatTotals[name]+=Math.floor(ms/60000);});
-  const otPatRows=Object.entries(otPatTotals).sort((a,b)=>b[1]-a[1]).map(([name,m])=>{const h=Math.floor(m/60);const mn=m%60;return'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f5f0ea"><span style="font-size:12px;font-weight:600">'+name+'</span><span style="font-size:12px;font-weight:700;color:#FF5900">'+h+'h '+mn+'m</span></div>';}).join('');
+  const otPatRows=Object.entries(otPatTotals).sort((a,b)=>b[1]-a[1]).map(([name,m])=>{const h=Math.floor(m/60);const mn=m%60;const _otp=D.patrollers.find(p=>p.name===name);const _opid=_otp?.patroller_id_num||'';return'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f5f0ea"><div><span style="font-size:11px;font-family:monospace;color:var(--g4);margin-right:8px">'+_opid+'</span><span style="font-size:12px;font-weight:600">'+name+'</span></div><span style="font-size:12px;font-weight:700;color:#FF5900">'+h+'h '+mn+'m</span></div>';}).join('');
   const otMonthlySummaryHtml='<div style="text-align:center;margin-bottom:12px"><div style="font-size:28px;font-weight:800;color:#FF5900">'+otHrs+'h '+otMins2+'m</div><div style="font-size:11px;color:#999">Total OT this month</div></div><div style="font-size:11px;color:#DC2626;font-weight:600;margin-bottom:8px">'+otThisMonth.length+' submissions</div>'+(otPatRows||'<div style="font-size:12px;color:#999;padding:10px 0;text-align:center">No OT this month</div>');
   const html=`
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
@@ -5213,7 +5215,7 @@ function overtimeView(){
     <div style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px"><i class="ti ti-list" style="font-size:12px;margin-right:5px"></i>All Overtime Records (${(D.overtimeRequests||[]).length})</div>
     ${(D.overtimeRequests||[]).length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-clock-plus" style="font-size:36px;display:block;opacity:.2;margin-bottom:10px"></i>No overtime records yet</div>`:`
     <div class="tcard"><div class="t-scroll"><table style="min-width:800px"><thead><tr>
-      <th class="lt">Patroller</th><th>Start</th><th>End</th><th>Total Hours</th><th>Requested By</th><th>Reason</th><th></th>
+      <th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Patroller</th><th>Start</th><th>End</th><th>Total Hours</th><th>Requested By</th><th>Reason</th><th></th>
     </tr></thead><tbody>${summaryRows}</tbody></table></div></div>`}
   </div>`;
   setTimeout(()=>{
@@ -5404,7 +5406,7 @@ function incentiveView(){
 
     const tableRows=rows.map(({p,r,adj})=>`
       <tr>
-        <td class="lt" style="font-weight:600;font-size:12px">${p.name}</td>
+        <td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">${p.patroller_id_num||''}</div><div style="font-weight:600;font-size:12px">${p.name}</div></td>
         <td style="font-size:11px;color:var(--g3)">${adj.adjTotal.toLocaleString()}</td>
         <td>${inp('ach-total-'+p.id,r.inc?.achieved_total,'68')}</td>
         <td>${sPill(r.auditScore)}</td>
@@ -5443,6 +5445,7 @@ function incentiveView(){
       <div class="t-scroll"><table style="min-width:1350px">
         <thead>
           <tr>
+            <th style="font-size:10px;white-space:nowrap" rowspan="2">ID</th>
             <th class="lt" rowspan="2" style="min-width:130px">Patroller</th>
             <th colspan="4" style="background:#EAF3DE;color:#27500A;border-bottom:0.5px solid #C0DD97">Audit target 25% <span style="font-size:8px;font-weight:400">adj. target system · achieved manual</span></th>
             <th colspan="4" style="background:#EAF3DE;color:#27500A;border-bottom:0.5px solid #C0DD97">Unique target 20% <span style="font-size:8px;font-weight:400">adj. target system · achieved manual</span></th>
@@ -5495,7 +5498,7 @@ function incentiveView(){
           <div style="font-size:10px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Eligibility per component</div>
           ${rows.map(({p,r})=>`
             <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:0.5px solid var(--g2)">
-              <span style="font-weight:600">${p.name}</span>
+              <div style="font-size:9px;font-family:monospace;color:rgba(255,255,255,.5)">${p.patroller_id_num||''}</div><span style="font-weight:600">${p.name}</span>
               <span style="display:flex;gap:4px">
                 ${[{s:r.auditScore,l:'A'},{s:r.uniqueScore,l:'U'},{s:r.perfScore,l:'P'},{s:r.riderScore,l:'R'}].map(({s,l})=>`<span style="font-size:9px;padding:1px 5px;border-radius:8px;${s!==null&&s>=0.70?'background:#DCFCE7;color:#166534':'background:#FEE2E2;color:#991B1B'}">${l}</span>`).join('')}
               </span>
@@ -5650,10 +5653,10 @@ function incentiveView(){
       </div>
       <div class="tcard" style="padding:14px">
         <div style="font-size:10px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px"><i class="ti ti-users" style="margin-right:4px"></i>Your score = avg of eligible patrollers (≥70%)</div>
-        <table><thead><tr><th class="lt">Patroller</th><th class="r">Reports</th><th class="r">Unique</th><th class="r">Perf</th><th class="r">Rider</th></tr></thead><tbody>
+        <table><thead><tr><th style="font-size:10px;white-space:nowrap">ID</th><th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Patroller</th><th class="r">Reports</th><th class="r">Unique</th><th class="r">Perf</th><th class="r">Rider</th></tr></thead><tbody>
         ${allRows.map(({p,r})=>{
           const pill=(s)=>s!==null?`<span style="font-size:9px;padding:1px 6px;border-radius:10px;font-weight:600;${s>=0.70?'background:#DCFCE7;color:#27500A':'background:#FCEBEB;color:#A32D2D'}">${Math.round(s*100)}%</span>`:'<span style="color:var(--g3);font-size:10px">--</span>';
-          return`<tr><td class="lt" style="font-size:11px;font-weight:600">${p.name}</td><td class="r">${pill(r.auditScore)}</td><td class="r">${pill(r.uniqueScore)}</td><td class="r">${pill(r.perfScore)}</td><td class="r">${pill(r.riderScore)}</td></tr>`;
+          return`<tr><td class="lt"><div style="font-size:9px;font-family:monospace;color:var(--g3)">${p.patroller_id_num||''}</div><div style="font-size:11px;font-weight:600">${p.name}</div></td><td class="r">${pill(r.auditScore)}</td><td class="r">${pill(r.uniqueScore)}</td><td class="r">${pill(r.perfScore)}</td><td class="r">${pill(r.riderScore)}</td></tr>`;
         }).join('')}
         </tbody></table>
         <div style="margin-top:8px;font-size:10px;color:var(--g3)">Each component averaged independently from eligible patrollers only</div>
