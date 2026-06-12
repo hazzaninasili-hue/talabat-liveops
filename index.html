@@ -3038,12 +3038,12 @@ async function _doNormalClockOut(){
       <div style="padding:24px">
         <table style="width:100%;border-collapse:collapse">
           ${emailRow('Patroller',pat.name)}
-          ${emailRow('Date',today2)}
+          ${emailRow('Date',today)}
           ${emailRow('Clock in',inT2)}
           ${emailRow('Clock out',outT2)}
           ${emailRow('Duration',dur2,late2>0?'#DC2626':'#16A34A')}
           ${late2>0?emailRow('Late by',Math.floor(late2/60)>0?Math.floor(late2/60)+'h '+(late2%60)+'m':late2+'m','#DC2626'):''}
-          ${emailRow('Location','<a href="'+mapUrl2+'" style="color:#FF5900">View on map</a>')}
+          ${emailRow('Location','<a href="'+mapUrl+'" style="color:#FF5900">View on map</a>')}
         </table>
       </div>
       ${emailFooter()}
@@ -3201,19 +3201,33 @@ function attendanceView(){
     const outT=rec?.clock_out?new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
     const dur=rec?.clock_in&&rec?.clock_out?`${Math.floor(Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000)/60)}h ${Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000)%60}m`:'--';
     const isAtt=status==='Attended';const isAbs=status==='Absent';
+    const earlyReq=(D.tasks||[]).find(t=>t.patroller_id===p.id&&t.date===today&&t.task_type==='Early Clock Out'&&t.status==='Pending');
+    const earlyApproved=(D.tasks||[]).find(t=>t.patroller_id===p.id&&t.date===today&&t.task_type==='Early Clock Out'&&t.status==='Approved');
+    const attIdMatch=earlyReq?.description?.match(/Att ID: ([a-f0-9-]+)/);
+    const attIdFromEarly=attIdMatch?attIdMatch[1]:'';
+    const statusBadge=earlyReq
+      ?`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:#FEF3C7;color:#D97706">⏳ Early out pending</span>`
+      :earlyApproved
+      ?`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:#EDE9FE;color:#4C1D95">⚡ Early out approved</span>`
+      :`<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;${isAtt?'background:#DCFCE7;color:#166534':isAbs?'background:#FEE2E2;color:#991B1B':'background:#F4EDE3;color:#94A3B8'}">${status||'Pending'}</span>`;
     const zone=gDZ(p.id,todaySelIdx)||'--';
     const sh=getDayShift(p.id,todaySelIdx);
     return`<tr>
       <td class="lt" style="font-weight:600">${p.name}</td>
       <td style="font-size:11px">${zone}</td>
       <td style="font-size:11px">${sh?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}-${fmtT(getEffectiveEndTime(p.id,sh,today)||sh.end_time)}${(rec?.late_mins||0)>0?` <span style="color:#D97706;font-size:9px">⚠+${rec.late_mins}m</span>`:''}`:'-'}</td>
-      <td><span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;${isAtt?'background:#DCFCE7;color:#166534':isAbs?'background:#FEE2E2;color:#991B1B':'background:#F4EDE3;color:#94A3B8'}">${status||'Pending'}</span></td>
+      <td>${statusBadge}</td>
       <td style="font-size:11px">${inT}${rec?.clock_in_map?` <a href="${rec.clock_in_map}" target="_blank" style="color:#FF5900"><i class="ti ti-map-pin" style="font-size:10px"></i></a>`:''}</td>
       <td style="font-size:11px">${outT}${rec?.clock_out_map?` <a href="${rec.clock_out_map}" target="_blank" style="color:#FF5900"><i class="ti ti-map-pin" style="font-size:10px"></i></a>`:''}</td>
       <td style="font-size:11px">${dur}</td>
       ${canEdit()?`<td style="white-space:nowrap">
-        <button onclick="markAttendance('${p.id}','${p.name.replace(/'/g,"\'")}','Attended')" style="padding:4px 10px;border-radius:6px;border:1.5px solid #86efac;background:${isAtt?'#DCFCE7':'transparent'};color:#166534;font-family:inherit;font-size:11px;cursor:pointer;font-weight:600">✓ Attended</button>
-        <button onclick="markAttendance('${p.id}','${p.name.replace(/'/g,"\'")}','Absent')" style="padding:4px 10px;border-radius:6px;border:1.5px solid #fca5a5;background:${isAbs?'#FEE2E2':'transparent'};color:#991B1B;font-family:inherit;font-size:11px;cursor:pointer;font-weight:600;margin-left:4px">✗ Absent</button>
+        ${earlyReq?`
+          <button onclick="approveEarlyClockOut('${earlyReq.id}','${attIdFromEarly}')" style="padding:3px 9px;border-radius:6px;border:1.5px solid #C4B5FD;background:#EDE9FE;color:#4C1D95;font-family:inherit;font-size:11px;cursor:pointer;font-weight:600">✓ Approve early out</button>
+          <button onclick="rejectEarlyClockOut('${earlyReq.id}')" style="padding:3px 9px;border-radius:6px;border:1.5px solid #fca5a5;background:transparent;color:#991B1B;font-family:inherit;font-size:11px;cursor:pointer;font-weight:600;margin-left:4px">✗ Reject</button>
+        `:`
+          <button onclick="markAttendance('${p.id}','${p.name.replace(/'/g,"\'")}','Attended')" style="padding:4px 10px;border-radius:6px;border:1.5px solid #86efac;background:${isAtt?'#DCFCE7':'transparent'};color:#166534;font-family:inherit;font-size:11px;cursor:pointer;font-weight:600">✓ Attended</button>
+          <button onclick="markAttendance('${p.id}','${p.name.replace(/'/g,"\'")}','Absent')" style="padding:4px 10px;border-radius:6px;border:1.5px solid #fca5a5;background:${isAbs?'#FEE2E2':'transparent'};color:#991B1B;font-family:inherit;font-size:11px;cursor:pointer;font-weight:600;margin-left:4px">✗ Absent</button>
+        `}
       </td>`:''}
     </tr>`;
   };
@@ -5366,6 +5380,7 @@ function incentiveView(){
         <span style="font-size:10px;padding:2px 7px;border-radius:8px;background:#EAF3DE;color:#27500A;font-weight:600"><i class="ti ti-link" style="font-size:9px;margin-right:2px"></i>green = system auto</span>
         <span style="font-size:10px;padding:2px 7px;border-radius:8px;background:#FEF3C7;color:#78350F;font-weight:600"><i class="ti ti-edit" style="font-size:9px;margin-right:2px"></i>amber = manual input</span>
         <button onclick="saveIncentiveData()" class="btn btn-primary" style="margin-left:auto;padding:6px 14px;font-size:11px"><i class="ti ti-circle-check"></i>Save & calculate</button>
+        <button onclick="clearIncInputs()" class="btn" style="padding:6px 14px;font-size:11px"><i class="ti ti-eraser"></i>Clear inputs</button>
       </div>
       <div class="t-scroll"><table style="min-width:1350px">
         <thead>
@@ -5437,7 +5452,8 @@ function incentiveView(){
       const logMonths=[...new Set(D.incentiveData.map(d=>d.month).filter(Boolean))].sort().reverse();
       if(!logMonths.length)return`<div class="tcard" style="padding:24px;text-align:center;margin-top:12px;color:var(--g3)"><i class="ti ti-history" style="font-size:28px;display:block;margin-bottom:8px"></i>No payout log yet — enter data above and click Save & calculate</div>`;
 
-      const months=logMonths.map(m=>{
+      const filteredLogMonths=D.logFilterMonth?logMonths.filter(m=>m===D.logFilterMonth):logMonths;
+      const months=filteredLogMonths.map(m=>{
         const recs=D.incentiveData.filter(d=>d.month===m&&d.role==='Patroller');
         const hasPayouts=recs.some(d=>d.payout_total!=null);
         const totalPayout=recs.reduce((s,d)=>s+(d.payout_total||0),0);
@@ -5506,7 +5522,16 @@ function incentiveView(){
       }).join('');
 
       return`<div class="tcard" style="padding:14px;margin-top:12px"> style="padding:14px;margin-top:12px">
-        <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px"><i class="ti ti-history" style="margin-right:4px"></i>Monthly payout log</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-history" style="margin-right:4px"></i>Monthly payout log</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select onchange="D.logFilterMonth=this.value;render()" style="padding:4px 8px;border-radius:7px;border:0.5px solid var(--g2);font-size:11px;font-family:inherit">
+              <option value="">All months</option>
+              ${logMonths.map(m=>`<option value="${m}" ${D.logFilterMonth===m?'selected':''}>${m}</option>`).join('')}
+            </select>
+            <button onclick="downloadPayoutLog()" class="btn" style="padding:5px 12px;font-size:11px"><i class="ti ti-download"></i> Export CSV</button>
+          </div>
+        </div>
         ${months}
       </div>`;
     })()}`;
@@ -5699,6 +5724,49 @@ function incentiveView(){
       </table></div>
     </div>`;
   })()}`;
+}
+
+function downloadPayoutLog(){
+  const filterMonth=D.logFilterMonth||'';
+  const recs=D.incentiveData.filter(d=>d.role==='Patroller'&&d.payout_total!=null&&(!filterMonth||d.month===filterMonth));
+  if(!recs.length){addNotification('No log data to export','info');return;}
+  const headers=['Month','Patroller ID','Patroller Name','Audit%','Unique%','Perf%','Rider%','Reports BHD','Unique BHD','Perf BHD','Rider BHD','OT BHD','Total BHD','Saved At'];
+  const rows=recs.sort((a,b)=>b.month?.localeCompare(a.month)).map(d=>{
+    const p=D.patrollers.find(pt=>pt.id===d.patroller_id);
+    const pid=d.patroller_id_num||p?.patroller_id_num||'--';
+    const name=p?.name||d.patroller_name||'--';
+    return [
+      d.month||'',pid,name,
+      d.audit_score!=null?d.audit_score+'%':'',
+      d.unique_score!=null?d.unique_score+'%':'',
+      d.perf_score!=null?d.perf_score+'%':'',
+      d.rider_score!=null?d.rider_score+'%':'',
+      (d.payout_audit||0).toFixed(3),
+      (d.payout_unique||0).toFixed(3),
+      (d.payout_perf||0).toFixed(3),
+      (d.payout_rider||0).toFixed(3),
+      (d.payout_ot||0).toFixed(3),
+      (d.payout_total||0).toFixed(3),
+      d.saved_at?new Date(d.saved_at).toLocaleDateString('en-GB'):''
+    ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',');
+  });
+  const csv=[headers.map(h=>`"${h}"`).join(','),...rows].join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='payout-log'+(filterMonth?'-'+filterMonth:'')+'.csv';a.click();
+  URL.revokeObjectURL(url);
+}
+
+function clearIncInputs(){
+  const pts=activePats().filter(p=>getUtype(p)==='patroller');
+  pts.forEach(p=>{
+    ['ach-total-','ach-unique-','rider-q-','rider-c-'].forEach(pfx=>{
+      const el=document.getElementById(pfx+p.id);
+      if(el)el.value='';
+    });
+  });
+  addNotification('Manual inputs cleared','info');
 }
 
 async function saveIncentiveData(){
