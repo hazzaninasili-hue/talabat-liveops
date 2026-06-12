@@ -617,7 +617,7 @@ async function loadAll(){
       wt(sb.from('shifts').select('*').order('created_at')),
       wt(sb.from('areas').select('*').order('name')),
       wt(sb.from('zones').select('*').order('name')),
-      wt(sb.from('patrollers').select('*').eq('is_active',true).order('name')),
+      wt(sb.from('patrollers').select('*').order('name')),
       wt(sb.from('schedules').select('*')),
     ]);
     D.shifts=sh.data||[];D.areas=ar.data||[];D.zones=zo.data||[];D.patrollers=pt.data||[];D.schedules=sc.data||[];
@@ -2219,6 +2219,32 @@ function renderModal(){
     <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" id="cu-btn" onclick="doCreateUser()"><i class="ti ti-check"></i>Create profile</button></div>`;return;
   }
   if(m.type==='resetpw'){box.innerHTML=`<div class="modal-title"><i class="ti ti-key"></i>Reset password - ${m.name}</div><div class="msg msg-err" id="rp-e"></div><div class="msg msg-ok" id="rp-ok"></div><div class="fg"><label>New password</label><div class="pw-wrap"><input type="password" id="rp1" placeholder="Min 6 characters"><button class="pw-eye" onclick="togglePw('rp1',this)"><i class="ti ti-eye"></i></button></div></div><div class="fg"><label>Confirm</label><div class="pw-wrap"><input type="password" id="rp2" placeholder="Repeat"><button class="pw-eye" onclick="togglePw('rp2',this)"><i class="ti ti-eye"></i></button></div></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" id="rp-btn" onclick="doResetPw('${m.uid}')"><i class="ti ti-check"></i>Reset</button></div>`;return;}
+  if(m.type==='editlogentry'){
+    const d=m.d;
+    const fld=(label,id,val,col)=>`<div class="fg"><label style="font-size:10px">${label}</label><input type="number" step="0.001" id="${id}" value="${val!=null?val:''}" placeholder="0.000" style="text-align:right;color:${col||'var(--g5)'}"></div>`;
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-edit"></i>Edit log entry — ${m.name} · ${d.month}</div>
+    <div class="info-box info-blue" style="font-size:11px"><i class="ti ti-lock" style="font-size:11px;margin-right:4px"></i>Manual edit — directly updates the locked log. Calculator will not overwrite these values.</div>
+    <div class="msg msg-err" id="le-e"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+      ${fld('Reports BHD','le-audit',d.payout_audit,'#166534')}
+      ${fld('Unique BHD','le-unique',d.payout_unique,'#166534')}
+      ${fld('Performance BHD','le-perf',d.payout_perf,'#4C1D95')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      ${fld('Rider BHD','le-rider',d.payout_rider,'#D97706')}
+      ${fld('OT BHD','le-ot',d.payout_ot,'#D94D00')}
+      <div class="fg"><label style="font-size:10px">Total BHD</label><div id="le-total-display" style="font-size:14px;font-weight:700;color:#FF5900;padding:6px 0">BHD ${(d.payout_total||0).toFixed(3)}</div></div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveLogEdit('${m.id}')"><i class="ti ti-check"></i>Save changes</button></div>`;
+    // live total
+    ['le-audit','le-unique','le-perf','le-rider','le-ot'].forEach(id=>{
+      document.getElementById(id)?.addEventListener('input',()=>{
+        const t=['le-audit','le-unique','le-perf','le-rider','le-ot'].reduce((s,x)=>s+(parseFloat(document.getElementById(x)?.value)||0),0);
+        document.getElementById('le-total-display').textContent='BHD '+t.toFixed(3);
+      });
+    });
+    return;
+  }
   if(m.type==='edituser'){
     const f=m.form;
     box.innerHTML=`<div class="modal-title"><i class="ti ti-id-badge"></i>Edit profile — ${f.name}</div>
@@ -5416,54 +5442,59 @@ function incentiveView(){
         const hasPayouts=recs.some(d=>d.payout_total!=null);
         const totalPayout=recs.reduce((s,d)=>s+(d.payout_total||0),0);
         const savedDate=recs[0]?.saved_at?new Date(recs[0].saved_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'--';
+        const isLocked=recs.some(d=>d.payout_total!=null&&d.saved_at!=null);
 
         const patRows=recs.map(d=>{
           const p=D.patrollers.find(pt=>pt.id===d.patroller_id);
           const name=p?.name||d.patroller_name||'--';
-          return`<tr>
-            <td class="lt" style="font-size:11px;font-weight:600;padding-left:28px">${name}</td>
+          const pid=d.patroller_id_num||p?.patroller_id_num||'--';
+          return`<tr id="log-row-${d.id}">
+            <td style="font-size:11px;color:var(--g3);font-family:monospace;padding-left:12px;white-space:nowrap">${pid}</td>
+            <td class="lt" style="font-size:11px;font-weight:600">${name}</td>
             <td class="r" style="font-size:11px;color:${(d.audit_score||0)>=70?'var(--g5)':'#DC2626'}">${d.audit_score!=null?d.audit_score+'%':'--'}</td>
             <td class="r" style="font-size:11px;color:${(d.unique_score||0)>=70?'var(--g5)':'#DC2626'}">${d.unique_score!=null?d.unique_score+'%':'--'}</td>
             <td class="r" style="font-size:11px;color:${(d.perf_score||0)>=70?'var(--g5)':'#DC2626'}">${d.perf_score!=null?d.perf_score+'%':'--'}</td>
             <td class="r" style="font-size:11px;color:${(d.rider_score||0)>=70?'var(--g5)':'#DC2626'}">${d.rider_score!=null?d.rider_score+'%':'--'}</td>
-            <td class="r" style="font-size:11px;color:#166534;font-weight:600">${(d.payout_audit||0)>0?'BHD '+(d.payout_audit||0).toFixed(3):'--'}</td>
-            <td class="r" style="font-size:11px;color:#166534;font-weight:600">${(d.payout_unique||0)>0?'BHD '+(d.payout_unique||0).toFixed(3):'--'}</td>
-            <td class="r" style="font-size:11px;color:#4C1D95;font-weight:600">${(d.payout_perf||0)>0?'BHD '+(d.payout_perf||0).toFixed(3):'--'}</td>
-            <td class="r" style="font-size:11px;color:#D97706;font-weight:600">${(d.payout_rider||0)>0?'BHD '+(d.payout_rider||0).toFixed(3):'--'}</td>
-            <td class="r" style="font-size:11px">${(d.payout_ot||0)>0?'BHD '+(d.payout_ot||0).toFixed(3):'--'}</td>
+            <td class="r" style="font-size:11px;color:#166534;font-weight:600">${(d.payout_audit||0).toFixed(3)}</td>
+            <td class="r" style="font-size:11px;color:#166534;font-weight:600">${(d.payout_unique||0).toFixed(3)}</td>
+            <td class="r" style="font-size:11px;color:#4C1D95;font-weight:600">${(d.payout_perf||0).toFixed(3)}</td>
+            <td class="r" style="font-size:11px;color:#D97706;font-weight:600">${(d.payout_rider||0).toFixed(3)}</td>
+            <td class="r" style="font-size:11px">${(d.payout_ot||0).toFixed(3)}</td>
             <td class="r" style="font-weight:700;color:#FF5900">BHD ${(d.payout_total||0).toFixed(3)}</td>
             <td class="r" style="white-space:nowrap">
-              <button class="edit-btn" onclick="editIncEntry('${d.id}')" title="Recalculate this entry" style="font-size:10px;padding:2px 6px"><i class="ti ti-refresh"></i></button>
-              <button class="icon-btn" onclick="deleteIncEntry('${d.id}','${name.replace(/'/g,"\\'")}','${m}')" title="Delete entry" style="background:#FEE2E2;color:#DC2626"><i class="ti ti-trash"></i></button>
+              <button class="edit-btn" onclick="openLogEdit('${d.id}')" title="Edit this entry manually" style="font-size:10px;padding:2px 6px"><i class="ti ti-edit"></i></button>
+              <button class="icon-btn" onclick="deleteIncEntry('${d.id}','${name.replace(/'/g,"\'")}','${m}')" title="Delete entry" style="background:#FEE2E2;color:#DC2626"><i class="ti ti-trash"></i></button>
             </td>
           </tr>`;
         }).join('');
 
         return`<div style="margin-bottom:10px;border:0.5px solid var(--g2);border-radius:10px;overflow:hidden">
           <div style="display:flex;align-items:center;padding:10px 14px;background:var(--g1);cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
-            <div style="flex:1">
+            <div style="flex:1;display:flex;align-items:center;gap:8px">
               <span style="font-size:13px;font-weight:700;color:var(--g5)">${m}</span>
-              <span style="font-size:11px;color:var(--g3);margin-left:10px">${recs.length} patrollers · saved ${savedDate}</span>
+              ${isLocked?`<span style="font-size:9px;padding:2px 7px;border-radius:8px;background:#DCFCE7;color:#166534;font-weight:700"><i class="ti ti-lock" style="font-size:9px;margin-right:2px"></i>LOCKED</span>`:''}
+              <span style="font-size:11px;color:var(--g3)">${recs.length} patrollers · saved ${savedDate}</span>
             </div>
             <span style="font-size:14px;font-weight:700;color:#FF5900;margin-right:12px">BHD ${totalPayout.toFixed(3)}</span>
-            <button onclick="event.stopPropagation();deleteIncMonth('${m}')" title="Delete entire month" style="background:#FEE2E2;color:#DC2626;border:none;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;font-family:inherit"><i class="ti ti-trash"></i> Delete month</button>
+            <button onclick="event.stopPropagation();deleteIncMonth('${m}')" style="background:#FEE2E2;color:#DC2626;border:none;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;font-family:inherit"><i class="ti ti-trash"></i> Delete month</button>
           </div>
           <div style="overflow-x:auto">
-            <table style="min-width:900px">
+            <table style="min-width:980px">
               <thead><tr style="background:var(--g1)">
-                <th class="lt" style="padding-left:28px">Patroller</th>
+                <th style="font-size:9px;padding-left:12px;min-width:70px">Patroller ID</th>
+                <th class="lt" style="min-width:120px">Name</th>
                 <th class="r" style="font-size:9px">Audit%</th><th class="r" style="font-size:9px">Unique%</th><th class="r" style="font-size:9px">Perf%</th><th class="r" style="font-size:9px">Rider%</th>
-                <th class="r" style="background:#EAF3DE;color:#27500A;font-size:9px">Reports BHD</th>
-                <th class="r" style="background:#EAF3DE;color:#27500A;font-size:9px">Unique BHD</th>
-                <th class="r" style="background:#EDE9FE;color:#4C1D95;font-size:9px">Perf BHD</th>
-                <th class="r" style="background:#FEF3C7;color:#78350F;font-size:9px">Rider BHD</th>
-                <th class="r" style="background:#FFF0E6;color:#D94D00;font-size:9px">OT BHD</th>
+                <th class="r" style="background:#EAF3DE;color:#27500A;font-size:9px">Reports</th>
+                <th class="r" style="background:#EAF3DE;color:#27500A;font-size:9px">Unique</th>
+                <th class="r" style="background:#EDE9FE;color:#4C1D95;font-size:9px">Perf</th>
+                <th class="r" style="background:#FEF3C7;color:#78350F;font-size:9px">Rider</th>
+                <th class="r" style="background:#FFF0E6;color:#D94D00;font-size:9px">OT</th>
                 <th class="r" style="background:#411517;color:#fff;font-size:9px">Total BHD</th>
-                <th class="r" style="font-size:9px">Actions</th>
+                <th class="r" style="font-size:9px">Edit</th>
               </tr></thead>
               <tbody>${patRows}
                 <tr style="background:rgba(255,89,0,.04);font-weight:700">
-                  <td class="lt" style="padding-left:28px">Month total</td>
+                  <td colspan="2" style="padding-left:12px;font-weight:700;font-size:12px">Month total</td>
                   <td colspan="9"></td>
                   <td class="r" style="font-weight:700;color:#FF5900;font-size:13px">BHD ${totalPayout.toFixed(3)}</td>
                   <td></td>
@@ -5474,7 +5505,7 @@ function incentiveView(){
         </div>`;
       }).join('');
 
-      return`<div class="tcard" style="padding:14px;margin-top:12px">
+      return`<div class="tcard" style="padding:14px;margin-top:12px"> style="padding:14px;margin-top:12px">
         <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px"><i class="ti ti-history" style="margin-right:4px"></i>Monthly payout log</div>
         ${months}
       </div>`;
@@ -5683,17 +5714,16 @@ async function saveIncentiveData(){
     const riderC=parseFloat(document.getElementById('rider-c-'+p.id)?.value);
     const existing=D.incentiveData.find(d=>d.patroller_id===p.id&&d.month===selMonth);
 
-    // Build the row and compute payouts for the log
+    // ── LOCK RULE: if log is already finalized (payout_total saved), only update manual inputs ──
+    const isLocked=existing?.payout_total!=null&&existing?.saved_at!=null;
+
+    // Build computed payouts
     const r=buildIncRow(p.id,selMonth,false);
     const adj=r.adj;
-
-    // Use freshly entered values if provided, else existing
-    const newAchTotal=isNaN(achTotal)?existing?.achieved_total:achTotal;
-    const newAchUnique=isNaN(achUnique)?existing?.achieved_unique:achUnique;
-    const newRiderQ=isNaN(riderQ)?existing?.rider_quality:riderQ;
-    const newRiderC=isNaN(riderC)?existing?.rider_coverage:riderC;
-
-    // Recompute scores with new values
+    const newAchTotal=isNaN(achTotal)?(existing?.achieved_total??null):achTotal;
+    const newAchUnique=isNaN(achUnique)?(existing?.achieved_unique??null):achUnique;
+    const newRiderQ=isNaN(riderQ)?(existing?.rider_quality??null):riderQ;
+    const newRiderC=isNaN(riderC)?(existing?.rider_coverage??null):riderC;
     const auditScore=adj.adjTotal>0&&newAchTotal!=null?Math.min(1,newAchTotal/adj.adjTotal):null;
     const uniqueScore=adj.adjUnique>0&&newAchUnique!=null?Math.min(1,newAchUnique/adj.adjUnique):null;
     const riderScore=(newRiderQ!=null&&newRiderC!=null)?(newRiderQ+newRiderC)/200:null;
@@ -5704,31 +5734,75 @@ async function saveIncentiveData(){
     const otPay=r.otHrs>0&&r.basic>0?+(r.basic/208*1.5*r.otHrs).toFixed(3):0;
     const totalPay=[auditPay,uniquePay,perfPay,riderPay].reduce((s,v)=>s+(v||0),0)+otPay;
 
-    const payload={
-      patroller_id:p.id,patroller_name:p.name,month:selMonth,role:'Patroller',
-      achieved_total:isNaN(achTotal)?null:achTotal,
-      achieved_unique:isNaN(achUnique)?null:achUnique,
-      rider_quality:isNaN(riderQ)?null:riderQ,
-      rider_coverage:isNaN(riderC)?null:riderC,
-      // Computed fields saved for log
-      perf_score:r.perfScore!==null?Math.round(r.perfScore*100):null,
-      audit_score:auditScore!==null?Math.round(auditScore*100):null,
-      unique_score:uniqueScore!==null?Math.round(uniqueScore*100):null,
-      rider_score:riderScore!==null?Math.round(riderScore*100):null,
-      payout_audit:auditPay||0,payout_unique:uniquePay||0,
-      payout_perf:perfPay||0,payout_rider:riderPay||0,
-      payout_ot:otPay,payout_total:totalPay,
-      ot_hours:r.otHrs,saved_at:new Date().toISOString()
-    };
-    if(existing){await sb.from('incentive_data').update(payload).eq('id',existing.id);}
-    else{await sb.from('incentive_data').insert(payload);}
+    if(isLocked){
+      // LOCKED: only update the manual input fields — do NOT overwrite computed payout columns
+      const manualOnly={
+        achieved_total:isNaN(achTotal)?existing.achieved_total:achTotal,
+        achieved_unique:isNaN(achUnique)?existing.achieved_unique:achUnique,
+        rider_quality:isNaN(riderQ)?existing.rider_quality:riderQ,
+        rider_coverage:isNaN(riderC)?existing.rider_coverage:riderC
+      };
+      await sb.from('incentive_data').update(manualOnly).eq('id',existing.id);
+    } else {
+      // FIRST SAVE: write everything including payout log
+      const payload={
+        patroller_id:p.id,patroller_name:p.name,month:selMonth,role:'Patroller',
+        patroller_id_num:p.patroller_id_num||null,
+        achieved_total:isNaN(achTotal)?null:achTotal,
+        achieved_unique:isNaN(achUnique)?null:achUnique,
+        rider_quality:isNaN(riderQ)?null:riderQ,
+        rider_coverage:isNaN(riderC)?null:riderC,
+        perf_score:r.perfScore!==null?Math.round(r.perfScore*100):null,
+        audit_score:auditScore!==null?Math.round(auditScore*100):null,
+        unique_score:uniqueScore!==null?Math.round(uniqueScore*100):null,
+        rider_score:riderScore!==null?Math.round(riderScore*100):null,
+        payout_audit:auditPay||0,payout_unique:uniquePay||0,
+        payout_perf:perfPay||0,payout_rider:riderPay||0,
+        payout_ot:otPay,payout_total:totalPay,
+        ot_hours:r.otHrs,saved_at:new Date().toISOString()
+      };
+      if(existing){await sb.from('incentive_data').update(payload).eq('id',existing.id);}
+      else{await sb.from('incentive_data').insert(payload);}
+    }
   }
+
+  // Clear manual input fields after save
+  pts.forEach(p=>{
+    ['ach-total-','ach-unique-','rider-q-','rider-c-'].forEach(pfx=>{
+      const el=document.getElementById(pfx+p.id);
+      if(el)el.value='';
+    });
+  });
 
   await reload();
   if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-circle-check"></i>Save & calculate';}
-  addNotification('Incentive saved — payout log updated','success');
+  addNotification('Incentive saved & locked in log','success');
 }
 
+
+function openLogEdit(id){
+  const d=D.incentiveData.find(x=>x.id===id);if(!d)return;
+  const p=D.patrollers.find(pt=>pt.id===d.patroller_id);
+  const name=p?.name||d.patroller_name||'Unknown';
+  openM({type:'editlogentry',id,name,d});
+}
+
+async function saveLogEdit(id){
+  const audit=parseFloat(document.getElementById('le-audit')?.value)||0;
+  const unique=parseFloat(document.getElementById('le-unique')?.value)||0;
+  const perf=parseFloat(document.getElementById('le-perf')?.value)||0;
+  const rider=parseFloat(document.getElementById('le-rider')?.value)||0;
+  const ot=parseFloat(document.getElementById('le-ot')?.value)||0;
+  const total=audit+unique+perf+rider+ot;
+  const{error}=await sb.from('incentive_data').update({
+    payout_audit:audit,payout_unique:unique,payout_perf:perf,
+    payout_rider:rider,payout_ot:ot,payout_total:total,
+    saved_at:new Date().toISOString()
+  }).eq('id',id);
+  if(error){showErr('le-e',error.message);return;}
+  closeM();await reload();
+  addNotification('Log entry updated','success');
+}
 
 async function deleteIncEntry(id,name,month){
   if(!confirm('Delete payout entry for '+name+' ('+month+')? This cannot be undone.'))return;
