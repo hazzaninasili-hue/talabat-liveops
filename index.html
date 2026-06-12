@@ -5830,29 +5830,63 @@ function incentiveView(){
 
 function downloadPayoutLog(){
   const filterMonth=D.logFilterMonth||'';
-  const recs=D.incentiveData.filter(d=>d.role==='Patroller'&&d.payout_total!=null&&(!filterMonth||d.month===filterMonth));
-  if(!recs.length){addNotification('No log data to export','info');return;}
-  const headers=['Month','Patroller ID','Patroller Name','Audit%','Unique%','Perf%','Rider%','Reports BHD','Unique BHD','Perf BHD','Rider BHD','OT BHD','Total BHD','Saved At'];
-  const rows=recs.sort((a,b)=>b.month?.localeCompare(a.month)).map(d=>{
-    const p=D.patrollers.find(pt=>pt.id===d.patroller_id);
-    const pid=d.patroller_id_num||p?.patroller_id_num||'--';
-    const name=p?.name||d.patroller_name||'--';
-    return [
-      d.month||'',pid,name,
-      d.audit_score!=null?d.audit_score+'%':'',
-      d.unique_score!=null?d.unique_score+'%':'',
-      d.perf_score!=null?d.perf_score+'%':'',
-      d.rider_score!=null?d.rider_score+'%':'',
-      (d.payout_audit||0).toFixed(3),
-      (d.payout_unique||0).toFixed(3),
-      (d.payout_perf||0).toFixed(3),
-      (d.payout_rider||0).toFixed(3),
-      (d.payout_ot||0).toFixed(3),
-      (d.payout_total||0).toFixed(3),
-      d.saved_at?new Date(d.saved_at).toLocaleDateString('en-GB'):''
-    ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',');
+  const months=[...new Set(D.incentiveData.map(d=>d.month).filter(Boolean))].sort().reverse();
+  const filteredMonths=filterMonth?[filterMonth]:months;
+  if(!filteredMonths.length){addNotification('No log data to export','info');return;}
+
+  const headers=['Role','Month','Patroller ID','Patroller Name','Audit%','Unique%','Perf%','Rider%','Reports BHD','Unique BHD','Perf BHD','Rider BHD','OT BHD','Total BHD','Saved At'];
+  const allRows=[];
+
+  filteredMonths.forEach(m=>{
+    // Team Lead row (computed live)
+    const tlLead=D.patrollers.find(p=>getUtype(p)==='lead');
+    const selPts=activePats().filter(p=>getUtype(p)==='patroller');
+    const tlAvgFn=(key)=>{
+      const el=selPts.map(p=>({r:buildIncRow(p.id,m,false)})).filter(({r})=>r[key]!==null&&r[key]>=0.70);
+      return el.length?el.reduce((s,{r})=>s+r[key],0)/el.length:null;
+    };
+    const tlAudit=tlAvgFn('auditScore');const tlUnique=tlAvgFn('uniqueScore');
+    const tlPerf=tlAvgFn('perfScore');const tlRider=tlAvgFn('riderScore');
+    const tlBasic=tlLead?getBasicSalary(tlLead.id):0;
+    const tlOTHrs=tlLead?getSysOTHours(tlLead.id,m):0;
+    const tlOTPay=tlOTHrs>0&&tlBasic>0?+(tlBasic/208*1.5*tlOTHrs).toFixed(3):0;
+    const tlAP=incLookup(tlAudit,'reports',true)||0;
+    const tlUP=incLookup(tlUnique,'unique',true)||0;
+    const tlPP=incLookup(tlPerf,'performance',true)||0;
+    const tlRP=incLookup(tlRider,'rider',true)||0;
+    const tlTotal=tlAP+tlUP+tlPP+tlRP+tlOTPay;
+    if(tlLead&&tlTotal>0){
+      allRows.push(['Team Lead',m,tlLead.patroller_id_num||'--',tlLead.name,
+        tlAudit!=null?Math.round(tlAudit*100)+'%':'',tlUnique!=null?Math.round(tlUnique*100)+'%':'',
+        tlPerf!=null?Math.round(tlPerf*100)+'%':'',tlRider!=null?Math.round(tlRider*100)+'%':'',
+        tlAP.toFixed(3),tlUP.toFixed(3),tlPP.toFixed(3),tlRP.toFixed(3),tlOTPay.toFixed(3),tlTotal.toFixed(3),'Computed'
+      ]);
+    }
+    // Patroller rows
+    const recs=D.incentiveData.filter(d=>d.role==='Patroller'&&d.payout_total!=null&&d.month===m)
+      .sort((a,b)=>(a.patroller_name||'').localeCompare(b.patroller_name||''));
+    recs.forEach(d=>{
+      const p=D.patrollers.find(pt=>pt.id===d.patroller_id);
+      allRows.push(['Patroller',m,d.patroller_id_num||p?.patroller_id_num||'--',p?.name||d.patroller_name||'--',
+        d.audit_score!=null?d.audit_score+'%':'',d.unique_score!=null?d.unique_score+'%':'',
+        d.perf_score!=null?d.perf_score+'%':'',d.rider_score!=null?d.rider_score+'%':'',
+        (d.payout_audit||0).toFixed(3),(d.payout_unique||0).toFixed(3),
+        (d.payout_perf||0).toFixed(3),(d.payout_rider||0).toFixed(3),
+        (d.payout_ot||0).toFixed(3),(d.payout_total||0).toFixed(3),
+        d.saved_at?new Date(d.saved_at).toLocaleDateString('en-GB'):''
+      ]);
+    });
+    // Month total
+    const patTotal=recs.reduce((s,d)=>s+(d.payout_total||0),0);
+    const grandTotal=patTotal+tlTotal;
+    if(grandTotal>0){
+      allRows.push(['MONTH TOTAL',m,'','','','','','','','','','','',grandTotal.toFixed(3),'']);
+      allRows.push(Array(15).fill(''));
+    }
   });
-  const csv=[headers.map(h=>`"${h}"`).join(','),...rows].join('\n');
+
+  if(!allRows.length){addNotification('No log data to export','info');return;}
+  const csv=[headers.map(h=>`"${h}"`).join(','),...allRows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','))].join('\n');
   const blob=new Blob([csv],{type:'text/csv'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
