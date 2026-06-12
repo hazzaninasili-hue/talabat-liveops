@@ -1608,7 +1608,56 @@ function accessView(){
     </table>`:'<div style="font-size:12px;color:var(--g3);text-align:center;padding:10px">No biometric devices registered yet. Devices will appear after patrollers login.</div>'}
   </div>
   <div class="toolbar"><button class="btn btn-primary" onclick="openM({type:'createuser'})"><i class="ti ti-user-plus"></i>Create user</button><span style="font-size:12px;color:var(--g3)">${D.users.length} users</span></div>
-  <div class="card-grid">${D.users.map(u=>`<div class="card"><div class="card-av" style="background:${roleBg(u.role)};color:${roleCol(u.role)}">${ini(u.full_name)}</div><div class="card-info" style="min-width:0"><div class="card-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.full_name}</div><div style="font-size:10.5px;color:var(--g3);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.email}</div><span class="role-badge ${roleCls(u.role)}">${u.custom_role_id&&D.customRoles?(D.customRoles.find(r=>r.id===u.custom_role_id)?.name||roleLabel(u.role)):roleLabel(u.role)}</span> <span style="font-size:10px;color:${u.is_active!==false?'var(--teal)':'var(--red)'}">${u.is_active!==false?'Active':'Inactive'}</span></div>${u.id!==D.profile.id?`<div style="display:flex;flex-direction:column;gap:4px"><select class="role-sel" onchange="chRole('${u.id}',this.value)">${(D.customRoles&&D.customRoles.length)?D.customRoles.map(r=>`<option value="cr:${r.id}" ${u.custom_role_id===r.id?'selected':''}>${r.name}</option>`).join(''):'<option disabled>No roles — add in Zone & Shifts</option>'}</select><button class="edit-btn" onclick="openEditUser('${u.id}')" title="Edit user" style="width:28px;height:28px"><i class="ti ti-edit"></i></button><button class="icon-btn" onclick="togActive('${u.id}',${u.is_active!==false})" title="${u.is_active!==false?'Deactivate':'Activate'}"><i class="ti ti-${u.is_active!==false?'user-off':'user-check'}"></i></button><button class="icon-btn" onclick="delUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button></div>`:'<span style="font-size:10px;color:var(--g3)">You</span>'}</div>`).join('')}</div>`;
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:4px">
+  ${D.users.map(u=>{
+    const pat=D.patrollers.find(p=>p.user_id===u.id);
+    const userIni=(u.full_name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const roleBgColor=u.role==='admin'?'#411517':u.role==='lead'?'#1E3A5F':u.role==='coordinator'?'#1C3A2E':'#2D1B00';
+    const missingFields=[];
+    if(!pat?.patroller_id_num)missingFields.push('ID');
+    if(!pat?.basic_salary)missingFields.push('Salary');
+    if(!pat?.phone)missingFields.push('Mobile');
+    const isMe=u.id===D.profile.id;
+    return`<div style="background:var(--sur);border:1.5px solid var(--g2);border-radius:16px;overflow:hidden;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='none'">
+      <div style="background:${roleBgColor};padding:16px 16px 12px;display:flex;align-items:center;gap:12px">
+        <div style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0">${userIni}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.full_name}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:1px">${roleLabel(u.role)}${u.is_active===false?' · <span style="color:#FCA5A5">Inactive</span>':' · <span style="color:#86EFAC">Active</span>'}</div>
+        </div>
+        ${!isMe?`<button onclick="openEditUser('${u.id}')" title="Edit profile" style="background:rgba(255,255,255,.15);border:none;border-radius:8px;width:30px;height:30px;cursor:pointer;color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center"><i class="ti ti-edit"></i></button>`:'<span style="font-size:10px;color:rgba(255,255,255,.5);padding:4px 8px;background:rgba(255,255,255,.1);border-radius:6px">You</span>'}
+      </div>
+      <div style="padding:14px 16px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div>
+            <div style="font-size:9px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Patroller ID</div>
+            <div style="font-size:12px;font-weight:600;color:${pat?.patroller_id_num?'var(--g5)':'#DC2626'};font-family:monospace">${pat?.patroller_id_num||'<span style="font-size:10px;color:#DC2626">⚠ Not set</span>'}</div>
+          </div>
+          <div>
+            <div style="font-size:9px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Basic salary</div>
+            <div style="font-size:12px;font-weight:600;color:${pat?.basic_salary?'var(--green)':'#DC2626'}">${pat?.basic_salary?'BHD '+pat.basic_salary:'<span style="font-size:10px;color:#DC2626">⚠ Not set</span>'}</div>
+          </div>
+        </div>
+        <div style="border-top:0.5px solid var(--g2);padding-top:10px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <i class="ti ti-mail" style="font-size:12px;color:var(--g3);width:14px"></i>
+            <span style="font-size:11px;color:var(--g4);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.email}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <i class="ti ti-brand-whatsapp" style="font-size:12px;color:${pat?.phone?'#25D366':'var(--g3)'};width:14px"></i>
+            <span style="font-size:11px;color:${pat?.phone?'var(--g5)':'#DC2626'}">${pat?.phone||'<span style="color:#DC2626;font-size:10px">⚠ Not set</span>'}</span>
+          </div>
+        </div>
+        ${missingFields.length&&!isMe?`<div style="margin-top:10px;padding:7px 10px;background:#FEF3C7;border-radius:8px;font-size:10px;color:#92400E;display:flex;align-items:center;gap:6px"><i class="ti ti-alert-triangle" style="font-size:11px"></i>Missing: ${missingFields.join(', ')} — <button onclick="openEditUser('${u.id}')" style="background:none;border:none;text-decoration:underline;color:#92400E;font-size:10px;cursor:pointer;font-family:inherit;padding:0">Complete profile</button></div>`:''}
+        ${!isMe?`<div style="margin-top:10px;display:flex;gap:6px">
+          <button class="btn btn-primary" style="flex:1;padding:6px 0;font-size:11px" onclick="openEditUser('${u.id}')"><i class="ti ti-edit"></i> Edit profile</button>
+          <button class="icon-btn" onclick="togActive('${u.id}',${u.is_active!==false})" title="${u.is_active!==false?'Deactivate':'Activate'}"><i class="ti ti-${u.is_active!==false?'user-off':'user-check'}"></i></button>
+          <button class="icon-btn" onclick="delUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button>
+        </div>`:''}
+      </div>
+    </div>`;
+  }).join('')}
+  </div>`;
 }
 
 function mySchedView(){
@@ -2154,37 +2203,37 @@ function renderModal(){
     box.innerHTML=`<div class="modal-title"><i class="ti ti-clock"></i>${isE?'Edit shift':'Add shift'}</div><div class="fg-row"><div class="fg"><label>Name</label><input id="shn" value="${f.name}" placeholder="Shift name"></div><div class="fg"><label>Type</label><select id="sht"><option value="morning" ${f.type==='morning'?'selected':''}>Morning</option><option value="evening" ${f.type==='evening'?'selected':''}>Evening</option></select></div></div><div class="fg-row"><div class="fg"><label>Start</label><input type="time" id="shst" value="${f.start}"></div><div class="fg"><label>End</label><input type="time" id="shet" value="${f.end}"></div></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveShift('${isE?m.id:'null'}')"><i class="ti ti-check"></i>Save</button></div>`;return;
   }
   if(m.type==='createuser'){
-    box.innerHTML=`<div class="modal-title"><i class="ti ti-user-plus"></i>Create user account</div>
-    <div class="info-box info-blue" style="font-size:12px">User logs in with their email only — no password needed. Patrollers &amp; Coordinators are automatically added to the schedule.</div>
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-user-plus"></i>Create user profile</div>
+    <div class="info-box info-blue" style="font-size:12px">All fields required. User logs in with their email — no password needed.</div>
     <div class="msg msg-err" id="cu-e"></div><div class="msg msg-ok" id="cu-ok"></div>
-    <div class="fg-row"><div class="fg"><label>Full name</label><input id="cu-name" placeholder="Name"></div><div class="fg"><label>Role</label><select id="cu-role" onchange="document.getElementById('cu-phone-row').style.display=(this.value==='patroller'||this.value==='coordinator')?'block':'none'">${(D.customRoles&&D.customRoles.length)?D.customRoles.map(r=>`<option value="cr:${r.id}">${r.name} (${r.access_level==='admin'?'Admin':r.access_level==='editor'?'Editor':'Viewer'})</option>`).join(''):'<option value="" disabled>No roles yet — create in Zone & Shifts first</option>'}</select></div></div>
-    <div class="fg"><label>Email</label><input type="email" id="cu-email" placeholder="email@talabat.com"></div>
-    <div class="fg" id="cu-phone-row">
-      <label>WhatsApp number <span style="font-weight:400;font-size:10px;color:var(--g3)">(with country code, e.g. +97333112233)</span></label>
-      <input type="tel" id="cu-phone" placeholder="+97333112233">
-    </div>
     <div class="fg-row">
-      <div class="fg"><label>Patroller ID <span style="font-weight:400;font-size:10px;color:var(--g3)">(optional)</span></label><input id="cu-patroller-id" placeholder="e.g. 605135" type="text"></div>
-      <div class="fg"><label>Basic salary (BHD) <span style="font-weight:400;font-size:10px;color:var(--g3)">(for incentive & OT calc)</span></label><input id="cu-basic-salary" placeholder="e.g. 360" type="number" min="0"></div>
+      <div class="fg"><label>Full name <span style="color:#DC2626">*</span></label><input id="cu-name" placeholder="Full name"></div>
+      <div class="fg"><label>Role <span style="color:#DC2626">*</span></label><select id="cu-role">${(D.customRoles&&D.customRoles.length)?D.customRoles.map(r=>`<option value="cr:${r.id}">${r.name} (${r.access_level==='admin'?'Admin':r.access_level==='editor'?'Editor':'Viewer'})</option>`).join(''):'<option value="" disabled>No roles yet</option>'}</select></div>
     </div>
-    <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" id="cu-btn" onclick="doCreateUser()"><i class="ti ti-check"></i>Create user</button></div>`;return;
+    <div class="fg"><label>Email <span style="color:#DC2626">*</span></label><input type="email" id="cu-email" placeholder="email@talabat.com"></div>
+    <div class="fg-row">
+      <div class="fg"><label>Mobile / WhatsApp <span style="color:#DC2626">*</span></label><input type="tel" id="cu-phone" placeholder="+97333112233"></div>
+      <div class="fg"><label>Patroller ID <span style="color:#DC2626">*</span></label><input id="cu-patroller-id" placeholder="e.g. 605135"></div>
+    </div>
+    <div class="fg"><label>Basic salary (BHD) <span style="color:#DC2626">*</span> <span style="font-weight:400;font-size:10px;color:var(--g3)">Used for OT and incentive calculations</span></label><input id="cu-basic-salary" placeholder="e.g. 360" type="number" min="0"></div>
+    <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" id="cu-btn" onclick="doCreateUser()"><i class="ti ti-check"></i>Create profile</button></div>`;return;
   }
   if(m.type==='resetpw'){box.innerHTML=`<div class="modal-title"><i class="ti ti-key"></i>Reset password - ${m.name}</div><div class="msg msg-err" id="rp-e"></div><div class="msg msg-ok" id="rp-ok"></div><div class="fg"><label>New password</label><div class="pw-wrap"><input type="password" id="rp1" placeholder="Min 6 characters"><button class="pw-eye" onclick="togglePw('rp1',this)"><i class="ti ti-eye"></i></button></div></div><div class="fg"><label>Confirm</label><div class="pw-wrap"><input type="password" id="rp2" placeholder="Repeat"><button class="pw-eye" onclick="togglePw('rp2',this)"><i class="ti ti-eye"></i></button></div></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" id="rp-btn" onclick="doResetPw('${m.uid}')"><i class="ti ti-check"></i>Reset</button></div>`;return;}
   if(m.type==='edituser'){
     const f=m.form;
-    box.innerHTML=`<div class="modal-title"><i class="ti ti-edit"></i>Edit user — ${f.name}</div>
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-id-badge"></i>Edit profile — ${f.name}</div>
     <div class="msg msg-err" id="eu-e"></div><div class="msg msg-ok" id="eu-ok"></div>
     <div class="fg-row">
-      <div class="fg"><label>Full name</label><input id="eu-name" value="${f.name}" placeholder="Name"></div>
-      <div class="fg"><label>Role</label><select id="eu-role">${['patroller','coordinator','lead','admin'].map(r=>`<option value="${r}" ${f.role===r?'selected':''}>${roleLabel(r)}</option>`).join('')}</select></div>
+      <div class="fg"><label>Full name <span style="color:#DC2626">*</span></label><input id="eu-name" value="${f.name}" placeholder="Full name"></div>
+      <div class="fg"><label>Role <span style="color:#DC2626">*</span></label><select id="eu-role">${['patroller','coordinator','lead','admin'].map(r=>`<option value="${r}" ${f.role===r?'selected':''}>${roleLabel(r)}</option>`).join('')}</select></div>
     </div>
-    <div class="fg"><label>Email</label><input type="email" id="eu-email" value="${f.email}" placeholder="email@talabat.com"></div>
-    <div class="fg"><label>WhatsApp number <span style="font-weight:400;font-size:10px;color:var(--g3)">(with country code)</span></label><input type="tel" id="eu-phone" value="${f.phone}" placeholder="+97333112233"></div>
+    <div class="fg"><label>Email <span style="color:#DC2626">*</span></label><input type="email" id="eu-email" value="${f.email}" placeholder="email@talabat.com"></div>
     <div class="fg-row">
-      <div class="fg"><label>Patroller ID <span style="font-weight:400;font-size:10px;color:var(--g3)">(optional)</span></label><input id="eu-patroller-id" value="${f.patrollerIdNum}" placeholder="e.g. 605135"></div>
-      <div class="fg"><label>Basic salary (BHD) <span style="font-weight:400;font-size:10px;color:var(--g3)">(for incentive & OT)</span></label><input id="eu-basic-salary" value="${f.basicSalary}" placeholder="e.g. 360" type="number" min="0"></div>
+      <div class="fg"><label>Mobile / WhatsApp <span style="color:#DC2626">*</span></label><input type="tel" id="eu-phone" value="${f.phone}" placeholder="+97333112233"></div>
+      <div class="fg"><label>Patroller ID <span style="color:#DC2626">*</span></label><input id="eu-patroller-id" value="${f.patrollerIdNum}" placeholder="e.g. 605135"></div>
     </div>
-    <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveEditUser('${m.uid}')"><i class="ti ti-check"></i>Save</button></div>`;return;
+    <div class="fg"><label>Basic salary (BHD) <span style="color:#DC2626">*</span> <span style="font-weight:400;font-size:10px;color:var(--g3)">Used for OT and incentive calculations</span></label><input id="eu-basic-salary" value="${f.basicSalary}" placeholder="e.g. 360" type="number" min="0"></div>
+    <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveEditUser('${m.uid}')"><i class="ti ti-check"></i>Save profile</button></div>`;return;
   }
   if(m.type==='createschedule'){
     const unscheduled=m.unscheduled||[];
@@ -2423,7 +2472,10 @@ async function saveEditUser(uid){
   const phone=(document.getElementById('eu-phone').value||'').trim();
   const patrollerIdNum=(document.getElementById('eu-patroller-id')?.value||'').trim();
   const basicSalary=parseFloat(document.getElementById('eu-basic-salary')?.value)||null;
-  if(!name||!email){showErr('eu-e','Name and email required.');return;}
+  if(!name||!email){showErr('eu-e','Name and email are required.');return;}
+  if(!phone){showErr('eu-e','Mobile number is required.');return;}
+  if(!patrollerIdNum){showErr('eu-e','Patroller ID is required.');return;}
+  if(!basicSalary){showErr('eu-e','Basic salary is required.');return;}
   // Update profile
   const{error}=await sb.from('profiles').update({full_name:name,email,role}).eq('id',uid);
   if(error){showErr('eu-e',error.message);return;}
@@ -3685,7 +3737,10 @@ async function doCreateUser(){
   const phone=(document.getElementById('cu-phone')?.value||'').trim();
   const patrollerId=(document.getElementById('cu-patroller-id')?.value||'').trim();
   const basicSalary=parseFloat(document.getElementById('cu-basic-salary')?.value)||null;
-  if(!name||!email){showErr('cu-e','Name and email required.');return;}
+  if(!name||!email){showErr('cu-e','Name and email are required.');return;}
+  if(!phone){showErr('cu-e','Mobile number is required.');return;}
+  if(!patrollerId){showErr('cu-e','Patroller ID is required.');return;}
+  if(!basicSalary){showErr('cu-e','Basic salary is required.');return;}
   const btn=document.getElementById('cu-btn');btn.disabled=true;btn.textContent='Creating...';
   try{
     // Check if already exists
@@ -5340,37 +5395,74 @@ function incentiveView(){
     ${(()=>{
       // ── PAYOUT LOG ──
       const logMonths=[...new Set(D.incentiveData.map(d=>d.month).filter(Boolean))].sort().reverse();
-      if(!logMonths.length)return'';
-      const logRows=logMonths.map(m=>{
-        const recs=D.incentiveData.filter(d=>d.month===m&&d.role==='Patroller'&&d.payout_total!=null);
-        if(!recs.length)return'';
-        const totalPayout=recs.reduce((s,d)=>s+(d.payout_total||0),0);
-        const saved=recs[0]?.saved_at?new Date(recs[0].saved_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'--';
-        return`<tr style="cursor:pointer" onclick="D.incMonth='${m}';render()">
-          <td class="lt" style="font-weight:600">${m}</td>
-          <td>${recs.length} patrollers</td>
-          <td style="font-size:11px;color:var(--g3)">${saved}</td>
-          ${recs.map(d=>{
-            const p=D.patrollers.find(pt=>pt.id===d.patroller_id);
-            return`<td style="font-size:11px">${p?.name||d.patroller_name||'--'}</td><td style="font-weight:600;color:${(d.payout_total||0)>0?'#166534':'#DC2626'}">BHD ${(d.payout_total||0).toFixed(3)}</td>`;
-          }).join('')}
-          <td style="font-weight:700;color:#FF5900">BHD ${totalPayout.toFixed(3)}</td>
-        </tr>`;
-      }).join('');
+      if(!logMonths.length)return`<div class="tcard" style="padding:24px;text-align:center;margin-top:12px;color:var(--g3)"><i class="ti ti-history" style="font-size:28px;display:block;margin-bottom:8px"></i>No payout log yet — enter data above and click Save & calculate</div>`;
 
-      // Get max patrollers across all months for column headers
-      const maxRecs=D.incentiveData.filter(d=>d.month===logMonths[0]&&d.role==='Patroller');
-      const patCols=maxRecs.map(d=>{const p=D.patrollers.find(pt=>pt.id===d.patroller_id);return`<th class="r" colspan="2">${p?.name||d.patroller_name||'--'}</th>`;}).join('');
+      const months=logMonths.map(m=>{
+        const recs=D.incentiveData.filter(d=>d.month===m&&d.role==='Patroller');
+        const hasPayouts=recs.some(d=>d.payout_total!=null);
+        const totalPayout=recs.reduce((s,d)=>s+(d.payout_total||0),0);
+        const savedDate=recs[0]?.saved_at?new Date(recs[0].saved_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'--';
+
+        const patRows=recs.map(d=>{
+          const p=D.patrollers.find(pt=>pt.id===d.patroller_id);
+          const name=p?.name||d.patroller_name||'--';
+          return`<tr>
+            <td class="lt" style="font-size:11px;font-weight:600;padding-left:28px">${name}</td>
+            <td class="r" style="font-size:11px;color:${(d.audit_score||0)>=70?'var(--g5)':'#DC2626'}">${d.audit_score!=null?d.audit_score+'%':'--'}</td>
+            <td class="r" style="font-size:11px;color:${(d.unique_score||0)>=70?'var(--g5)':'#DC2626'}">${d.unique_score!=null?d.unique_score+'%':'--'}</td>
+            <td class="r" style="font-size:11px;color:${(d.perf_score||0)>=70?'var(--g5)':'#DC2626'}">${d.perf_score!=null?d.perf_score+'%':'--'}</td>
+            <td class="r" style="font-size:11px;color:${(d.rider_score||0)>=70?'var(--g5)':'#DC2626'}">${d.rider_score!=null?d.rider_score+'%':'--'}</td>
+            <td class="r" style="font-size:11px;color:#166534;font-weight:600">${(d.payout_audit||0)>0?'BHD '+(d.payout_audit||0).toFixed(3):'--'}</td>
+            <td class="r" style="font-size:11px;color:#166534;font-weight:600">${(d.payout_unique||0)>0?'BHD '+(d.payout_unique||0).toFixed(3):'--'}</td>
+            <td class="r" style="font-size:11px;color:#4C1D95;font-weight:600">${(d.payout_perf||0)>0?'BHD '+(d.payout_perf||0).toFixed(3):'--'}</td>
+            <td class="r" style="font-size:11px;color:#D97706;font-weight:600">${(d.payout_rider||0)>0?'BHD '+(d.payout_rider||0).toFixed(3):'--'}</td>
+            <td class="r" style="font-size:11px">${(d.payout_ot||0)>0?'BHD '+(d.payout_ot||0).toFixed(3):'--'}</td>
+            <td class="r" style="font-weight:700;color:#FF5900">BHD ${(d.payout_total||0).toFixed(3)}</td>
+            <td class="r" style="white-space:nowrap">
+              <button class="edit-btn" onclick="editIncEntry('${d.id}')" title="Recalculate this entry" style="font-size:10px;padding:2px 6px"><i class="ti ti-refresh"></i></button>
+              <button class="icon-btn" onclick="deleteIncEntry('${d.id}','${name.replace(/'/g,"\\'")}','${m}')" title="Delete entry" style="background:#FEE2E2;color:#DC2626"><i class="ti ti-trash"></i></button>
+            </td>
+          </tr>`;
+        }).join('');
+
+        return`<div style="margin-bottom:10px;border:0.5px solid var(--g2);border-radius:10px;overflow:hidden">
+          <div style="display:flex;align-items:center;padding:10px 14px;background:var(--g1);cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+            <div style="flex:1">
+              <span style="font-size:13px;font-weight:700;color:var(--g5)">${m}</span>
+              <span style="font-size:11px;color:var(--g3);margin-left:10px">${recs.length} patrollers · saved ${savedDate}</span>
+            </div>
+            <span style="font-size:14px;font-weight:700;color:#FF5900;margin-right:12px">BHD ${totalPayout.toFixed(3)}</span>
+            <button onclick="event.stopPropagation();deleteIncMonth('${m}')" title="Delete entire month" style="background:#FEE2E2;color:#DC2626;border:none;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;font-family:inherit"><i class="ti ti-trash"></i> Delete month</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table style="min-width:900px">
+              <thead><tr style="background:var(--g1)">
+                <th class="lt" style="padding-left:28px">Patroller</th>
+                <th class="r" style="font-size:9px">Audit%</th><th class="r" style="font-size:9px">Unique%</th><th class="r" style="font-size:9px">Perf%</th><th class="r" style="font-size:9px">Rider%</th>
+                <th class="r" style="background:#EAF3DE;color:#27500A;font-size:9px">Reports BHD</th>
+                <th class="r" style="background:#EAF3DE;color:#27500A;font-size:9px">Unique BHD</th>
+                <th class="r" style="background:#EDE9FE;color:#4C1D95;font-size:9px">Perf BHD</th>
+                <th class="r" style="background:#FEF3C7;color:#78350F;font-size:9px">Rider BHD</th>
+                <th class="r" style="background:#FFF0E6;color:#D94D00;font-size:9px">OT BHD</th>
+                <th class="r" style="background:#411517;color:#fff;font-size:9px">Total BHD</th>
+                <th class="r" style="font-size:9px">Actions</th>
+              </tr></thead>
+              <tbody>${patRows}
+                <tr style="background:rgba(255,89,0,.04);font-weight:700">
+                  <td class="lt" style="padding-left:28px">Month total</td>
+                  <td colspan="9"></td>
+                  <td class="r" style="font-weight:700;color:#FF5900;font-size:13px">BHD ${totalPayout.toFixed(3)}</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+      }).join('');
 
       return`<div class="tcard" style="padding:14px;margin-top:12px">
         <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px"><i class="ti ti-history" style="margin-right:4px"></i>Monthly payout log</div>
-        <div class="t-scroll"><table style="min-width:600px">
-          <thead><tr>
-            <th class="lt">Month</th><th>Patrollers</th><th>Saved on</th>${patCols}<th style="background:#FFF0E6;color:#D94D00">Total payout</th>
-          </tr></thead>
-          <tbody>${logRows||'<tr><td colspan="10" style="text-align:center;color:var(--g3);padding:20px">No saved records yet — enter data and click Save & calculate</td></tr>'}</tbody>
-        </table></div>
-        <div style="margin-top:8px;font-size:10px;color:var(--g3)"><i class="ti ti-info-circle" style="font-size:10px;margin-right:3px"></i>Log updates automatically each time you save. Click a row to view that month's details.</div>
+        ${months}
       </div>`;
     })()}`;
   }
@@ -5499,10 +5591,10 @@ function incentiveView(){
   return`
   <div style="background:${headerBg};border-radius:14px;padding:18px;margin-bottom:12px;color:#fff">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-      <div style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700">${ini}</div>
+      <div style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700">${(D.profile?.full_name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
       <div>
         <div style="font-size:16px;font-weight:700">${D.profile?.full_name||''}</div>
-        <div style="font-size:11px;opacity:.5;margin-top:2px">Incentive summary · ${selMonth}${isTL?' · Team Lead':''}</div>
+        <div style="font-size:11px;opacity:.5;margin-top:2px">Incentive summary · ${selMonth}</div>
       </div>
       <div style="margin-left:auto;text-align:right">
         <div style="font-size:10px;opacity:.5;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Total incentive</div>
@@ -5622,6 +5714,26 @@ async function saveIncentiveData(){
   addNotification('Incentive saved — payout log updated','success');
 }
 
+
+async function deleteIncEntry(id,name,month){
+  if(!confirm('Delete payout entry for '+name+' ('+month+')? This cannot be undone.'))return;
+  await sb.from('incentive_data').delete().eq('id',id);
+  await reload();
+  addNotification('Entry for '+name+' deleted','info');
+}
+
+async function deleteIncMonth(month){
+  if(!confirm('Delete ALL payout records for '+month+'? This will remove all '+month+' entries from the log and cannot be undone.'))return;
+  await sb.from('incentive_data').delete().eq('month',month).eq('role','Patroller');
+  await reload();
+  addNotification('All entries for '+month+' deleted','info');
+}
+
+async function editIncEntry(id){
+  // Jump to that month so admin can recalculate
+  const rec=D.incentiveData.find(d=>d.id===id);
+  if(rec){D.incMonth=rec.month;render();addNotification('Showing '+rec.month+' — edit values and click Save & calculate','info');}
+}
 
 // ── GLOBAL ERROR HANDLER ──
 window.addEventListener('error', (e) => {
