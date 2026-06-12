@@ -1738,10 +1738,6 @@ function mySchedView(){
     <button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button>
     <span style="font-size:13px;font-weight:600;color:#411517">Week ${wn} · ${fmt(dates[0])} – ${fmt(dates[6])}</span>
     <button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button>
-  </div>
-  <div style="display:flex;background:#F4EDE3;border-radius:10px;padding:4px;gap:2px;margin-bottom:14px">
-    <button class="seg-btn${D.view==='week'?' active':''}" onclick="D.view='week';render()" style="flex:1">Week</button>
-    <button class="seg-btn${D.view==='date'?' active':''}" onclick="D.view='date';render()" style="flex:1">Daily</button>
   </div>`;
 
   // ── Week table ──
@@ -1940,15 +1936,20 @@ function renderSidebar(){
   let html='';
   if(!isPatroller){
     html+=`<div class="sb-section">Operations</div>`;
-    html+=item('schedule','ti-calendar-week','Schedule');
+    html+=item('schedule','ti-calendar-week','Weekly schedule');
+    html+=item('schedule-daily','ti-calendar-day','Daily schedule');
+    html+=item('schedule-hourly','ti-clock','Hourly schedule');
     html+=item('summary','ti-layout-dashboard','Summary');
     html+=item('attendance','ti-clock-check','Attendance');
-    html+=item('timeofftask','ti-calendar-off','Time off & Tasks',(pendingTasks+pendingTO)>0?{cls:'amber',txt:pendingTasks+pendingTO}:null);
+    html+=item('timeoff','ti-calendar-off','Time off',(pendingTO)>0?{cls:'amber',txt:pendingTO}:null);
+    html+=item('tasks','ti-checklist','Tasks',(pendingTasks)>0?{cls:'amber',txt:pendingTasks}:null);
+    html+=item('overtime','ti-clock-bolt','Overtime');
     html+=`<div class="sb-section" style="margin-top:4px">Overall performance</div>`;
     html+=item('performance','ti-chart-infographic','Scores & Incentive');
     html+=item('evaluation','ti-star','Evaluation');
     html+=item('coaching','ti-users','Coaching');
     html+=item('audittargets','ti-target','Audit targets');
+    html+=item('incentive','ti-cash','Incentive');
     html+=`<div class="sb-section" style="margin-top:4px">Admin</div>`;
     html+=item('leavebalance','ti-calendar-stats','Leave balance');
     html+=item('documents','ti-files','Documents');
@@ -1956,9 +1957,11 @@ function renderSidebar(){
     if(isAdmin)html+=item('access','ti-lock','Access control');
   } else {
     html+=`<div class="sb-section">My workspace</div>`;
-    html+=item('myschedule','ti-user','My schedule');
+    html+=item('myschedule','ti-calendar-week','My schedule (weekly)');
+    html+=item('myschedule-daily','ti-calendar-day','My schedule (daily)');
     html+=item('myattendance','ti-clock-check','My attendance');
-    html+=item('timeofftask','ti-calendar-off','Time off & Tasks');
+    html+=item('timeoff','ti-calendar-off','Time off');
+    html+=item('tasks','ti-checklist','Tasks');
     html+=item('myleavebalance','ti-calendar-stats','Leave balance');
     html+=item('documents','ti-files','Documents');
     html+=`<div class="sb-section" style="margin-top:4px">Performance</div>`;
@@ -2045,7 +2048,12 @@ function render(){
   const wNav=`<div class="toolbar"><button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button><span class="wk-range">Week ${wn} - ${fmt(dates[0])} to ${fmt(dates[6])}</span><button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button></div>`;
   let html='';
   const safeRender=(fn,name)=>{try{return fn();}catch(e){console.error('Tab error ['+name+']:',e);return`<div style="padding:40px;text-align:center"><div style="font-size:40px;margin-bottom:12px">⚠️</div><div style="font-size:15px;font-weight:700;color:#DC2626;margin-bottom:8px">${name} failed to load</div><div style="font-size:12px;color:#A08070;margin-bottom:16px">${e.message}</div><button class="btn btn-primary" onclick="doRefresh()"><i class="ti ti-refresh"></i>Refresh</button></div>`;}};
-  if(D.tab==='schedule')html=safeRender(()=>statBar+nav+getRunningTasks()+(D.view==='week'?weekTable(canEdit()):D.view==='hourly'?hourlyView():dateView())+notesBar(),'Schedule');
+  if(D.tab==='schedule'||D.tab==='schedule-daily'||D.tab==='schedule-hourly'){
+    if(D.tab==='schedule'){D.view='week';}
+    else if(D.tab==='schedule-daily'){D.view='date';}
+    else if(D.tab==='schedule-hourly'){D.view='hourly';}
+    html=safeRender(()=>statBar+nav+getRunningTasks()+(D.view==='week'?weekTable(canEdit()):D.view==='hourly'?hourlyView():dateView())+notesBar(),'Schedule');
+  }
   else if(D.tab==='summary')html=safeRender(()=>wNav+summaryView(),'Summary');
   else if(D.tab==='timeofftask')html=safeRender(()=>timeOffTaskView(),'Time off & Tasks');
   else if(D.tab==='zonenshift'||D.tab==='operations'||D.tab==='areas'||D.tab==='shifts')html=safeRender(()=>operationsView(),'Zone & Shifts');
@@ -2053,7 +2061,10 @@ function render(){
   else if(D.tab==='access')html=safeRender(()=>accessView(),'Access Control');
   else if(D.tab==='leavebalance')html=safeRender(()=>leaveBalanceView(),'Leave Balance');
   else if(D.tab==='myleavebalance')html=safeRender(()=>myLeaveBalanceView(),'My Leave Balance');
-  else if(D.tab==='myschedule')html=safeRender(()=>mySchedView(),'My Schedule');
+  else if(D.tab==='myschedule'||D.tab==='myschedule-daily'){
+    if(D.tab==='myschedule-daily')D.schedView='daily'; else D.schedView='week';
+    html=safeRender(()=>mySchedView(),'My Schedule');
+  }
   else if(D.tab==='attendance')html=safeRender(()=>attendanceView(),'Attendance');
   else if(D.tab==='myattendance')html=safeRender(()=>myAttendanceView(),'My Attendance');
   else if(D.tab==='performance')html=safeRender(()=>overallPerfView(),'Scores & Incentive');
@@ -2061,6 +2072,10 @@ function render(){
   else if(D.tab==='evaluation')html=safeRender(()=>evalTabView(),'Evaluation');
   else if(D.tab==='coaching')html=safeRender(()=>coachingTabView(),'Coaching');
   else if(D.tab==='audittargets')html=safeRender(()=>auditTargetsTabView(),'Audit targets');
+  else if(D.tab==='timeoff')html=safeRender(()=>timeOffView(),'Time off');
+  else if(D.tab==='tasks')html=safeRender(()=>tasksView(),'Tasks');
+  else if(D.tab==='overtime')html=safeRender(()=>overtimeView(),'Overtime');
+  else if(D.tab==='timeofftask')html=safeRender(()=>timeOffTaskView(),'Time off & Tasks');
   document.getElementById('main').innerHTML=`<div class="fade-in">${html}</div>`;
 }
 function setTab(t){D.tab=t;D.ne=false;render();}
@@ -4541,37 +4556,22 @@ function pScoreBadge(pct){
 
 // ── SUB-TAB VIEWS ──
 function evalTabView(){
-  // Extract just the evaluation section from performanceView
-  D.perfSubTab='evaluation';
+  D.perfTab='evaluation';
   return performanceView();
 }
 function coachingTabView(){
-  D.perfSubTab='coaching';
+  D.perfTab='coaching';
   return performanceView();
 }
 function auditTargetsTabView(){
-  D.perfSubTab='audittargets';
+  D.perfTab='audit';
   return performanceView();
 }
 
-// ── OVERALL PERFORMANCE VIEW (Scores + Incentive combined) ──
+// Scores & Incentive = overview only (no incentive calculator here)
 function overallPerfView(){
-  D.perfSubTab='scores';
-  const perfHtml=performanceView();
-  const incHtml=incentiveView();
-  return`
-  <div style="margin-bottom:14px">
-    <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">
-      <i class="ti ti-chart-infographic" style="margin-right:6px;font-size:14px"></i>Scores & Incentive
-    </div>
-    ${perfHtml}
-  </div>
-  <div style="border-top:2px solid #E8DDD4;padding-top:16px;margin-top:4px">
-    <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">
-      <i class="ti ti-cash" style="margin-right:6px;font-size:14px"></i>Incentive calculator & payout log
-    </div>
-    ${incHtml}
-  </div>`;
+  D.perfTab='overview';
+  return performanceView();
 }
 
 function performanceView(){
@@ -4581,26 +4581,7 @@ function performanceView(){
   const curMonth=now.getUTCFullYear()+'-'+String(now.getUTCMonth()+1).padStart(2,'0');
   const ps=getPerfSettings();
   const subTab=D.perfTab||(isAL?'overview':'myperformance');
-
-  // sub-tab pills builder
-  const adminTabs=[
-    {id:'overview',icon:'ti-gauge',label:'Overview'},
-    {id:'evaluation',icon:'ti-clipboard-check',label:'Evaluation'},
-    {id:'coaching',icon:'ti-school',label:'Coaching'},
-    {id:'audit',icon:'ti-target',label:'Audit Targets'},
-  ];
-  const patTabs=[
-    {id:'myperformance',icon:'ti-gauge',label:'My Score'},
-    {id:'mycoaching',icon:'ti-school',label:'My Coaching'},
-    {id:'mytarget',icon:'ti-target',label:'My Target'},
-  ];
-  const tabs=isAL?adminTabs:patTabs;
-  const segHtml='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'+
-    tabs.map(t=>'<button onclick="D.perfTab=\''+t.id+'\';render()" style="padding:5px 14px;border-radius:20px;border:0.5px solid var(--g2);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;'+
-      (subTab===t.id?'background:#411517;color:#fff;border-color:#411517':'background:var(--sur);color:var(--g3)')+'">'+
-      '<i class="ti '+t.icon+'" style="font-size:11px;margin-right:4px"></i>'+t.label+'</button>'
-    ).join('')+
-    '</div>';
+  const segHtml='';
 
   // ── HELPERS ──
   const months=[...new Set([
