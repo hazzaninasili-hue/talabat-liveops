@@ -2064,7 +2064,7 @@ function render(){
   else if(D.tab==='leavebalance')html=safeRender(()=>leaveBalanceView(),'Leave Balance');
   else if(D.tab==='myleavebalance')html=safeRender(()=>myLeaveBalanceView(),'My Leave Balance');
   else if(D.tab==='myschedule'||D.tab==='myschedule-daily'){
-    if(D.tab==='myschedule-daily')D.schedView='daily'; else D.schedView='week';
+    if(D.tab==='myschedule-daily')D.view='date'; else D.view='week';
     html=safeRender(()=>mySchedView(),'My Schedule');
   }
   else if(D.tab==='attendance')html=safeRender(()=>attendanceView(),'Attendance');
