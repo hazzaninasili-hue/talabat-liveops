@@ -1625,7 +1625,7 @@ function accessView(){
           <div style="font-size:15px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.full_name}</div>
           <div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:1px">${roleLabel(u.role)}${u.is_active===false?' · <span style="color:#FCA5A5">Inactive</span>':' · <span style="color:#86EFAC">Active</span>'}</div>
         </div>
-        ${!isMe?`<button onclick="openEditUser('${u.id}')" title="Edit profile" style="background:rgba(255,255,255,.15);border:none;border-radius:8px;width:30px;height:30px;cursor:pointer;color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center"><i class="ti ti-edit"></i></button>`:'<span style="font-size:10px;color:rgba(255,255,255,.5);padding:4px 8px;background:rgba(255,255,255,.1);border-radius:6px">You</span>'}
+        ${isMe?'<span style="font-size:10px;color:rgba(255,255,255,.5);padding:4px 8px;background:rgba(255,255,255,.1);border-radius:6px">You</span>':''}
       </div>
       <div style="padding:14px 16px">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
@@ -2481,17 +2481,28 @@ async function saveEditUser(uid){
   if(error){showErr('eu-e',error.message);return;}
   // Update linked patroller entry if exists
   const pat=D.patrollers.find(p=>p.user_id===uid);
-  if(pat){await sb.from('patrollers').update({name,phone:phone||null,user_type:role,patroller_id_num:patrollerIdNum||null,basic_salary:basicSalary}).eq('id',pat.id);}
-  // If no patroller entry yet and role is patroller/coordinator, create one
-  else if(role==='patroller'||role==='coordinator'){
-    const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null,patroller_id_num:patrollerIdNum||null,basic_salary:basicSalary}).select().single();
-    if(np)await sb.from('schedules').insert({patroller_id:np.id,week_start:wStart(),day_0:'',day_1:'',day_2:'',day_3:'',day_4:'',day_5:'',day_6:''});
+  if(pat){
+    // For lead/admin: keep is_active=false for schedule, but still save profile data
+    const isLeadOrAdmin=role==='admin'||role==='lead';
+    await sb.from('patrollers').update({
+      name,phone:phone||null,user_type:role,
+      patroller_id_num:patrollerIdNum||null,
+      basic_salary:basicSalary,
+      is_active:isLeadOrAdmin?false:true
+    }).eq('id',pat.id);
+  } else {
+    // No patroller row yet — create one for ALL roles (needed for profile card + incentive)
+    const isLeadOrAdmin=role==='admin'||role==='lead';
+    const{data:np}=await sb.from('patrollers').insert({
+      name,shift_id:D.shifts[0]?.id||null,cov_area:'',
+      user_id:uid,is_active:!isLeadOrAdmin,user_type:role,
+      phone:phone||null,patroller_id_num:patrollerIdNum||null,basic_salary:basicSalary
+    }).select().single();
+    if(np&&!isLeadOrAdmin)await sb.from('schedules').insert({patroller_id:np.id,week_start:wStart(),day_0:'',day_1:'',day_2:'',day_3:'',day_4:'',day_5:'',day_6:''});
   }
-  // If admin/lead, hide from schedule
-  if(role==='admin'||role==='lead'){
-    await sb.from('patrollers').update({is_active:false}).eq('user_id',uid);
-  }
-  showOk('eu-ok','User updated!');setTimeout(()=>{closeM();reload();},900);
+  showOk('eu-ok','Profile updated!');
+  await reload();
+  closeM();
 }
 
 async function saveCreateSchedule(){
@@ -3752,20 +3763,23 @@ async function doCreateUser(){
     const uid=data?.user?.id;
     if(uid){
       await sb.from('profiles').upsert({id:uid,email,full_name:name,role,is_active:true,custom_role_id:customRoleId||null},{onConflict:'id'});
-      if(role==='patroller'||role==='coordinator'){
-        // Check if patroller entry already exists for this user
-        const{data:existingPat}=await sb.from('patrollers').select('id').eq('user_id',uid).maybeSingle();
-        if(!existingPat){
-          const{data:np}=await sb.from('patrollers').insert({name,shift_id:D.shifts[0]?.id||null,cov_area:'',user_id:uid,is_active:true,user_type:role,phone:phone||null,patroller_id_num:patrollerId||null,basic_salary:basicSalary}).select().single();
-          if(np)await sb.from('schedules').insert({patroller_id:np.id,week_start:wStart(),day_0:'',day_1:'',day_2:'',day_3:'',day_4:'',day_5:'',day_6:''});
-        } else {
-          // Update existing patroller
-          await sb.from('patrollers').update({name,user_type:role,is_active:true}).eq('user_id',uid);
-        }
+      const isLeadOrAdmin=role==='admin'||role==='lead';
+      // Always create patroller row — needed for profile card, incentive & OT for ALL roles
+      const{data:existingPat}=await sb.from('patrollers').select('id').eq('user_id',uid).maybeSingle();
+      if(!existingPat){
+        const{data:np}=await sb.from('patrollers').insert({
+          name,shift_id:isLeadOrAdmin?null:D.shifts[0]?.id||null,cov_area:'',
+          user_id:uid,is_active:!isLeadOrAdmin,user_type:role,
+          phone:phone||null,patroller_id_num:patrollerId||null,basic_salary:basicSalary
+        }).select().single();
+        if(np&&!isLeadOrAdmin)await sb.from('schedules').insert({patroller_id:np.id,week_start:wStart(),day_0:'',day_1:'',day_2:'',day_3:'',day_4:'',day_5:'',day_6:''});
+      } else {
+        await sb.from('patrollers').update({name,user_type:role,is_active:!isLeadOrAdmin,phone:phone||null,patroller_id_num:patrollerId||null,basic_salary:basicSalary}).eq('user_id',uid);
       }
     }
-    showOk('cu-ok',`User "${name}" created! They can log in with their email.`);
-    btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i>Create user';await reload();
+    showOk('cu-ok',`Profile for "${name}" created! They can log in with their email.`);
+    btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i>Create profile';
+    await reload();closeM();
   }catch(e){btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i>Create user';showErr('cu-e',e.message||'Failed.');}
 }
 
@@ -5552,6 +5566,7 @@ function incentiveView(){
   const adj=r.adj;
   const auditPct=r.auditScore!==null?Math.round(r.auditScore*100):null;
   const uniquePct=r.uniqueScore!==null?Math.round(r.uniqueScore*100):null;
+  const perfPct=r.perfScore!==null?Math.round(r.perfScore*100):null;
   const riderPct=r.riderScore!==null?Math.round(r.riderScore*100):null;
   const headerBg='#411517';
   const totalColor='#FF5900';
