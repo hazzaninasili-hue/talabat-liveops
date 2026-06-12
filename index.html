@@ -814,8 +814,9 @@ function getPatrollerShiftStatus(pid,dayIdx,dateStr){
   const isToday=dateStr===todayStr();
   if(rec&&rec.clock_out)return{status:'completed',rec,sh,lateMins:rec.late_mins||0,adjEndTime:rec.adj_end_time||null};
   if(rec&&rec.clock_in&&!rec.clock_out){
-    // Check early clock out request
-    const earlyReq=(D.tasks||[]).find(t=>t.patroller_id===pid&&t.date===dateStr&&t.task_type==='Early Clock Out'&&t.status==='Pending');
+    // Check early clock out request — use clock-in date for overnight shifts
+    const clockInDate=rec.clock_in?new Date(rec.clock_in).toLocaleDateString('en-CA',{timeZone:'Asia/Bahrain'}):dateStr;
+    const earlyReq=(D.tasks||[]).find(t=>t.patroller_id===pid&&(t.date===dateStr||t.date===clockInDate)&&t.task_type==='Early Clock Out'&&t.status==='Pending');
     if(earlyReq)return{status:'early_out_pending',rec,sh,earlyReq};
     return{status:'clocked_in',rec,sh,lateMins:rec.late_mins||0,adjEndTime:rec.adj_end_time||null};
   }
@@ -1112,9 +1113,10 @@ function summaryView(){
       return clockInMins>getShiftStartMins(sh)+1; // 1 min grace
     }).length;
 
-    // Early clock-out: approved early clock-out tasks for this day
+    // Early clock-out: approved OR pending early clock-out tasks for this day (including overnight shifts from day before)
+    const prevDs=new Date(new Date(ds).getTime()-86400000).toISOString().split('T')[0];
     const earlyOutCount=(D.tasks||[]).filter(t=>
-      t.date===ds&&t.task_type==='Early Clock Out'&&t.status==='Approved'
+      (t.date===ds||t.date===prevDs)&&t.task_type==='Early Clock Out'&&(t.status==='Approved'||t.status==='Pending')
     ).length;
 
     const on=amV+pmV;const pct=tot?Math.round(offV/tot*100):0;
@@ -2990,15 +2992,30 @@ async function doClockOut(){
   // Check if clocking out before shift end
   if(sh&&sh.end_time){
     const nowMins=getBahrainMinutes();
-    // Use stored late_mins from attendance record (most accurate)
     const lateMins=rec.late_mins||0;
-    const adjEndMins=getShiftEndMins(sh)+lateMins;
-    if(nowMins<adjEndMins-5){ // 5 min grace period
-      const early=adjEndMins-nowMins;
+    let shiftEndMins=getShiftEndMins(sh)+lateMins;
+    const shiftStartMins=getShiftStartMins(sh)||0;
+    // Handle overnight shifts: if end < start, shift crosses midnight
+    const isOvernightShift=getShiftEndMins(sh)<shiftStartMins;
+    if(isOvernightShift){
+      // nowMins is current time of day; shift end is next calendar day
+      // If current time is in PM (after shift start), end is +24h away
+      // If current time is in early AM (before end), compare directly with end
+      const endRaw=getShiftEndMins(sh)+lateMins;
+      if(nowMins>=shiftStartMins){
+        // Still on the PM side — end is endRaw+1440
+        shiftEndMins=endRaw+1440;
+      } else {
+        // Already past midnight, on the AM side — compare normally
+        shiftEndMins=endRaw;
+      }
+    }
+    if(nowMins<shiftEndMins-5){ // 5 min grace period
+      const early=shiftEndMins-nowMins;
       const eH=Math.floor(early/60);const eM=early%60;
       const earlyLabel=eH>0?`${eH}h ${eM}m`:`${eM}m`;
-      const adjEndStr=`${String(Math.floor(adjEndMins/60)%24).padStart(2,'0')}:${String(adjEndMins%60).padStart(2,'0')}`;
-      // Submit early clock out request
+      const rawEnd=(getShiftEndMins(sh)+lateMins)%1440;
+      const adjEndStr=`${String(Math.floor(rawEnd/60)).padStart(2,'0')}:${String(rawEnd%60).padStart(2,'0')}`;
       openM({type:'earlyClockOut',earlyLabel,adjEndStr,patId:pat.id,attId:rec.id});
       return;
     }
@@ -3201,8 +3218,11 @@ function attendanceView(){
     const outT=rec?.clock_out?new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
     const dur=rec?.clock_in&&rec?.clock_out?`${Math.floor(Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000)/60)}h ${Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000)%60}m`:'--';
     const isAtt=status==='Attended';const isAbs=status==='Absent';
-    const earlyReq=(D.tasks||[]).find(t=>t.patroller_id===p.id&&t.date===today&&t.task_type==='Early Clock Out'&&t.status==='Pending');
-    const earlyApproved=(D.tasks||[]).find(t=>t.patroller_id===p.id&&t.date===today&&t.task_type==='Early Clock Out'&&t.status==='Approved');
+    // For overnight shifts, early clock-out request may be stored with clock-in date (could be yesterday)
+    const rec2=todayRecs.find(a=>a.patroller_id===p.id);
+    const clockInDate=rec2?.clock_in?new Date(rec2.clock_in).toLocaleDateString('en-CA',{timeZone:'Asia/Bahrain'}):today;
+    const earlyReq=(D.tasks||[]).find(t=>t.patroller_id===p.id&&(t.date===today||t.date===clockInDate)&&t.task_type==='Early Clock Out'&&t.status==='Pending');
+    const earlyApproved=(D.tasks||[]).find(t=>t.patroller_id===p.id&&(t.date===today||t.date===clockInDate)&&t.task_type==='Early Clock Out'&&t.status==='Approved');
     const attIdMatch=earlyReq?.description?.match(/Att ID: ([a-f0-9-]+)/);
     const attIdFromEarly=attIdMatch?attIdMatch[1]:'';
     const statusBadge=earlyReq
@@ -4209,15 +4229,18 @@ async function submitEarlyClockOut(patId,attId,adjEndStr){
   const pat=D.patrollers.find(p=>p.id===patId);
   const now=getBahrainNow();
   const timeStr=`${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')}`;
+  // Use the attendance record's date (clock-in date) — handles overnight shifts correctly
+  const attRec=(D.attendance||[]).find(a=>a.id===attId);
+  const taskDate=attRec?.date||todayStr();
   const{error}=await sb.from('task_requests').insert({
     patroller_id:patId,patroller_name:pat?.name||'',
     task_type:'Early Clock Out',
-    date:todayStr(),start_time:timeStr,end_time:adjEndStr,
+    date:taskDate,start_time:timeStr,end_time:adjEndStr,
     status:'Pending',description:`Early clock out request. Reason: ${reason}. Att ID: ${attId}`,
   });
   if(error){alert(error.message);return;}
   closeM();await reload();
-  addNotification('Early clock out request submitted — awaiting approval','info');
+  addNotification('Early clock out request submitted — awaiting TL/Admin approval','info');
 }
 
 async function approveEarlyClockOut(taskId,attId){
