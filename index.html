@@ -1965,7 +1965,9 @@ function renderSidebar(){
     html+=item('myleavebalance','ti-calendar-stats','Leave balance');
     html+=item('documents','ti-files','Documents');
     html+=`<div class="sb-section" style="margin-top:4px">Performance</div>`;
-    html+=item('performance','ti-chart-infographic','My scores');
+    html+=item('pat-scores','ti-chart-infographic','My scores');
+    html+=item('pat-coaching','ti-users','My coaching');
+    html+=item('pat-targets','ti-target','My targets');
     html+=item('incentive','ti-cash','My incentive');
   }
   const sb=document.getElementById('sidebar-nav');
@@ -2067,6 +2069,9 @@ function render(){
   }
   else if(D.tab==='attendance')html=safeRender(()=>attendanceView(),'Attendance');
   else if(D.tab==='myattendance')html=safeRender(()=>myAttendanceView(),'My Attendance');
+  else if(D.tab==='pat-scores'){D.perfTab='myperformance';html=safeRender(()=>performanceView(),'My Scores');}
+  else if(D.tab==='pat-coaching'){D.perfTab='mycoaching';html=safeRender(()=>performanceView(),'My Coaching');}
+  else if(D.tab==='pat-targets'){D.perfTab='mytarget';html=safeRender(()=>performanceView(),'My Targets');}
   else if(D.tab==='performance')html=safeRender(()=>overallPerfView(),'Scores & Incentive');
   else if(D.tab==='incentive')html=safeRender(()=>incentiveView(),'Incentive');
   else if(D.tab==='evaluation')html=safeRender(()=>evalTabView(),'Evaluation');
