@@ -2108,7 +2108,7 @@ function openAdd(){openM({type:'addpat',form:{name:'',shiftId:D.shifts[0]?.id||'
 function openEditUser(uid){
   const u=D.users.find(x=>x.id===uid);if(!u)return;
   const pat=D.patrollers.find(p=>p.user_id===uid);
-  openM({type:'edituser',uid,form:{name:u.full_name,email:u.email,role:u.role,phone:pat?.phone||'',patrollerIdNum:pat?.patroller_id_num||'',basicSalary:pat?.basic_salary||''}});
+  openM({type:'edituser',uid,form:{name:u.full_name,email:u.email,role:u.role,phone:pat?.phone||'',patrollerIdNum:pat?.patroller_id_num||'',basicSalary:pat?.basic_salary||'',joinDate:pat?.join_date||''}});
 }
 function openCreateSchedule(){
   const users=D.users.filter(u=>(u.role==='patroller'||u.role==='coordinator')&&u.is_active!==false);
@@ -2237,6 +2237,7 @@ function renderModal(){
       <div class="fg"><label>Patroller ID <span style="color:#DC2626">*</span></label><input id="cu-patroller-id" placeholder="e.g. 605135"></div>
     </div>
     <div class="fg"><label>Basic salary (BHD) <span style="color:#DC2626">*</span> <span style="font-weight:400;font-size:10px;color:var(--g3)">Used for OT and incentive calculations</span></label><input id="cu-basic-salary" placeholder="e.g. 360" type="number" min="0"></div>
+    <div class="fg"><label>Join date <span style="font-weight:400;font-size:10px;color:var(--g3)">(used for leave accrual — required for new staff)</span></label><input type="date" id="cu-join-date"></div>
     <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" id="cu-btn" onclick="doCreateUser()"><i class="ti ti-check"></i>Create profile</button></div>`;return;
   }
   if(m.type==='resetpw'){box.innerHTML=`<div class="modal-title"><i class="ti ti-key"></i>Reset password - ${m.name}</div><div class="msg msg-err" id="rp-e"></div><div class="msg msg-ok" id="rp-ok"></div><div class="fg"><label>New password</label><div class="pw-wrap"><input type="password" id="rp1" placeholder="Min 6 characters"><button class="pw-eye" onclick="togglePw('rp1',this)"><i class="ti ti-eye"></i></button></div></div><div class="fg"><label>Confirm</label><div class="pw-wrap"><input type="password" id="rp2" placeholder="Repeat"><button class="pw-eye" onclick="togglePw('rp2',this)"><i class="ti ti-eye"></i></button></div></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" id="rp-btn" onclick="doResetPw('${m.uid}')"><i class="ti ti-check"></i>Reset</button></div>`;return;}
@@ -2280,6 +2281,7 @@ function renderModal(){
       <div class="fg"><label>Patroller ID <span style="color:#DC2626">*</span></label><input id="eu-patroller-id" value="${f.patrollerIdNum}" placeholder="e.g. 605135"></div>
     </div>
     <div class="fg"><label>Basic salary (BHD) <span style="color:#DC2626">*</span> <span style="font-weight:400;font-size:10px;color:var(--g3)">Used for OT and incentive calculations</span></label><input id="eu-basic-salary" value="${f.basicSalary}" placeholder="e.g. 360" type="number" min="0"></div>
+    <div class="fg"><label>Join date <span style="font-weight:400;font-size:10px;color:var(--g3)">(for leave accrual)</span></label><input type="date" id="eu-join-date" value="${f.joinDate||''}"></div>
     <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveEditUser('${m.uid}')"><i class="ti ti-check"></i>Save profile</button></div>`;return;
   }
   if(m.type==='createschedule'){
@@ -2419,22 +2421,32 @@ function renderModal(){
     const bal=m.balance||{};
     const cf=bal.annual_carry_forward||0;
     const rid=bal.rider_id||'';
-    const hc=bal?bal.historical_consumed||0:0;
-    const hs=bal?bal.historical_sick||0:0;
+    const hc=bal.historical_consumed||0;
+    const hs=bal.historical_sick||0;
+    const hs50=bal.sick50_consumed||0;
+    const hu=bal.unpaid_consumed||0;
+    const jd=bal.join_date||'';
+    const pat=D.patrollers.find(p=>p.id===m.patrollerId||('profile-'+p.user_id)===m.patrollerId);
+    const autoId=pat?.patroller_id_num||rid||'';
     box.innerHTML=`<div class="modal-title"><i class="ti ti-calendar-stats"></i>Edit Leave Balance — ${m.patrollerName}</div>
     <div class="msg msg-err" id="lb-e"></div>
     <div class="info-box" style="background:#FFF0E6;border:1px solid #FFB380;color:#D94D00;font-size:12px;margin-bottom:14px">
       <i class="ti ti-info-circle" style="margin-right:5px"></i>
-      <b>Consumed</b> = leaves taken before this app was set up. New approved requests are added on top automatically.
+      <b>Consumed</b> = leaves taken before this app was set up. New approved requests are added automatically.
     </div>
     <div class="fg-row">
-      <div class="fg"><label>Rider ID</label><input id="lb-rid" value="${rid}" placeholder="e.g. 784315"></div>
-      <div class="fg"><label>Annual carry forward (days)</label><input type="number" id="lb-cf" value="${cf}" step="0.001" min="0" placeholder="0"></div>
+      <div class="fg"><label>Patroller ID <span style="font-size:10px;color:var(--g3)">(from profile)</span></label><input id="lb-rid" value="${autoId}" placeholder="e.g. 784315" ${autoId?'readonly style="background:var(--g1);color:var(--g4)"':''}></div>
+      <div class="fg"><label>Join date <span style="font-size:10px;color:var(--g3)">(for accrual calc)</span></label><input type="date" id="lb-joindate" value="${jd}"></div>
     </div>
-    <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin:12px 0 8px">Historical consumed (before app)</div>
+    <div class="fg"><label>Annual carry forward (days)</label><input type="number" id="lb-cf" value="${cf}" step="0.001" min="0" placeholder="0"></div>
+    <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin:12px 0 8px">Historical consumed (before app setup)</div>
     <div class="fg-row">
-      <div class="fg"><label>Annual leave consumed</label><input type="number" id="lb-hc" value="${hc}" step="1" min="0" placeholder="0"></div>
-      <div class="fg"><label>Sick leave consumed</label><input type="number" id="lb-hs" value="${hs}" step="1" min="0" placeholder="0"></div>
+      <div class="fg"><label>Annual leave consumed (days)</label><input type="number" id="lb-hc" value="${hc}" step="1" min="0" placeholder="0"></div>
+      <div class="fg"><label>Sick leave consumed (days)</label><input type="number" id="lb-hs" value="${hs}" step="1" min="0" placeholder="0"></div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>Sick 50% consumed (days)</label><input type="number" id="lb-hs50" value="${hs50}" step="1" min="0" placeholder="0"></div>
+      <div class="fg"><label>Unpaid leave consumed (days)</label><input type="number" id="lb-hu" value="${hu}" step="1" min="0" placeholder="0"></div>
     </div>
     <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveLeaveBalance('${m.patrollerId}')"><i class="ti ti-check"></i>Save</button></div>`;return;
   }
@@ -2473,7 +2485,7 @@ function renderModal(){
   if(m.type==='timeoff'){
     const isAL=canEdit();const myP=D.patrollers.find(p=>p.user_id===D.profile.id);
     const patOpts=isAL?D.patrollers.map(p=>`<option value="${p.id}">${p.name}</option>`).join(''):myP?`<option value="${myP.id}" selected>${myP.name}</option>`:'';
-    box.innerHTML=`<div class="modal-title"><i class="ti ti-calendar-off"></i>New time-off request</div><div class="msg msg-err" id="to-e"></div><div class="fg-row"><div class="fg"><label>Patroller</label><select id="to-pat"><option value="">-- Select --</option>${patOpts}</select></div><div class="fg"><label>Patroller ID (manual)</label><input id="to-code" placeholder="e.g. PAT-001"></div></div><div class="fg"><label>Leave type</label><select id="to-type">${LEAVE_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('')}</select></div><div class="fg-row"><div class="fg"><label>Start date</label><input type="date" id="to-start"></div><div class="fg"><label>End date</label><input type="date" id="to-end"></div></div><div class="fg"><label>Support document link (optional)</label><input id="to-doc" placeholder="https://drive.google.com/..."></div><div class="fg"><label>Comment</label><textarea id="to-comment" style="min-height:65px;resize:vertical" placeholder="Additional notes..."></textarea></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveTO()"><i class="ti ti-send"></i>Submit</button></div>`;
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-calendar-off"></i>New time-off request</div><div class="msg msg-err" id="to-e"></div><div class="fg-row"><div class="fg"><label>Patroller</label><select id="to-pat" onchange="var _tp=D.patrollers.find(function(x){return x.id===document.getElementById('to-pat').value;});document.getElementById('to-code').value=_tp?(_tp.patroller_id_num||''):''"><option value="">-- Select --</option>${patOpts}</select></div><div class="fg"><label>Patroller ID</label><input id="to-code" placeholder="Auto-filled" readonly style="background:var(--g1);color:var(--g4)"></div></div><div class="fg"><label>Leave type</label><select id="to-type">${LEAVE_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('')}</select></div><div class="fg-row"><div class="fg"><label>Start date</label><input type="date" id="to-start"></div><div class="fg"><label>End date</label><input type="date" id="to-end"></div></div><div class="fg"><label>Support document link (optional)</label><input id="to-doc" placeholder="https://drive.google.com/..."></div><div class="fg"><label>Comment</label><textarea id="to-comment" style="min-height:65px;resize:vertical" placeholder="Additional notes..."></textarea></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveTO()"><i class="ti ti-send"></i>Submit</button></div>`;
     if(!isAL&&myP)setTimeout(()=>{const el=document.getElementById('to-pat');if(el)el.value=myP.id;},50);
     return;
   }
@@ -2535,6 +2547,7 @@ async function saveEditUser(uid){
       name,phone:phone||null,user_type:role,
       patroller_id_num:patrollerIdNum||null,
       basic_salary:basicSalary,
+      join_date:document.getElementById('eu-join-date')?.value||null,
       is_active:isLeadOrAdmin?false:true
     }).eq('id',pat.id);
   } else {
@@ -3243,10 +3256,12 @@ function attendanceView(){
     const earlyApproved=(D.tasks||[]).find(t=>t.patroller_id===p.id&&t.date===attDate&&t.task_type==='Early Clock Out'&&t.status==='Approved');
     const attIdMatch=earlyReq?.description?.match(/Att ID: ([a-f0-9-]+)/);
     const attIdFromEarly=attIdMatch?attIdMatch[1]:'';
+    const earlyAny=earlyReq||earlyApproved;
+    const earlyReason=earlyAny?.description?.match(/Reason: ([^.]+)/)?.[1]||'';
     const statusBadge=earlyReq
-      ?`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:#FEF3C7;color:#D97706">⏳ Early out pending</span>`
+      ?`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:#FEF3C7;color:#D97706">⏳ Early out pending</span>${earlyReason?`<div style="font-size:9px;color:#92400E;margin-top:2px">💬 ${earlyReason}</div>`:''}`
       :earlyApproved
-      ?`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:#EDE9FE;color:#4C1D95">⚡ Early out approved</span>`
+      ?`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:#EDE9FE;color:#4C1D95">⚡ Early out approved</span>${earlyReason?`<div style="font-size:9px;color:#4C1D95;margin-top:2px">💬 ${earlyReason}</div>`:''}`
       :`<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;${isAtt?'background:#DCFCE7;color:#166534':isAbs?'background:#FEE2E2;color:#991B1B':'background:#F4EDE3;color:#94A3B8'}">${status||'Pending'}</span>`;
     const zone=gDZ(p.id,todaySelIdx)||'--';
     const sh=getDayShift(p.id,todaySelIdx);
@@ -3848,7 +3863,8 @@ async function doCreateUser(){
         const{data:np}=await sb.from('patrollers').insert({
           name,shift_id:isLeadOrAdmin?null:D.shifts[0]?.id||null,cov_area:'',
           user_id:uid,is_active:!isLeadOrAdmin,user_type:role,
-          phone:phone||null,patroller_id_num:patrollerId||null,basic_salary:basicSalary
+          phone:phone||null,patroller_id_num:patrollerId||null,basic_salary:basicSalary,
+          join_date:document.getElementById('cu-join-date')?.value||null
         }).select().single();
         if(np&&!isLeadOrAdmin)await sb.from('schedules').insert({patroller_id:np.id,week_start:wStart(),day_0:'',day_1:'',day_2:'',day_3:'',day_4:'',day_5:'',day_6:''});
       } else {
@@ -3943,8 +3959,15 @@ async function saveLeaveBalance(patrollerId){
   const rid=(document.getElementById('lb-rid').value||'').trim();
   const hc=parseFloat(document.getElementById('lb-hc').value)||0;
   const hs=parseFloat(document.getElementById('lb-hs').value)||0;
+  const hs50=parseFloat(document.getElementById('lb-hs50')?.value)||0;
+  const hu=parseFloat(document.getElementById('lb-hu')?.value)||0;
+  const joinDate=document.getElementById('lb-joindate')?.value||null;
   const year=getLeaveYear();
-  const payload={annual_carry_forward:cf,rider_id:rid||null,year,historical_consumed:hc,historical_sick:hs,updated_at:new Date().toISOString()};
+  const payload={annual_carry_forward:cf,rider_id:rid||null,year,
+    historical_consumed:hc,historical_sick:hs,
+    sick50_consumed:hs50,unpaid_consumed:hu,
+    join_date:joinDate||null,
+    updated_at:new Date().toISOString()};
 
   // Handle profile-based IDs (team leads with no patroller record)
   let realPatrollerId=patrollerId;
@@ -4043,13 +4066,18 @@ const ANNUAL_DAILY_RATE = 30.295 / 365; // ~0.083 days per day
 
 function getLeaveYear(){ return new Date().getFullYear(); }
 
-function calcAnnualAccrued(){
-  const now = new Date();
-  const jan1 = new Date(now.getFullYear(), 0, 1);
-  const daysElapsed = Math.floor((now - jan1) / 86400000);
-  return Math.round(daysElapsed * ANNUAL_DAILY_RATE * 1000) / 1000;
+function calcAnnualAccrued(joinDate){
+  const now=getBahrainNow();
+  const jan1=new Date(Date.UTC(now.getUTCFullYear(),0,1));
+  let startDate=jan1;
+  if(joinDate){
+    const jd=new Date(joinDate+'T00:00:00Z');
+    if(jd.getUTCFullYear()===now.getUTCFullYear()&&jd>jan1)startDate=jd;
+    else if(jd>now)return 0;
+  }
+  const daysElapsed=Math.floor((now-startDate)/86400000);
+  return Math.round(daysElapsed*ANNUAL_DAILY_RATE*1000)/1000;
 }
-
 function getLeaveBalance(patrollerId){
   const lb = D.leaveBalances.find(b => b.patroller_id === patrollerId);
   const pat = D.patrollers.find(p=>p.id===patrollerId);
@@ -4060,7 +4088,8 @@ function getLeaveBalance(patrollerId){
     ? getRosterByEmail(ownEmail)
     : (pat ? getRosterByPatroller(pat) : null);
   const year = getLeaveYear();
-  const accrued = calcAnnualAccrued();
+  const joinDate=lb?.join_date||pat?.join_date||null;
+  const accrued = calcAnnualAccrued(joinDate);
 
   // Carry forward: use DB value if set, else use roster spreadsheet value
   const carryForward = (lb && lb.annual_carry_forward != null && lb.annual_carry_forward > 0)
@@ -4140,7 +4169,7 @@ function leaveBalanceCard(p, showFull=true){
       <div style="width:44px;height:44px;border-radius:50%;background:#F9EDEE;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#411517;flex-shrink:0">${ini(p.name)}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:14px;font-weight:700;color:#2A0D0F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
-        <div style="font-size:11px;color:#A08070;margin-top:1px">${b.riderId?`ID: ${b.riderId} · `:''}${roleName}</div>
+        <div style="font-size:11px;color:#A08070;margin-top:1px">${p.patroller_id_num?`<span style="font-family:monospace;font-weight:600;color:#411517">${p.patroller_id_num}</span> · `:''}${b.riderId&&b.riderId!==p.patroller_id_num?`ID: ${b.riderId} · `:''}${roleName}${p.join_date?` · Joined ${p.join_date}`:''}</div>
       </div>
       <div style="text-align:right;flex-shrink:0">
         <div style="font-size:10px;color:#A08070">${b.year}</div>
@@ -4192,36 +4221,24 @@ function leaveBalanceCard(p, showFull=true){
 
 // ── LEAVE BALANCE VIEW (admin) ──
 function leaveBalanceView(){
-  // Include ALL active patrollers (has schedule record)
+  // Include all staff — patrollers (active), team leads (is_active=false but user_type=lead), excluding pure admins
   const pts = D.patrollers.filter(p=>{
-    if(p.is_active===false)return false;
     const u=D.users.find(u=>u.id===p.user_id);
-    if(u){
-      if(u.is_active===false)return false;
-      if(u.role==='admin')return false;
-      if(u.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr&&cr.access_level==='admin')return false;}
-    }
-    return true;
+    if(u&&u.is_active===false)return false;
+    if(u&&u.role==='admin')return false;
+    if(u&&u.custom_role_id){const cr=(D.customRoles||[]).find(r=>r.id===u.custom_role_id);if(cr&&cr.access_level==='admin')return false;}
+    return true; // includes patrollers (is_active=true) and leads (is_active=false but user_type=lead)
   });
-  // Also include team leads who have profiles but no patroller record
-  const leadProfiles=D.users.filter(u=>{
-    if(u.is_active===false)return false;
-    if(u.role==='admin')return false;
-    if(u.role!=='lead')return false;
-    if(D.patrollers.find(p=>p.user_id===u.id))return false; // already in pts
-    return true;
-  }).map(u=>({id:'profile-'+u.id,name:u.full_name,user_id:u.id,shift_id:null,is_active:true,user_type:'lead'}));
-  const allPts=[...pts,...leadProfiles];
   if(!pts.length) return `<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-calendar-off" style="font-size:40px;display:block;margin-bottom:10px;opacity:.3"></i><div style="font-weight:600">No users yet</div></div>`;
 
   // Summary stats
-  const allBalances = allPts.map(p => getLeaveBalance(p.id));
+  const allBalances = pts.map(p => getLeaveBalance(p.id));
   const lowBalance = allBalances.filter(b => b.annualRemaining < 5).length;
   const totalAnnualUsed = allBalances.reduce((s,b) => s + b.consumedAnnual, 0);
 
   const isJan1=getBahrainNow().getUTCMonth()===0&&getBahrainNow().getUTCDate()===1;
   return`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-    <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">${allPts.length} staff · ${getLeaveYear()}</div>
+    <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em">${pts.length} staff · ${getLeaveYear()}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       ${lowBalance>0?`<span style="font-size:11px;background:#FEE2E2;color:#DC2626;padding:4px 10px;border-radius:8px;font-weight:600">⚠ ${lowBalance} low balance</span>`:''}
       <span style="font-size:11px;background:#F4EDE3;color:#411517;padding:4px 10px;border-radius:8px">Used this year: ${totalAnnualUsed}d</span>
@@ -4230,7 +4247,7 @@ function leaveBalanceView(){
     </div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
-    ${allPts.map(p => leaveBalanceCard(p)).join('')}
+    ${pts.map(p => leaveBalanceCard(p)).join('')}
   </div>`;
 }
 
