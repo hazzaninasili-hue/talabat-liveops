@@ -704,7 +704,7 @@ function isAbsentOnDate(pid, dateStr){
 }
 function isAbsentToday(pid){return isAbsentOnDate(pid,todayStr());}
 // Get effective user_type: prefer profile role over patroller.user_type
-function getUtype(p){const u=D.users.find(u=>u.id===p.user_id);if(u){return u.role==='coordinator'?'coordinator':'patroller';}return p.user_type||'patroller';}
+function getUtype(p){const u=D.users.find(u=>u.id===p.user_id);if(u){if(u.role==='coordinator')return'coordinator';if(u.role==='lead')return'lead';if(u.role==='admin')return'admin';return'patroller';}return p.user_type||'patroller';}
 function summ(pts){const p=pts||activePats();const am=Array(7).fill(0),pm=Array(7).fill(0),off=Array(7).fill(0);
   p.forEach(pt=>{for(let i=0;i<7;i++){
     const dates=wDates();const dayStr=dates[i]?dateToStr(dates[i]):'';
