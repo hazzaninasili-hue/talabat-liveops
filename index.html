@@ -1063,125 +1063,180 @@ function dateView(){
 function summaryView(){
   const dates=wDates();const pts=activePats();
   const patrollers=pts.filter(p=>getUtype(p)==='patroller');
-  const coordinators=pts.filter(p=>getUtype(p)==='coordinator');
   const{am,pm,off}=summ(pts);
-  const{am:pam,pm:ppm,off:poff}=summ(patrollers);
-  const{am:cam,pm:cpm,off:coff}=summ(coordinators);
-  const ptot=patrollers.length;const ctot=coordinators.length;
-
-  // Weekly attendance totals
   const ds2=d=>d.toISOString().split('T')[0];
-  const weekAttended=dates.reduce((t,d)=>{const ds=ds2(d);return t+(D.attendance||[]).filter(a=>a.date===ds&&a.status==='Attended').length;},0);
-  const weekAbsent=dates.reduce((t,d)=>{const ds=ds2(d);return t+(D.attendance||[]).filter(a=>a.date===ds&&a.status&&a.status.startsWith('Absent')).length;},0);
-  const weekVac=pts.filter(p=>dates.some(d=>{const ds=ds2(d);return D.timeoff.find(tf=>tf.patroller_id===p.id&&tf.status==='Approved'&&ds>=tf.start_date&&ds<=tf.end_date);})).length;
+  const today=todayStr();
 
-  const mkScheduleRow=(d,i,amV,pmV,offV,tot)=>{
-    const ds=d.toISOString().split('T')[0];
+  // Live status counts
+  const onShift=patrollers.filter(p=>{
+    const todayIdx=new Date(today+'T00:00:00Z').getUTCDay();
+    return gDZ(p.id,todayIdx)&&shiftActive(getDayShift(p.id,todayIdx));
+  }).length;
+  const onVacToday=patrollers.filter(p=>isOnVacationToday(p.id)).length;
+  const absentToday=(D.attendance||[]).filter(a=>a.date===today&&a.status&&a.status.startsWith('Absent')).length;
+  const runningTasks=(D.tasks||[]).filter(t=>t.status==='Running').length;
+
+  // Quick action counts
+  const pendingTO=(D.timeoff||[]).filter(t=>t.status==='Pending').length;
+  const savedMonth=D.incMonth||(getBahrainNow().getUTCFullYear()+'-'+String(getBahrainNow().getUTCMonth()+1).padStart(2,'0'));
+  const monthPayout=(D.incentiveData||[]).filter(d=>d.month===savedMonth&&d.payout_total!=null).reduce((s,d)=>s+(d.payout_total||0),0);
+
+  // Performance score for current month
+  const ps=getPerfSettings();
+  const curMonth=savedMonth;
+  const teamPerfScores=patrollers.map(p=>{
+    const ev=D.evaluations.filter(e=>e.patroller_id===p.id&&(e.month||e.eval_date?.slice(0,7))===curMonth);
+    const ea=ev.length?Math.round(ev.reduce((s,e)=>s+evalScore(e),0)/ev.length):null;
+    const cs=coachingScore(p.id,curMonth);
+    return(ea!==null&&cs!==null)?perfScore(ea,cs,ps):null;
+  }).filter(s=>s!==null);
+  const teamAvgScore=teamPerfScores.length?Math.round(teamPerfScores.reduce((a,b)=>a+b,0)/teamPerfScores.length):null;
+
+  // Patroller status cards
+  const todayIdx2=new Date(today+'T00:00:00Z').getUTCDay();
+  const patrollerCards=patrollers.map(p=>{
+    const z=gDZ(p.id,todayIdx2);
+    const sh=getDayShift(p.id,todayIdx2);
+    const onVac=isOnVacationToday(p.id);
+    const attRec=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===today);
+    const isAbs=isAbsentOnDate(p.id,today);
+    const ini2=ini(p.name);
+
+    let status='',statusPill='',borderCol='var(--g2)',avBg='var(--g1)',avCol='var(--g4)';
+    if(onVac){status='On vacation';statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">🌴 Vacation</span>`;borderCol='#A78BFA';}
+    else if(isAbs){status='Absent';statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#FEE2E2;color:#991B1B">✗ Absent</span>`;borderCol='#F87171';avBg='#FEE2E2';avCol='#991B1B';}
+    else if(!z){statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:var(--g1);color:var(--g3)">Off day</span>`;}
+    else if(attRec?.status?.startsWith('Early out')){
+      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">⚡ Early out ${attRec.status.includes('Approved')?'approved':'pending'}</span>`;
+      borderCol='#A78BFA';avBg='#EDE9FE';avCol='#4C1D95';
+    }
+    else if(attRec?.clock_in){
+      const inT=new Date(attRec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#DCFCE7;color:#166534">🟢 On shift · in ${inT}</span>`;
+      borderCol='#4ADE80';avBg='#DCFCE7';avCol='#166534';
+    } else if(z&&sh&&shiftActive(sh)){
+      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:var(--g1);color:var(--g3)">⏰ Not clocked in</span>`;
+    } else if(z&&sh){
+      const shiftLabel=sh.shift_type==='morning'?'☀️':'🌙';
+      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:var(--g1);color:var(--g3)">${shiftLabel} Starts ${fmtT(sh.start_time)}</span>`;
+    }
+    const zoneLabel=z?z.substring(0,18)+(z.length>18?'…':''):'';
+    const shiftLabel=sh?(sh.shift_type==='morning'?'☀️':'🌙')+' '+fmtT(sh.start_time)+'–'+fmtT(sh.end_time):'';
+    return`<div style="display:flex;align-items:center;gap:9px;background:var(--sur);border:0.5px solid var(--g2);border-left:3px solid ${borderCol};border-radius:0 9px 9px 0;padding:8px 11px;margin-bottom:6px">
+      <div style="width:28px;height:28px;border-radius:50%;background:${avBg};color:${avCol};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;flex-shrink:0">${ini2}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+        <div style="font-size:10px;color:var(--g3)">${z?zoneLabel+' · '+shiftLabel:sh?shiftLabel:''}</div>
+      </div>
+      <div>${statusPill}</div>
+    </div>`;
+  }).join('');
+
+  // Weekly summary rows
+  const weekRows=dates.map((d,i)=>{
+    const ds=ds2(d);const isToday=ds===today;
     const dayAtts=(D.attendance||[]).filter(a=>a.date===ds);
-    const attCount=dayAtts.filter(a=>a.status==='Attended').length;
-    const absCount=dayAtts.filter(a=>a.status&&a.status.startsWith('Absent')).length;
-    const vacCount=pts.filter(p=>D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds>=t.start_date&&ds<=t.end_date)).length;
-
-    // Late clock-in: clocked in after shift start time
-    const lateCount=dayAtts.filter(a=>{
-      if(!a.clock_in)return false;
-      const pat=D.patrollers.find(p=>p.id===a.patroller_id);if(!pat)return false;
-      const dayIdx=new Date(Date.UTC(...ds.split('-').map((v,i)=>i===1?v-1:+v))).getUTCDay();
-      const sh=getDayShift(pat.id,dayIdx);if(!sh||!sh.start_time)return false;
-      const inT=new Date(a.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
-      const clockInMins=parseInt(inT.split(':')[0])*60+parseInt(inT.split(':')[1]);
-      return clockInMins>getShiftStartMins(sh)+1; // 1 min grace
-    }).length;
-
-    // Early clock-out: count from tasks (Approved/Pending) OR directly from attendance records
-    // where patroller clocked out before shift end (catches historical data with wrong task dates)
-    const taskEarlyOut=(D.tasks||[]).filter(t=>
-      t.date===ds&&t.task_type==='Early Clock Out'&&(t.status==='Approved'||t.status==='Pending')
-    ).map(t=>{const m=t.description?.match(/Att ID: ([a-f0-9-]+)/);return m?m[1]:null;}).filter(Boolean);
-
-    const attEarlyOut=dayAtts.filter(a=>{
-      if(taskEarlyOut.includes(a.id))return false; // already counted via task
-      if(!a.clock_in||!a.clock_out)return false;
-      const pat=D.patrollers.find(p=>p.id===a.patroller_id);if(!pat)return false;
-      const dayIdx=new Date(Date.UTC(...ds.split('-').map((v,i)=>i===1?v-1:+v))).getUTCDay();
-      const sh=getDayShift(pat.id,dayIdx);if(!sh||!sh.end_time)return false;
-      const outT=new Date(a.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
-      const outMins=parseInt(outT.split(':')[0])*60+parseInt(outT.split(':')[1]);
-      const lateMins=a.late_mins||0;
-      const shiftEndRaw=getShiftEndMins(sh)+lateMins;
-      const shiftStartMins=getShiftStartMins(sh)||0;
-      const isOvernight=getShiftEndMins(sh)<shiftStartMins;
-      // For overnight shifts: if clock-out is PM side, compare with end+1440
-      const adjEnd=isOvernight&&outMins>=shiftStartMins?shiftEndRaw+1440:shiftEndRaw;
-      const adjOut=isOvernight&&outMins>=shiftStartMins?outMins+1440:outMins;
-      return adjOut<adjEnd-5; // clocked out more than 5 min early
-    }).length;
-
-    const earlyOutCount=taskEarlyOut.length+attEarlyOut;
-
-    const on=amV+pmV;const pct=tot?Math.round(offV/tot*100):0;
-    const pb=pct>=50?'background:var(--red-l);color:var(--red-d)':pct>=30?'background:var(--amber-l);color:var(--amber-d)':'background:var(--green-l);color:var(--green)';
-    const isToday=ds===todayStr();
-    return`<tr${isToday?' style="background:#FFF8F0"':''}>
-      <td class="lt">${DAYS[i]}${isToday?'<span style="font-size:9px;background:#FF5900;color:#fff;padding:1px 5px;border-radius:4px;margin-left:5px">Today</span>':''}</td>
-      <td style="font-family:monospace;font-size:11px">${fmt(d)}</td>
-      <td><span class="am-chip">${amV}</span></td>
-      <td><span class="pm-chip">${pmV}</span></td>
-      <td style="font-weight:700;color:var(--teal)">${on}</td>
-      <td style="font-weight:700;color:var(--red)">${offV}</td>
-      <td>${attCount>0?`<span style="font-size:10px;font-weight:700;color:#166534;background:#DCFCE7;padding:2px 7px;border-radius:6px">${attCount}</span>`:'<span style="font-size:10px;color:var(--g3)">--</span>'}</td>
-      <td>${absCount>0?`<span style="font-size:10px;font-weight:700;color:#991B1B;background:#FEE2E2;padding:2px 7px;border-radius:6px">${absCount}</span>`:'<span style="font-size:10px;color:var(--g3)">--</span>'}</td>
-      <td>${vacCount>0?`<span style="font-size:10px;font-weight:700;color:#7C3AED;background:#EDE9FE;padding:2px 7px;border-radius:6px">🌴 ${vacCount}</span>`:'<span style="font-size:10px;color:var(--g3)">--</span>'}</td>
-      <td>${lateCount>0?`<span style="font-size:10px;font-weight:700;color:#D97706;background:#FEF3C7;padding:2px 7px;border-radius:6px">🕐 ${lateCount}</span>`:'<span style="font-size:10px;color:var(--g3)">--</span>'}</td>
-      <td>${earlyOutCount>0?`<span style="font-size:10px;font-weight:700;color:#7C3AED;background:#EDE9FE;padding:2px 7px;border-radius:6px">⏩ ${earlyOutCount}</span>`:'<span style="font-size:10px;color:var(--g3)">--</span>'}</td>
-      <td><span class="pct-badge" style="${pb}">${pct}%</span></td>
+    const att=dayAtts.filter(a=>a.status==='Attended').length;
+    const abs=dayAtts.filter(a=>a.status&&a.status.startsWith('Absent')).length;
+    const late=dayAtts.filter(a=>a.is_late).length;
+    const early=dayAtts.filter(a=>a.status&&a.status.includes('Early out')).length;
+    const duty=patrollers.filter(p=>gDZ(p.id,i)).length;
+    if(duty===0&&att===0&&abs===0)return'';
+    return`<tr${isToday?' style="background:rgba(255,89,0,.04)"':''}>
+      <td style="font-size:10px;font-family:monospace;color:var(--g4)">${SD[i]} ${ds.slice(5).replace('-','/')}</td>
+      ${isToday?`<td style="text-align:center"><b>${duty}</b></td>`:`<td style="text-align:center;color:var(--g3)">${duty}</td>`}
+      <td style="text-align:center">${att?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#DCFCE7;color:#166534">${att}</span>`:'—'}</td>
+      <td style="text-align:center">${abs?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#FEE2E2;color:#991B1B">${abs}</span>`:'—'}</td>
+      <td style="text-align:center">${late?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#FEF3C7;color:#92400E">${late}</span>`:'—'}</td>
+      <td style="text-align:center">${early?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#EDE9FE;color:#4C1D95">${early}</span>`:'—'}</td>
     </tr>`;
-  };
+  }).filter(Boolean).join('');
 
-  return buildRoleLiveTable(D.woff===0)+`
+  // Individual attendance this week
+  const indivRows=patrollers.map(p=>{
+    const cells=dates.map((d,i)=>{
+      const ds=ds2(d);
+      const onVacD=D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds>=t.start_date&&ds<=t.end_date);
+      if(onVacD)return`<td style="text-align:center;font-size:10px">🌴</td>`;
+      if(!gDZ(p.id,i))return`<td style="text-align:center;font-size:10px;color:var(--g3)">Off</td>`;
+      const att=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);
+      if(att?.status==='Attended')return`<td style="text-align:center;color:#166534;font-weight:600">✓</td>`;
+      if(att?.status?.startsWith('Absent'))return`<td style="text-align:center;color:#DC2626;font-weight:600">✗</td>`;
+      return`<td style="text-align:center;color:var(--g3);font-size:10px">?</td>`;
+    }).join('');
+    const present=(D.attendance||[]).filter(a=>a.patroller_id===p.id&&dates.some(d=>ds2(d)===a.date)&&a.status==='Attended').length;
+    const absent=(D.attendance||[]).filter(a=>a.patroller_id===p.id&&dates.some(d=>ds2(d)===a.date)&&a.status?.startsWith('Absent')).length;
+    return`<tr>
+      <td style="font-size:10px;font-family:monospace;color:var(--g3)">${p.patroller_id_num||'—'}</td>
+      <td style="font-weight:600">${p.name}</td>
+      <td><span style="display:inline-block;padding:1px 5px;border-radius:5px;font-size:9px;font-weight:500;background:var(--g1);color:var(--g3)">Pat</span></td>
+      ${cells}
+      <td style="text-align:center;font-weight:600;color:#166534">${present}</td>
+      <td style="text-align:center;font-weight:600;color:${absent?'#DC2626':'var(--g4)'}">${absent}</td>
+    </tr>`;
+  }).join('');
 
-  ${patrollers.length?`
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-    <strong style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-user" style="font-size:12px;margin-right:5px"></i>Patrollers — Weekly Summary</strong>
+  return`
+  <div style="background:#1A0507;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden">
+    <div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div>
+    <div style="position:relative;z-index:1">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px">
+        <div style="width:7px;height:7px;border-radius:50%;background:#4ADE80"></div>
+        <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.6">Live · ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'})} · Today</div>
+        <div style="margin-left:auto;font-size:10px;opacity:.35">Week ${getISOWeek(dates[0])} · ${fmt(dates[0])} – ${fmt(dates[6])}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">On shift</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${onShift}</div></div>
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Off duty</div><div style="font-size:24px;font-weight:500;opacity:.45">${patrollers.length-onShift-onVacToday-absentToday}</div></div>
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Absent</div><div style="font-size:24px;font-weight:500;color:#FCA5A5">${absentToday}</div></div>
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">On vacation</div><div style="font-size:24px;font-weight:500;color:#C4B5FD">${onVacToday}</div></div>
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">On task</div><div style="font-size:24px;font-weight:500;color:#FCD34D">${runningTasks}</div></div>
+      </div>
+    </div>
   </div>
-  <div class="tcard"><div class="t-scroll"><table class="sum-table"><thead><tr>
-    <th class="lt">Day</th><th>Date</th><th>AM</th><th>PM</th><th>On duty</th><th>Off</th>
-    <th style="color:#166534">Attended</th><th style="color:#991B1B">Absent</th><th style="color:#7C3AED">Vacation</th><th style="color:#D97706">Late In</th><th style="color:#7C3AED">Early Out</th><th style="min-width:80px">Off%</th>
-  </tr></thead><tbody>${dates.map((d,i)=>mkScheduleRow(d,i,pam[i],ppm[i],poff[i],ptot)).join('')}</tbody></table></div></div>`:''}
 
-  ${coordinators.length?`
-  <div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 8px">
-    <strong style="font-size:12px;font-weight:700;color:#134E4A;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-star" style="font-size:12px;margin-right:5px"></i>Coordinators — Weekly Summary</strong>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
+    <div class="tcard" style="padding:10px;text-align:center;background:#FFF0E6;border-color:#F0997B;cursor:pointer" onclick="setTab('attendance')"><i class="ti ti-clock-check" style="font-size:18px;color:#FF5900;display:block;margin-bottom:4px"></i><div style="font-size:11px;font-weight:600">Attendance</div><div style="font-size:10px;color:#993C1D;margin-top:2px">${onShift} on shift today</div></div>
+    <div class="tcard" style="padding:10px;text-align:center;cursor:pointer" onclick="setTab('timeoff')"><i class="ti ti-calendar-off" style="font-size:18px;color:#BA7517;display:block;margin-bottom:4px"></i><div style="font-size:11px;font-weight:600">Time off</div><div style="font-size:10px;color:${pendingTO>0?'#BA7517':'var(--g3)'};font-weight:${pendingTO>0?600:400};margin-top:2px">${pendingTO>0?pendingTO+' pending':'No pending'}</div></div>
+    <div class="tcard" style="padding:10px;text-align:center;cursor:pointer" onclick="setTab('incentive')"><i class="ti ti-cash" style="font-size:18px;color:#166534;display:block;margin-bottom:4px"></i><div style="font-size:11px;font-weight:600">${savedMonth.replace('-','/')} payout</div><div style="font-size:10px;color:#166534;font-weight:600;margin-top:2px">${monthPayout>0?'BHD '+monthPayout.toFixed(3):'Not saved yet'}</div></div>
+    <div class="tcard" style="padding:10px;text-align:center;cursor:pointer" onclick="setTab('performance')"><i class="ti ti-chart-infographic" style="font-size:18px;color:#185FA5;display:block;margin-bottom:4px"></i><div style="font-size:11px;font-weight:600">Team score</div><div style="font-size:10px;color:#185FA5;font-weight:600;margin-top:2px">${teamAvgScore!==null?teamAvgScore+'% avg':'No data'}</div></div>
   </div>
-  <div class="tcard"><div class="t-scroll"><table class="sum-table"><thead><tr>
-    <th class="lt">Day</th><th>Date</th><th>AM</th><th>PM</th><th>On duty</th><th>Off</th>
-    <th style="color:#166534">Attended</th><th style="color:#991B1B">Absent</th><th style="color:#7C3AED">Vacation</th><th style="color:#D97706">Late In</th><th style="color:#7C3AED">Early Out</th><th style="min-width:80px">Off%</th>
-  </tr></thead><tbody>${dates.map((d,i)=>mkScheduleRow(d,i,cam[i],cpm[i],coff[i],ctot)).join('')}</tbody></table></div></div>`:''}
 
-  <div style="margin-top:20px;border-top:1.5px solid var(--g2);padding-top:16px">
-    <strong style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-users" style="font-size:12px;margin-right:5px"></i>Individual Attendance This Week</strong>
-    <div class="tcard" style="margin-top:10px"><div class="t-scroll"><table style="table-layout:auto"><thead><tr>
-      <th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Name</th><th>Type</th>
-      ${dates.map((d,i)=>`<th>${SD[i]}<br><span style="font-family:monospace;font-size:9px;font-weight:400">${fmt(d)}</span></th>`).join('')}
-      <th>Attended</th><th>Absent</th>
-    </tr></thead><tbody>
-    ${pts.map(p=>{
-      const cells=dates.map(d=>{
-        const ds=d.toISOString().split('T')[0];
-        const zone=gDZ(p.id,dates.indexOf(d));
-        const isVac=D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds>=t.start_date&&ds<=t.end_date);
-        const rec=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);
-        if(isVac)return`<td><span style="font-size:9px;background:#EDE9FE;color:#7C3AED;padding:1px 5px;border-radius:3px">🌴</span></td>`;
-        if(!zone)return`<td><span style="font-size:9px;color:var(--g3)">Off</span></td>`;
-        if(rec?.status==='Attended')return`<td><span style="font-size:11px;color:#166534;font-weight:700">✓</span></td>`;
-        if(rec?.status&&rec.status.startsWith('Absent'))return`<td><span style="font-size:11px;color:#DC2626;font-weight:700" title="${rec.status}">✗</span></td>`;
-        return`<td><span style="font-size:9px;color:var(--g3)">?</span></td>`;
-      }).join('');
-      const attW=dates.filter(d=>{const ds=d.toISOString().split('T')[0];const r=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);return r?.status==='Attended';}).length;
-      const absW=dates.filter(d=>{const ds=d.toISOString().split('T')[0];const r=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);return r&&r.status&&r.status.startsWith('Absent');}).length;
-      return`<tr><td style="font-size:11px;font-family:monospace;color:var(--g4);white-space:nowrap">${p.patroller_id_num||'--'}</td><td class="lt" style="font-weight:600">${p.name}</td><td><span class="role-badge ${getUtype(p)==='coordinator'?'rb-coord':'rb-pat'}">${getUtype(p)==='coordinator'?'Coord':'Pat'}</span></td>${cells}<td style="font-weight:700;color:#166534">${attW}</td><td style="font-weight:700;color:#DC2626">${absW}</td></tr>`;
-    }).join('')}
-    </tbody></table></div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    <div>
+      <div style="font-size:9px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Team today</div>
+      ${patrollerCards}
+    </div>
+    <div>
+      <div style="font-size:9px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Weekly summary</div>
+      <div class="tcard" style="padding:0;overflow:hidden;margin-bottom:8px">
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="background:var(--g1)">
+            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-bottom:0.5px solid var(--g2);text-align:left">Day</th>
+            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-bottom:0.5px solid var(--g2);text-align:center">Duty</th>
+            <th style="font-size:9px;font-weight:500;color:#166534;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-bottom:0.5px solid var(--g2);text-align:center">Att</th>
+            <th style="font-size:9px;font-weight:500;color:#DC2626;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-bottom:0.5px solid var(--g2);text-align:center">Abs</th>
+            <th style="font-size:9px;font-weight:500;color:#D97706;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-bottom:0.5px solid var(--g2);text-align:center">Late</th>
+            <th style="font-size:9px;font-weight:500;color:#7C3AED;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-bottom:0.5px solid var(--g2);text-align:center">Early out</th>
+          </tr></thead>
+          <tbody>${weekRows}</tbody>
+        </table>
+      </div>
+      <div style="font-size:9px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Individual attendance this week</div>
+      <div class="tcard" style="padding:0;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="background:var(--g1)">
+            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2)">ID</th>
+            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2)">Name</th>
+            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2)">Type</th>
+            ${dates.map((d,i)=>`<th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:center">${SD[i]}<br><span style="font-family:monospace;font-size:8px;font-weight:400">${ds2(d).slice(5).replace('-','/')}</span></th>`).join('')}
+            <th style="font-size:9px;font-weight:500;color:#166534;text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:center">Present</th>
+            <th style="font-size:9px;font-weight:500;color:#DC2626;text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:center">Absent</th>
+          </tr></thead>
+          <tbody>${indivRows}</tbody>
+        </table>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -1939,7 +1994,7 @@ function renderSidebar(){
   if(!isPatroller){
     html+=`<div class="sb-section">Operations</div>`;
     html+=item('schedule','ti-calendar-week','Weekly schedule');
-    html+=item('schedule-daily','ti-calendar-day','Daily schedule');
+    html+=item('schedule-daily','ti-calendar-event','Daily schedule');
     html+=item('schedule-hourly','ti-clock','Hourly schedule');
     html+=item('summary','ti-layout-dashboard','Summary');
     html+=item('attendance','ti-clock-check','Attendance');
