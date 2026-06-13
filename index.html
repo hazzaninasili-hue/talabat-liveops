@@ -3315,6 +3315,12 @@ async function doClockOut(){
   if(!pat)return;
   const rec=getMyAttRecord();
   if(!rec||!rec.clock_in)return;
+  // Block if there's already a pending early clock out request
+  const _pendingEarly=(D.tasks||[]).find(t=>t.patroller_id===pat.id&&t.date===todayStr()&&t.task_type==='Early Clock Out'&&t.status==='Pending');
+  if(_pendingEarly){
+    openM({type:'confirm',msg:'You already have a pending early clock-out request awaiting approval. Please wait for it to be reviewed.',cb:()=>{}});
+    return;
+  }
   const todayIdx=todayDayIdx();
   const sh=getDayShift(pat.id,todayIdx);
   // Check if clocking out before shift end
@@ -3481,8 +3487,8 @@ function myAttendanceView(){
     // Check if there's a pending early clock-out request for this patroller today
     const _myEarlyTask=(D.tasks||[]).find(t=>t.patroller_id===pat.id&&t.date===today&&t.task_type==='Early Clock Out'&&t.status==='Pending');
     const _myRejTask=(D.tasks||[]).find(t=>t.patroller_id===pat.id&&t.date===today&&t.task_type==='Early Clock Out'&&t.status==='Rejected');
-    const _earlyReason=_myEarlyTask?.description?.replace(/Early clock out request\. Reason: /i,'').split('. Att')[0]||'';
-    const _earlyLocMatch=_myEarlyTask?.description?.match(/Location: (https?:\/\/\S+)/i);
+    const _earlyReason=(_myEarlyTask?.description||'').replace(/Early clock out request\.\s*Reason:\s*/i,'').split('. Att')[0].replace(/\.\s*Location:.*$/i,'').trim();
+    const _earlyLocMatch=(_myEarlyTask?.description||'').match(/Location: (https:\/\/[^\s]+)/i);
     const _earlyLoc=_earlyLocMatch?_earlyLocMatch[1]:'';
     if(_myEarlyTask){
       // Pending early out — show awaiting approval state
@@ -3589,8 +3595,10 @@ function attendanceView(){
       const sh=getDayShift(p.id,jsDay);
       const onVac=isOnVacationDate(p.id,ds);
       // Early clock-out task for this patroller+date
-      const earlyTask=(D.tasks||[]).find(t=>t.patroller_id===p.id&&(t.date===ds||(t.start_time||'').slice(0,10)===ds)&&t.task_type==='Early Clock Out');
-      const earlyReason=earlyTask?.description?.replace(/Early clock out request\. Reason: /i,'').split('. Att')[0]||'';
+      // Always prefer Pending task; fall back to most recent by any status
+      const _allEarlyTasks=(D.tasks||[]).filter(t=>t.patroller_id===p.id&&t.date===ds&&t.task_type==='Early Clock Out');
+      const earlyTask=_allEarlyTasks.find(t=>t.status==='Pending')||_allEarlyTasks[0]||null;
+      const earlyReason=(earlyTask?.description||'').replace(/Early clock out request\.\s*Reason:\s*/i,'').split('. Att')[0].replace(/\.?\s*Location:.*$/i,'').trim();
 
       const inT=rec?.clock_in?new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'—';
       const outT=rec?.clock_out?new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'—';
@@ -3608,10 +3616,8 @@ function attendanceView(){
         const stBg=approved?'#DCFCE7':rejected?'#FEE2E2':'#EDE9FE';
         st=`<div>
           <span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:600;background:${stBg};color:${stColor}">⚡ ${rec.status}</span>
-          ${earlyReason?`<div style="font-size:9px;color:#7C3AED;margin-top:2px;font-style:italic">Reason: ${earlyReason}</div>`:''}
-          ${earlyTask&&earlyTask.status==='Pending'&&canEdit()?`<div style="margin-top:3px"><button class="edit-btn" style="background:#DCFCE7;color:#166534;border-color:#86EFAC;font-size:9px" onclick="approveEarlyOut('${earlyTask.id}')">✓ Approve</button> <button class="edit-btn" style="background:#FEE2E2;color:#991B1B;border-color:#FCA5A5;font-size:9px" onclick="rejectEarlyOut('${earlyTask.id}')">✗ Reject</button></div>`:''}
         </div>`;
-        rowBg=approved?'rgba(22,101,52,0.03)':'rgba(124,58,237,0.04)';
+        rowBg=approved?'rgba(22,101,52,0.03)':'rgba(153,27,27,0.03)';
       } else if(rec?.status?.startsWith('Absent')){
         st=`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:600;background:#FEE2E2;color:#991B1B">✗ Absent</span>`;
         rowBg='rgba(153,27,27,0.03)';
@@ -3652,8 +3658,10 @@ function attendanceView(){
           ${dur}${rec?.clock_in&&!rec?.clock_out?`<span style="font-size:8px;color:#16A34A;margin-left:4px;font-weight:400">(ongoing)</span>`:''}
         </td>
         <td style="font-size:9px;color:#7C3AED;max-width:160px">
-          ${earlyReason?`<div>⚡ ${earlyReason}</div>`:''}
-          ${(()=>{const _lm=earlyTask?.description?.match(/Location: (https?:\/\/\S+)/i);return _lm?`<a href="${_lm[1]}" target="_blank" style="color:#7C3AED;font-size:9px;text-decoration:none"><i class="ti ti-map-pin" style="font-size:10px"></i> Early-out location</a>`:''})()}
+          ${earlyTask&&earlyTask.status==='Pending'?`
+            ${earlyReason?`<div style="font-weight:600">⚡ ${earlyReason}</div>`:''}
+            ${(()=>{const _lm=earlyTask?.description?.match(/Location: (https:\/\/[^\s]+)/i);return _lm?`<a href="${_lm[1].replace(/\.$/,'')}" target="_blank" style="color:#7C3AED;font-size:9px;text-decoration:none"><i class="ti ti-map-pin" style="font-size:10px"></i> Early-out location</a>`:''})()}
+          `:''}
         </td>
         <td style="white-space:nowrap">${canEdit()?`${(rec&&(rec.clock_in||rec.status==='Attended'||rec.status?.startsWith('Absent')||rec.status?.startsWith('Early out')))?`<button onclick="editAttendance('${p.id}','${p.name}','${ds}')" title="Edit attendance" style="background:var(--g1);color:var(--g4);border:1.5px solid var(--g2);padding:5px 10px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-pencil" style="font-size:12px"></i>Edit</button>`:`<button onclick="markAttendance('${p.id}','${p.name}','Attended')" title="Mark attended" style="background:var(--green-l);color:var(--green);border:1.5px solid #86efac;padding:5px 8px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-check" style="font-size:12px"></i></button><button onclick="markAttendance('${p.id}','${p.name}','Absent')" title="Mark absent" style="background:var(--red-l);color:var(--red-d);border:1.5px solid #fca5a5;padding:5px 8px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-x" style="font-size:12px"></i></button>`}`:''}</td>
       </tr>`;
@@ -4661,6 +4669,9 @@ function myLeaveBalanceView(){
 
 // ── EARLY CLOCK OUT ──
 async function submitEarlyClockOut(patId,attId,adjEndStr){
+  // Guard: check no pending request already exists
+  const _existingPending=(D.tasks||[]).find(t=>t.patroller_id===patId&&t.date===todayStr()&&t.task_type==='Early Clock Out'&&t.status==='Pending');
+  if(_existingPending){alert('You already have a pending early clock-out request. Please wait for it to be reviewed.');return;}
   const reason=document.getElementById('early-reason').value.trim()||'No reason provided';
   const pat=D.patrollers.find(p=>p.id===patId);
   const now=getBahrainNow();
@@ -4690,24 +4701,37 @@ async function approveEarlyClockOut(taskId,attId){
   // Complete the clock out — admin approves, use patroller's submitted time and location
   const now=new Date();
   const task=D.tasks.find(x=>x.id===taskId);
-  // Use requested time (start_time = time patroller submitted the request)
-  let clockOutTime=now.toISOString();
   const attRec=(D.attendance||[]).find(a=>a.id===attId);
+  // Build clock-out timestamp from the date + HH:MM time the patroller submitted
+  let clockOutTime=now.toISOString();
   if(task&&task.start_time&&attRec?.date){
-    clockOutTime=new Date(attRec.date+'T'+task.start_time+':00+03:00').toISOString();
+    // start_time stored as HH:MM (Bahrain time UTC+3)
+    const hhmm=String(task.start_time).trim().slice(0,5); // ensure "HH:MM"
+    const dateStr=attRec.date; // "YYYY-MM-DD"
+    // Parse as Bahrain time (UTC+3)
+    const parts=hhmm.split(':');
+    if(parts.length===2){
+      const utcH=parseInt(parts[0])-3;
+      const d=new Date(dateStr+'T00:00:00Z');
+      d.setUTCHours(utcH<0?utcH+24:utcH, parseInt(parts[1]), 0, 0);
+      // If hours went negative, subtract a day
+      if(utcH<0)d.setUTCDate(d.getUTCDate()-1);
+      clockOutTime=d.toISOString();
+    }
   }
-  // Extract location URL from task description if captured at request time
+  // Extract location URL from task description (stored as "...Location: https://...")
   let earlyMapUrl=null;
   if(task?.description){
-    const locMatch=(task.description).match(/Location: (https?:\/\/[^\s.]+(?:\.[^\s.]+)*(?:\?[^\s]*)?)/i);
-    if(locMatch)earlyMapUrl=locMatch[1];
+    const locMatch=task.description.match(/Location: (https:\/\/[^\s]+)/i);
+    if(locMatch)earlyMapUrl=locMatch[1].replace(/\.$/,''); // strip trailing period if any
   }
   const updatePayload={clock_out:clockOutTime,status:'Early out - Approved'};
   if(earlyMapUrl)updatePayload.clock_out_map=earlyMapUrl;
-  await sb.from('attendance').update(updatePayload).eq('id',attId);
+  const{error}=await sb.from('attendance').update(updatePayload).eq('id',attId);
+  if(error){addNotification('Error updating attendance: '+error.message,'error');console.error(error);return;}
   await sb.from('task_requests').update({status:'Approved',reviewed_by:D.profile.id,updated_at:now.toISOString()}).eq('id',taskId);
   await reload();
-  addNotification('Early clock out approved — patroller shift ended','success');
+  addNotification('Early clock out approved — shift ended','success');
 }
 
 async function rejectEarlyClockOut(taskId){
@@ -4719,20 +4743,28 @@ async function rejectEarlyClockOut(taskId){
 // Wrapper functions used from tasks table (look up attId from description)
 async function approveEarlyOut(taskId){
   const t=D.tasks.find(x=>x.id===taskId);
-  if(!t)return;
+  if(!t){addNotification('Task not found','error');return;}
   // Extract attId from description: "...Att ID: <uuid>"
-  const m=(t.description||'').match(/Att ID: ([a-f0-9-]+)/i);
+  // UUID format: 8-4-4-4-12 hex chars with hyphens, or raw 32 hex chars
+  const m=(t.description||'').match(/Att ID:\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})/i);
   const attId=m?m[1]:null;
   if(attId){
     await approveEarlyClockOut(taskId,attId);
   } else {
-    // No att ID — just approve the task, update attendance by patroller+date
-    await sb.from('task_requests').update({status:'Approved',reviewed_by:D.profile.id,updated_at:new Date().toISOString()}).eq('id',taskId);
-    if(t.patroller_id&&t.date){
-      await sb.from('attendance').update({status:'Early out - Approved'}).eq('patroller_id',t.patroller_id).eq('date',t.date);
+    // No att ID — find attendance record by patroller+date
+    const attRec=(D.attendance||[]).find(a=>a.patroller_id===t.patroller_id&&a.date===t.date);
+    if(attRec){
+      await approveEarlyClockOut(taskId,attRec.id);
+    } else {
+      // Last resort: just mark task approved and update attendance by patroller+date
+      await sb.from('task_requests').update({status:'Approved',reviewed_by:D.profile.id,updated_at:new Date().toISOString()}).eq('id',taskId);
+      if(t.patroller_id&&t.date){
+        const now=new Date().toISOString();
+        await sb.from('attendance').update({clock_out:now,status:'Early out - Approved'}).eq('patroller_id',t.patroller_id).eq('date',t.date);
+      }
+      await reload();
+      addNotification('Early clock out approved','success');
     }
-    await reload();
-    addNotification('Early clock out approved','success');
   }
 }
 async function rejectEarlyOut(taskId){
