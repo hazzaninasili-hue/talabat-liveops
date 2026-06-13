@@ -1060,192 +1060,152 @@ function dateView(){
   return h+'</div>';
 }
 
-function summaryView(){
-  const dates=wDates();const pts=activePats();
-  const patrollers=pts.filter(p=>getUtype(p)==='patroller');
-  const ds2=d=>d.toISOString().split('T')[0];
+
+// ── DATE RANGE BAR HELPER ──
+function drBar(pfx,fromVal,toVal){
   const today=todayStr();
+  const bhr=getBahrainNow();
+  const y=bhr.getUTCFullYear(),mo=String(bhr.getUTCMonth()+1).padStart(2,'0'),d=String(bhr.getUTCDate()).padStart(2,'0');
+  const yest=new Date(bhr.getTime()-86400000);
+  const yy=yest.getUTCFullYear(),ym=String(yest.getUTCMonth()+1).padStart(2,'0'),yd=String(yest.getUTCDate()).padStart(2,'0');
+  const w7=new Date(bhr.getTime()-6*86400000);
+  const w7y=w7.getUTCFullYear(),w7m=String(w7.getUTCMonth()+1).padStart(2,'0'),w7d=String(w7.getUTCDate()).padStart(2,'0');
+  const presets=[
+    {label:'Today',     f:`${y}-${mo}-${d}T00:00`, t:`${y}-${mo}-${d}T23:59`},
+    {label:'Yesterday', f:`${yy}-${ym}-${yd}T00:00`,t:`${yy}-${ym}-${yd}T23:59`},
+    {label:'7 Days',    f:`${w7y}-${w7m}-${w7d}T00:00`,t:`${y}-${mo}-${d}T23:59`},
+    {label:'Month',     f:`${y}-${mo}-01T00:00`,t:`${y}-${mo}-${d}T23:59`},
+  ];
+  const btns=presets.map(p=>{
+    const on=fromVal===p.f&&toVal===p.t;
+    return`<button onclick="D['${pfx}From']='${p.f}';D['${pfx}To']='${p.t}';render()" style="padding:0 12px;height:34px;border-radius:8px;border:0.5px solid ${on?'rgba(255,89,0,.7)':'rgba(255,255,255,.2)'};background:${on?'rgba(255,89,0,.25)':'rgba(255,255,255,.07)'};color:${on?'#FF8C42':'rgba(255,255,255,.75)'};font-size:11px;font-weight:500;cursor:pointer;font-family:inherit">${p.label}</button>`;
+  }).join('');
+  return`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+    <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.55;min-width:28px">FROM</span>
+    <div style="display:flex;align-items:center;background:rgba(0,0,0,.25);border:0.5px solid rgba(255,255,255,.18);border-radius:8px;padding:0 10px;height:34px;min-width:160px">
+      <input type="datetime-local" value="${fromVal}" onchange="D['${pfx}From']=this.value" style="background:transparent;border:none;outline:none;color:#fff;font-size:12px;font-family:inherit;font-weight:500;width:100%;cursor:pointer;color-scheme:dark">
+    </div>
+    <span style="opacity:.4;font-size:16px">→</span>
+    <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.55;min-width:14px">TO</span>
+    <div style="display:flex;align-items:center;background:rgba(0,0,0,.25);border:0.5px solid rgba(255,255,255,.18);border-radius:8px;padding:0 10px;height:34px;min-width:160px">
+      <input type="datetime-local" value="${toVal}" onchange="D['${pfx}To']=this.value" style="background:transparent;border:none;outline:none;color:#fff;font-size:12px;font-family:inherit;font-weight:500;width:100%;cursor:pointer;color-scheme:dark">
+    </div>
+    <button onclick="render()" style="padding:0 16px;height:34px;border-radius:8px;border:1.5px solid #FF5900;background:transparent;color:#FF8C42;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.02em">Apply</button>
+    <div style="display:flex;gap:5px;margin-left:2px">${btns}</div>
+  </div>`;
+}
+// Helper: get date string from datetime-local string
+function drDate(dt){return dt?dt.slice(0,10):'';}
+// Helper: default range (today full day)
+function drDefault(pfx){
+  const today=todayStr();
+  if(!D[pfx+'From'])D[pfx+'From']=today+'T00:00';
+  if(!D[pfx+'To'])D[pfx+'To']=today+'T23:59';
+}
+// Helper: check if a date string is within a range
+function inRange(dateStr,fromDT,toDT){
+  const f=drDate(fromDT),t=drDate(toDT);
+  return dateStr>=f&&dateStr<=t;
+}
 
-  // ── Date selector for historical view ──
-  const selDate=D.summaryDate||today;
-  const isLive=selDate===today;
+function summaryView(){
+  const pts=activePats();
+  const patrollers=pts.filter(p=>getUtype(p)==='patroller');
+  const today=todayStr();
+  drDefault('summary');
+  const fromDT=D.summaryFrom;const toDT=D.summaryTo;
+  const fromDate=drDate(fromDT);const toDate=drDate(toDT);
+  const isToday=fromDate===today&&toDate===today;
+  const dates=[];
+  let cur=new Date(fromDate+'T00:00:00Z');
+  const end=new Date(toDate+'T00:00:00Z');
+  while(cur<=end){dates.push(cur.toISOString().split('T')[0]);cur=new Date(cur.getTime()+86400000);}
+  const dayCount=dates.length;
 
-  // ── Accurate shift-active check using Bahrain local time ──
-  const nowBahrain=getBahrainNow();
-  const nowH=nowBahrain.getUTCHours()+3; // UTC+3
-  const nowMinsBhr=(nowH%24)*60+nowBahrain.getUTCMinutes();
-  const isShiftNowActive=(sh)=>{
-    if(!sh||!sh.start_time||!sh.end_time)return false;
-    const[sh_h,sh_m]=sh.start_time.split(':').map(Number);
-    const[eh,em]=sh.end_time.split(':').map(Number);
-    const start=sh_h*60+sh_m; let end=eh*60+em;
-    if(end<=start)end+=24*60; // overnight
-    const now2=nowMinsBhr<start?nowMinsBhr+24*60:nowMinsBhr;
-    return now2>=start&&now2<=end;
-  };
-
-  // ── Day index for selected date ──
-  const selDateObj=new Date(selDate+'T00:00:00Z');
-  const selIdx=selDateObj.getUTCDay(); // 0=Sun..6=Sat
-
-  // ── Counts for selected date ──
-  const scheduledPats=patrollers.filter(p=>gDZ(p.id,selIdx)&&!isOnVacationDate(p.id,selDate));
-  const vacPats=patrollers.filter(p=>isOnVacationDate(p.id,selDate));
-  const absentPats=patrollers.filter(p=>{
-    const a=(D.attendance||[]).find(r=>r.patroller_id===p.id&&r.date===selDate);
-    return a?.status?.startsWith('Absent');
+  // ── Per-range counts ──
+  const allAtt=(D.attendance||[]).filter(a=>inRange(a.date,fromDT,toDT));
+  const attRecs=allAtt.filter(a=>a.status==='Attended'||a.clock_in);
+  const absentRecs=allAtt.filter(a=>a.status&&a.status.startsWith('Absent'));
+  const uniquePats=new Set(patrollers.map(p=>p.id));
+  let totalShifts=0;
+  dates.forEach(ds=>{
+    const jsDay=new Date(ds+'T00:00:00Z').getUTCDay();
+    patrollers.forEach(p=>{if(gDZ(p.id,jsDay))totalShifts++;});
   });
-  const offPats=patrollers.filter(p=>!gDZ(p.id,selIdx)&&!isOnVacationDate(p.id,selDate));
+  const vacPatsInRange=patrollers.filter(p=>dates.some(ds=>isOnVacationDate(p.id,ds)));
+  const offCount=dates.reduce((s,ds)=>{const jsDay=new Date(ds+'T00:00:00Z').getUTCDay();return s+patrollers.filter(p=>!gDZ(p.id,jsDay)&&!isOnVacationDate(p.id,ds)).length;},0);
 
-  // Live clocked-in (only meaningful for today)
-  const clockedIn=isLive?patrollers.filter(p=>{
-    const a=(D.attendance||[]).find(r=>r.patroller_id===p.id&&r.date===today);
-    return a?.clock_in&&!a?.clock_out;
-  }):[];
-
-  // Running tasks (live only)
-  const runningTasks=isLive?(D.tasks||[]).filter(t=>t.status==='Running').length:0;
-
-  // Quick action counts
+  // Quick cards (always today-based)
   const pendingTO=(D.timeoff||[]).filter(t=>t.status==='Pending').length;
   const savedMonth=D.incMonth||(getBahrainNow().getUTCFullYear()+'-'+String(getBahrainNow().getUTCMonth()+1).padStart(2,'0'));
   const monthPayout=(D.incentiveData||[]).filter(d=>d.month===savedMonth&&d.payout_total!=null).reduce((s,d)=>s+(d.payout_total||0),0);
-  const ps=getPerfSettings();const curMonth=savedMonth;
-  const teamPerfScores=patrollers.map(p=>{
-    const ev=D.evaluations.filter(e=>e.patroller_id===p.id&&(e.month||e.eval_date?.slice(0,7))===curMonth);
-    const ea=ev.length?Math.round(ev.reduce((s,e)=>s+evalScore(e),0)/ev.length):null;
-    const cs=coachingScore(p.id,curMonth);
-    return(ea!==null&&cs!==null)?perfScore(ea,cs,ps):null;
-  }).filter(s=>s!==null);
+  const ps=getPerfSettings();
+  const teamPerfScores=patrollers.map(p=>{const ev=D.evaluations.filter(e=>e.patroller_id===p.id&&(e.month||e.eval_date?.slice(0,7))===savedMonth);const ea=ev.length?Math.round(ev.reduce((s,e)=>s+evalScore(e),0)/ev.length):null;const cs=coachingScore(p.id,savedMonth);return(ea!==null&&cs!==null)?perfScore(ea,cs,ps):null;}).filter(s=>s!==null);
   const teamAvgScore=teamPerfScores.length?Math.round(teamPerfScores.reduce((a,b)=>a+b,0)/teamPerfScores.length):null;
 
-  // ── Patroller cards for selected date ──
-  const patrollerCards=patrollers.map(p=>{
-    const z=gDZ(p.id,selIdx);
-    const sh=getDayShift(p.id,selIdx);
-    const onVac=isOnVacationDate(p.id,selDate);
-    const attRec=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===selDate);
-    const isAbs=isAbsentOnDate(p.id,selDate);
-    let statusPill='',borderCol='var(--g2)',avBg='var(--g1)',avCol='var(--g4)';
-    if(onVac){
-      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">🌴 Vacation</span>`;
-      borderCol='#A78BFA';
-    } else if(isAbs){
-      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#FEE2E2;color:#991B1B">✗ Absent</span>`;
-      borderCol='#F87171';avBg='#FEE2E2';avCol='#991B1B';
-    } else if(!z){
-      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:var(--g1);color:var(--g3)">Off day</span>`;
-    } else if(attRec?.status?.startsWith('Early out')){
-      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">⚡ Early out${attRec.status.includes('Approved')?' approved':' pending'}</span>`;
-      borderCol='#A78BFA';avBg='#EDE9FE';avCol='#4C1D95';
-    } else if(attRec?.clock_in&&attRec?.clock_out){
-      const inT=new Date(attRec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
-      const outT=new Date(attRec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
-      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#DBEAFE;color:#1E40AF">✓ ${inT}→${outT}</span>`;
-      borderCol='#60A5FA';avBg='#DBEAFE';avCol='#1E40AF';
-    } else if(attRec?.clock_in){
-      const inT=new Date(attRec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
-      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#DCFCE7;color:#166534">🟢 On shift · in ${inT}</span>`;
-      borderCol='#4ADE80';avBg='#DCFCE7';avCol='#166534';
-    } else if(z&&sh&&isLive&&isShiftNowActive(sh)){
-      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:var(--g1);color:var(--g3)">⏰ Not clocked in</span>`;
-    } else if(z&&sh){
-      const sl=sh.shift_type==='morning'?'☀️':'🌙';
-      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:var(--g1);color:var(--g3)">${sl} ${fmtT(sh.start_time)}–${fmtT(sh.end_time)}</span>`;
-    }
-    const zl=z?z.substring(0,18)+(z.length>18?'…':''):'';
-    const sl2=sh?(sh.shift_type==='morning'?'☀️':'🌙')+' '+fmtT(sh.start_time)+'–'+fmtT(sh.end_time):'';
-    return`<div style="display:flex;align-items:center;gap:9px;background:var(--sur);border:0.5px solid var(--g2);border-left:3px solid ${borderCol};border-radius:0 9px 9px 0;padding:8px 11px;margin-bottom:6px">
-      <div style="width:28px;height:28px;border-radius:50%;background:${avBg};color:${avCol};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;flex-shrink:0">${ini(p.name)}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
-        <div style="font-size:10px;color:var(--g3)">${z?zl+' · '+sl2:sl2||'No shift'}</div>
-      </div>
-      <div>${statusPill}</div>
-    </div>`;
+  // ── Daily breakdown rows ──
+  const dailyRows=dates.map(ds=>{
+    const jsDay=new Date(ds+'T00:00:00Z').getUTCDay();
+    const dayName=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][jsDay];
+    const scheduled=patrollers.filter(p=>gDZ(p.id,jsDay)&&!isOnVacationDate(p.id,ds)).length;
+    const dayAtt=(D.attendance||[]).filter(a=>a.patroller_id&&a.date===ds);
+    const att=dayAtt.filter(a=>a.status==='Attended'||a.clock_in).length;
+    const abs=dayAtt.filter(a=>a.status&&a.status.startsWith('Absent')).length;
+    const offDay=patrollers.filter(p=>!gDZ(p.id,jsDay)&&!isOnVacationDate(p.id,ds)).length;
+    const vac=patrollers.filter(p=>isOnVacationDate(p.id,ds)).length;
+    const isToday2=ds===today;
+    const rate=scheduled>0?Math.round(att/scheduled*100):0;
+    return`<tr${isToday2?' style="background:rgba(255,89,0,.04)"':''}>
+      <td class="mono">${ds}</td><td style="font-size:11px">${dayName}${isToday2?' <span style="font-size:8px;background:#FF5900;color:#fff;padding:0 3px;border-radius:3px">Today</span>':''}</td>
+      <td style="text-align:right">${scheduled}</td>
+      <td style="text-align:right">${att?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#DCFCE7;color:#166534">${att}</span>`:'—'}</td>
+      <td style="text-align:right">${abs?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#FEE2E2;color:#991B1B">${abs}</span>`:'—'}</td>
+      <td style="text-align:right">${vac?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#EDE9FE;color:#4C1D95">${vac}</span>`:'—'}</td>
+      <td style="text-align:right">${offDay}</td>
+      <td style="text-align:right"><span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:${rate>=70?'#DCFCE7':rate>=40?'#FEF3C7':'#FEE2E2'};color:${rate>=70?'#166534':rate>=40?'#92400E':'#991B1B'}">${scheduled>0?rate+'%':'—'}</span></td>
+    </tr>`;
   }).join('');
 
-  // ── Weekly summary rows ──
-  const weekRows=dates.map((d,i)=>{
-    const ds=ds2(d);const isToday=ds===today;const isSel=ds===selDate;
-    const dayAtts=(D.attendance||[]).filter(a=>a.date===ds);
-    const att=dayAtts.filter(a=>a.status==='Attended').length;
-    const abs=dayAtts.filter(a=>a.status&&a.status.startsWith('Absent')).length;
-    const late=dayAtts.filter(a=>a.is_late).length;
-    const early=dayAtts.filter(a=>a.status&&a.status.includes('Early out')).length;
-    const duty=patrollers.filter(p=>gDZ(p.id,i)).length;
-    if(duty===0&&att===0&&abs===0)return'';
-    return`<tr style="${isSel?'background:rgba(255,89,0,.07);':''}${isToday&&!isSel?'background:rgba(255,89,0,.03);':''}" onclick="D.summaryDate='${ds}';render()" title="View ${ds}" style="cursor:pointer">
-      <td style="font-size:10px;font-family:monospace;color:var(--g4);cursor:pointer">${SD[i]} ${ds.slice(5).replace('-','/')}${isToday?' <span style="font-size:8px;background:#FF5900;color:#fff;padding:0 4px;border-radius:3px">Today</span>':''}${isSel&&!isToday?' <span style="font-size:8px;background:#411517;color:#fff;padding:0 4px;border-radius:3px">Viewing</span>':''}</td>
-      <td style="text-align:center;${isToday?'font-weight:700':''}">${duty}</td>
-      <td style="text-align:center">${att?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#DCFCE7;color:#166534">${att}</span>`:'—'}</td>
-      <td style="text-align:center">${abs?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#FEE2E2;color:#991B1B">${abs}</span>`:'—'}</td>
-      <td style="text-align:center">${late?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#FEF3C7;color:#92400E">${late}</span>`:'—'}</td>
-      <td style="text-align:center">${early?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#EDE9FE;color:#4C1D95">${early}</span>`:'—'}</td>
-    </tr>`;
-  }).filter(Boolean).join('');
-
-  // ── Individual grid ──
-  const indivRows=patrollers.map(p=>{
-    const cells=dates.map((d,i)=>{
-      const ds=ds2(d);
-      const onVacD=D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds>=t.start_date&&ds<=t.end_date);
-      if(onVacD)return`<td style="text-align:center;font-size:10px">🌴</td>`;
-      if(!gDZ(p.id,i))return`<td style="text-align:center;font-size:10px;color:var(--g3)">Off</td>`;
-      const att=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===ds);
-      if(att?.status==='Attended')return`<td style="text-align:center;color:#166534;font-weight:600">✓</td>`;
-      if(att?.status?.startsWith('Absent'))return`<td style="text-align:center;color:#DC2626;font-weight:600">✗</td>`;
-      return`<td style="text-align:center;color:var(--g3);font-size:10px">?</td>`;
-    }).join('');
-    const present=(D.attendance||[]).filter(a=>a.patroller_id===p.id&&dates.some(d=>ds2(d)===a.date)&&a.status==='Attended').length;
-    const absent=(D.attendance||[]).filter(a=>a.patroller_id===p.id&&dates.some(d=>ds2(d)===a.date)&&a.status?.startsWith('Absent')).length;
+  // ── Per-patroller summary ──
+  const patRows=patrollers.map(p=>{
+    const pAtt=allAtt.filter(a=>a.patroller_id===p.id);
+    const pAttended=pAtt.filter(a=>a.status==='Attended'||a.clock_in).length;
+    const pAbsent=pAtt.filter(a=>a.status&&a.status.startsWith('Absent')).length;
+    const pScheduled=dates.filter(ds=>{const jsDay=new Date(ds+'T00:00:00Z').getUTCDay();return gDZ(p.id,jsDay)&&!isOnVacationDate(p.id,ds);}).length;
+    const pOff=dates.filter(ds=>{const jsDay=new Date(ds+'T00:00:00Z').getUTCDay();return !gDZ(p.id,jsDay)&&!isOnVacationDate(p.id,ds);}).length;
+    const rate=pScheduled>0?Math.round(pAttended/pScheduled*100):0;
     return`<tr>
-      <td style="font-size:10px;font-family:monospace;color:var(--g3)">${p.patroller_id_num||'—'}</td>
+      <td class="mono" style="font-size:10px;color:var(--g3)">${p.patroller_id_num||'—'}</td>
       <td style="font-weight:600">${p.name}</td>
-      <td><span style="display:inline-block;padding:1px 5px;border-radius:5px;font-size:9px;font-weight:500;background:var(--g1);color:var(--g3)">Pat</span></td>
-      ${cells}
-      <td style="text-align:center;font-weight:600;color:#166534">${present}</td>
-      <td style="text-align:center;font-weight:600;color:${absent?'#DC2626':'var(--g4)'}">${absent}</td>
+      <td style="text-align:right">${pScheduled}</td>
+      <td style="text-align:right">${pAttended?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#DCFCE7;color:#166534">${pAttended}</span>`:'—'}</td>
+      <td style="text-align:right">${pAbsent?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#FEE2E2;color:#991B1B">${pAbsent}</span>`:'—'}</td>
+      <td style="text-align:right">${pOff}</td>
+      <td style="text-align:right"><span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:${rate>=70?'#DCFCE7':rate>=40?'#FEF3C7':'#FEE2E2'};color:${rate>=70?'#166534':rate>=40?'#92400E':'#991B1B'}">${pScheduled>0?rate+'%':'—'}</span></td>
     </tr>`;
   }).join('');
 
-  // ── Hero tile values ──
-  const tileScheduled=scheduledPats.length;
-  const tileLive=isLive?clockedIn.length:
-    (D.attendance||[]).filter(a=>a.date===selDate&&(a.status==='Attended'||a.clock_in)).length;
-  const tileOnTask=runningTasks;
-  const tileOff=offPats.length;
-  const tileAbsent=absentPats.length;
-  const tileVac=vacPats.length;
+  const totAtt=attRecs.length,totAbs=absentRecs.length,totRate=totalShifts>0?Math.round(totAtt/totalShifts*100):0;
 
   return`
-  <div style="background:#1A0507;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden">
+  <div style="background:#1A0507;border-radius:12px;padding:14px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden">
     <div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div>
     <div style="position:relative;z-index:1">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:6px">
-          <div style="width:7px;height:7px;border-radius:50%;background:${isLive?'#4ADE80':'#FCD34D'}"></div>
-          <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.7">${isLive?'Live · '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'Historical'} · ${selDate}</div>
-        </div>
-        <div style="margin-left:auto;display:flex;align-items:center;gap:7px">
-          <input type="date" value="${selDate}" max="${today}" onchange="D.summaryDate=this.value;render()" style="padding:3px 8px;border-radius:6px;border:0.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:11px;font-family:inherit;cursor:pointer">
-          ${!isLive?`<button onclick="D.summaryDate='${today}';render()" style="padding:3px 9px;border-radius:6px;border:0.5px solid rgba(255,255,255,.3);background:rgba(255,89,0,.4);color:#fff;font-size:10px;font-family:inherit;cursor:pointer">↩ Today</button>`:''}
-          <span style="font-size:10px;opacity:.35">Week ${wNum(dates[0])} · ${fmt(dates[0])} – ${fmt(dates[6])}</span>
-        </div>
-      </div>
+      ${drBar('summary',fromDT,toDT)}
       <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:7px">
-        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Scheduled</div><div style="font-size:22px;font-weight:500;color:#93C5FD">${tileScheduled}</div></div>
-        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">${isLive?'Live (clocked in)':'Attended'}</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${tileLive}</div></div>
-        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">On task</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${tileOnTask}</div></div>
-        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Off day</div><div style="font-size:22px;font-weight:500;opacity:.5">${tileOff}</div></div>
-        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Absent</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">${tileAbsent}</div></div>
-        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Vacation</div><div style="font-size:22px;font-weight:500;color:#C4B5FD">${tileVac}</div></div>
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total shifts</div><div style="font-size:22px;font-weight:500;color:#93C5FD">${totalShifts}</div></div>
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Attended</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${totAtt}</div></div>
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Unique pats</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${patrollers.length}</div></div>
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Off days</div><div style="font-size:22px;font-weight:500;opacity:.5">${offCount}</div></div>
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Absent</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">${totAbs}</div></div>
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Vacation</div><div style="font-size:22px;font-weight:500;color:#C4B5FD">${vacPatsInRange.length}</div></div>
       </div>
+      <div style="font-size:9px;opacity:.35;margin-top:8px">${dayCount} day${dayCount!==1?'s':''} · ${fromDate} → ${toDate} · att rate ${totRate}%</div>
     </div>
   </div>
 
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
-    <div class="tcard" style="padding:10px;text-align:center;background:#FFF0E6;border-color:#F0997B;cursor:pointer" onclick="setTab('attendance')"><i class="ti ti-clock-check" style="font-size:18px;color:#FF5900;display:block;margin-bottom:4px"></i><div style="font-size:11px;font-weight:600">Attendance</div><div style="font-size:10px;color:#993C1D;margin-top:2px">${tileLive} on shift today</div></div>
+    <div class="tcard" style="padding:10px;text-align:center;background:#FFF0E6;border-color:#F0997B;cursor:pointer" onclick="setTab('attendance')"><i class="ti ti-clock-check" style="font-size:18px;color:#FF5900;display:block;margin-bottom:4px"></i><div style="font-size:11px;font-weight:600">Attendance</div><div style="font-size:10px;color:#993C1D;margin-top:2px">${totAtt} attended in range</div></div>
     <div class="tcard" style="padding:10px;text-align:center;cursor:pointer" onclick="setTab('timeoff')"><i class="ti ti-calendar-off" style="font-size:18px;color:#BA7517;display:block;margin-bottom:4px"></i><div style="font-size:11px;font-weight:600">Time off</div><div style="font-size:10px;color:${pendingTO>0?'#BA7517':'var(--g3)'};font-weight:${pendingTO>0?600:400};margin-top:2px">${pendingTO>0?pendingTO+' pending':'No pending'}</div></div>
     <div class="tcard" style="padding:10px;text-align:center;cursor:pointer" onclick="setTab('incentive')"><i class="ti ti-cash" style="font-size:18px;color:#166534;display:block;margin-bottom:4px"></i><div style="font-size:11px;font-weight:600">${savedMonth.replace('-','/')} payout</div><div style="font-size:10px;color:#166534;font-weight:600;margin-top:2px">${monthPayout>0?'BHD '+monthPayout.toFixed(3):'Not saved yet'}</div></div>
     <div class="tcard" style="padding:10px;text-align:center;cursor:pointer" onclick="setTab('scores')"><i class="ti ti-chart-infographic" style="font-size:18px;color:#185FA5;display:block;margin-bottom:4px"></i><div style="font-size:11px;font-weight:600">Team score</div><div style="font-size:10px;color:#185FA5;font-weight:600;margin-top:2px">${teamAvgScore!==null?teamAvgScore+'% avg':'No data'}</div></div>
@@ -1253,36 +1213,37 @@ function summaryView(){
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
     <div>
-      <div style="font-size:9px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Team · ${selDate}${isLive?' (Live)':''}</div>
-      ${patrollerCards}
-    </div>
-    <div>
-      <div style="font-size:9px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Weekly summary <span style="font-size:9px;font-weight:400;color:var(--g3);text-transform:none">— click a row to view that day</span></div>
-      <div class="tcard" style="padding:0;overflow:hidden;margin-bottom:8px">
+      <div class="tcard" style="padding:0;overflow:hidden">
+        <div style="padding:9px 13px;border-bottom:0.5px solid var(--g2);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:space-between">Daily breakdown <span style="font-size:10px;font-weight:400;color:var(--g3)">${dayCount} days</span></div>
         <table style="width:100%;border-collapse:collapse">
           <thead><tr style="background:var(--g1)">
-            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-bottom:0.5px solid var(--g2);text-align:left">Day</th>
-            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-bottom:0.5px solid var(--g2);text-align:center">Duty</th>
-            <th style="font-size:9px;font-weight:500;color:#166534;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-bottom:0.5px solid var(--g2);text-align:center">Att</th>
-            <th style="font-size:9px;font-weight:500;color:#DC2626;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-bottom:0.5px solid var(--g2);text-align:center">Abs</th>
-            <th style="font-size:9px;font-weight:500;color:#D97706;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-bottom:0.5px solid var(--g2);text-align:center">Late</th>
-            <th style="font-size:9px;font-weight:500;color:#7C3AED;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-bottom:0.5px solid var(--g2);text-align:center">Early out</th>
+            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2)">Date</th>
+            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2)">Day</th>
+            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:right">Sched</th>
+            <th style="font-size:9px;font-weight:500;color:#166534;text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:right">Att</th>
+            <th style="font-size:9px;font-weight:500;color:#991B1B;text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:right">Abs</th>
+            <th style="font-size:9px;font-weight:500;color:#7C3AED;text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:right">Vac</th>
+            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:right">Off</th>
+            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:right">Rate</th>
           </tr></thead>
-          <tbody>${weekRows}</tbody>
+          <tbody>${dailyRows}</tbody>
         </table>
       </div>
-      <div style="font-size:9px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Individual attendance this week</div>
+    </div>
+    <div>
       <div class="tcard" style="padding:0;overflow:hidden">
+        <div style="padding:9px 13px;border-bottom:0.5px solid var(--g2);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:space-between">Patroller summary <span style="font-size:10px;font-weight:400;color:var(--g3)">${patrollers.length} unique</span></div>
         <table style="width:100%;border-collapse:collapse">
           <thead><tr style="background:var(--g1)">
             <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2)">ID</th>
             <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2)">Name</th>
-            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2)">Type</th>
-            ${dates.map((d,i)=>`<th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:center">${SD[i]}<br><span style="font-family:monospace;font-size:8px;font-weight:400">${ds2(d).slice(5).replace('-','/')}</span></th>`).join('')}
-            <th style="font-size:9px;font-weight:500;color:#166534;text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:center">Present</th>
-            <th style="font-size:9px;font-weight:500;color:#DC2626;text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:center">Absent</th>
+            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:right">Sched</th>
+            <th style="font-size:9px;font-weight:500;color:#166534;text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:right">Att</th>
+            <th style="font-size:9px;font-weight:500;color:#991B1B;text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:right">Abs</th>
+            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:right">Off</th>
+            <th style="font-size:9px;font-weight:500;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;padding:5px 7px;border-bottom:0.5px solid var(--g2);text-align:right">Rate</th>
           </tr></thead>
-          <tbody>${indivRows}</tbody>
+          <tbody>${patRows}</tbody>
         </table>
       </div>
     </div>
@@ -1314,12 +1275,21 @@ function timeOffView(){
   const pen=reqs.filter(r=>r.status==='Pending').length;
   const apr=reqs.filter(r=>r.status==='Approved').length;
   const rej=reqs.filter(r=>r.status==='Rejected').length;
-  const rows=reqs.map(r=>{
+  drDefault('timeoff');
+  const toFromDT=D.timeoffFrom;const toToDT=D.timeoffTo;
+  const toFromDate=drDate(toFromDT);const toToDate=drDate(toToDT);
+  // Filter requests that overlap the range
+  const filteredReqs=reqs.filter(r=>r.start_date<=toToDate&&r.end_date>=toFromDate);
+  const fPen=filteredReqs.filter(r=>r.status==='Pending').length;
+  const fApr=filteredReqs.filter(r=>r.status==='Approved').length;
+  const fRej=filteredReqs.filter(r=>r.status==='Rejected').length;
+  const totalDays=filteredReqs.reduce((s,r)=>{const d=r.start_date&&r.end_date?Math.round((new Date(r.end_date)-new Date(r.start_date))/86400000)+1:0;return s+d;},0);
+  const rows=filteredReqs.map(r=>{
     const days=r.start_date&&r.end_date?Math.round((new Date(r.end_date)-new Date(r.start_date))/86400000)+1:'--';
     const sc=r.status==='Approved'?'background:var(--green-l);color:var(--green)':r.status==='Rejected'?'background:var(--red-l);color:var(--red-d)':'background:var(--amber-l);color:var(--amber-d)';
     return`<tr><td class="lt" style="white-space:nowrap">${r.patroller_name||'--'}</td><td style="font-family:monospace;font-size:10.5px">${r.patroller_code||'--'}</td><td style="white-space:nowrap;font-size:10.5px;font-weight:500">${r.request_type}</td><td style="font-family:monospace;font-size:10.5px">${r.start_date}</td><td style="font-family:monospace;font-size:10.5px">${r.end_date}</td><td style="font-weight:700">${days}</td><td><span class="pct-badge" style="${sc};white-space:nowrap">${r.status}</span></td><td style="font-size:10.5px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.comment||'--'}</td><td>${r.support_doc_url?`<a href="${r.support_doc_url}" target="_blank" style="font-size:10.5px;color:var(--blue)"><i class="ti ti-external-link"></i></a>`:'--'}</td>${isAL?`<td style="white-space:nowrap">${r.status==='Pending'?`<button class="edit-btn" style="background:var(--green-l);color:var(--green);border-color:#86efac" onclick="reviewTO('${r.id}','Approved')" title="Approve"><i class="ti ti-check"></i></button><button class="edit-btn" style="background:var(--red-l);color:var(--red-d);border-color:#fca5a5" onclick="reviewTO('${r.id}','Rejected')" title="Reject"><i class="ti ti-x"></i></button>`:''}<button class="icon-btn" onclick="delTO('${r.id}')"><i class="ti ti-trash"></i></button></td>`:''}</tr>`;
   }).join('');
-  return`<div style="background:#412402;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Time off requests</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Pending</div><div style="font-size:24px;font-weight:500;color:#FCD34D">${pen}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Approved</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${apr}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Rejected</div><div style="font-size:24px;font-weight:500;color:#FCA5A5">${rej}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Total</div><div style="font-size:24px;font-weight:500;color:#fff">${reqs.length}</div></div></div></div></div>
+  return`<div style="background:#412402;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Time off requests</div>${drBar('timeoff',toFromDT,toToDT)}<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Pending</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${fPen}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Approved</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${fApr}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Rejected</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">${fRej}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total requests</div><div style="font-size:22px;font-weight:500;color:#fff">${filteredReqs.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total days off</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${totalDays}</div></div></div></div></div>
   <div class="toolbar"><button class="btn btn-primary" onclick="openM({type:'timeoff'})"><i class="ti ti-plus"></i>New request</button>${isAL?`<button class="btn" onclick="dlTO()"><i class="ti ti-download"></i>Export CSV</button>`:''}</div>
   ${reqs.length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-calendar-off" style="font-size:40px;display:block;margin-bottom:10px"></i>No time-off requests yet.</div>`:`<div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr><th class="lt">Name</th><th>ID</th><th>Leave type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th><th>Comment</th><th>Doc</th>${isAL?'<th>Actions</th>':''}</tr></thead><tbody>${rows}</tbody></table></div></div>`}`;
 }
@@ -3392,81 +3362,83 @@ function myAttendanceView(){
 
 // ── ADMIN ATTENDANCE VIEW ──
 function attendanceView(){
-  const today=D.attDate||todayStr();
   const pts=activePats();
+  const patrollers=pts.filter(p=>getUtype(p)==='patroller');
+  const today=todayStr();
+  drDefault('att');
+  const fromDT=D.attFrom;const toDT=D.attTo;
+  const fromDate=drDate(fromDT);const toDate=drDate(toDT);
+  const dates=[];
+  let cur=new Date(fromDate+'T00:00:00Z');
+  const endD=new Date(toDate+'T00:00:00Z');
+  while(cur<=endD){dates.push(cur.toISOString().split('T')[0]);cur=new Date(cur.getTime()+86400000);}
 
-  // Stats
-  const todayRecs=(D.attendance||[]).filter(a=>a.date===today);
-  const attended=todayRecs.filter(a=>a.status==='Attended').length;
-  const absent=todayRecs.filter(a=>a.status&&a.status.startsWith('Absent')).length;
-  const onVacCount=pts.filter(p=>isOnVacationToday(p.id)).length;
-  const todayIdx=todayDayIdx();
+  const allAtt=(D.attendance||[]).filter(a=>inRange(a.date,fromDT,toDT));
+  const attended=allAtt.filter(a=>a.status==='Attended'||a.clock_in).length;
+  const absent=allAtt.filter(a=>a.status&&a.status.startsWith('Absent')).length;
+  const uniquePats=new Set(allAtt.map(a=>a.patroller_id)).size;
+  let totalShifts=0;
+  dates.forEach(ds=>{const jsDay=new Date(ds+'T00:00:00Z').getUTCDay();patrollers.forEach(p=>{if(gDZ(p.id,jsDay))totalShifts++;});});
+  const attRate=totalShifts>0?Math.round(attended/totalShifts*100):0;
 
-  // Build rows — skip off-day and vacation patrollers
-  const todaySelIdx=todayDayIdx();
-  const workingPats=pts.filter(p=>{
-    if(isOnVacationToday(p.id))return false;
-    return !!gDZ(p.id,todaySelIdx);
-  });
-  const vacPats=pts.filter(p=>isOnVacationToday(p.id));
-  const offPats=pts.filter(p=>{
-    if(isOnVacationToday(p.id))return false;
-    return !gDZ(p.id,todaySelIdx);
-  });
-
-  const mkRow=p=>{
-    const rec=todayRecs.find(a=>a.patroller_id===p.id);
-    const status=rec?.status||'';
-    const inT=rec?.clock_in?new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
-    const outT=rec?.clock_out?new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
-    const dur=rec?.clock_in&&rec?.clock_out?`${Math.floor(Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000)/60)}h ${Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000)%60}m`:'--';
-    const isAtt=status==='Attended';const isAbs=status==='Absent';
-    // task.date = attendance record date (clock-in date) — exact match
-    const attDate=rec?.date||today;
-    const earlyReq=(D.tasks||[]).find(t=>t.patroller_id===p.id&&t.date===attDate&&t.task_type==='Early Clock Out'&&t.status==='Pending');
-    const earlyApproved=(D.tasks||[]).find(t=>t.patroller_id===p.id&&t.date===attDate&&t.task_type==='Early Clock Out'&&t.status==='Approved');
-    const attIdMatch=earlyReq?.description?.match(/Att ID: ([a-f0-9-]+)/);
-    const attIdFromEarly=attIdMatch?attIdMatch[1]:'';
-    const earlyAny=earlyReq||earlyApproved;
-    const earlyReason=earlyAny?.description?.match(/Reason: ([^.]+)/)?.[1]||'';
-    const statusBadge=earlyReq
-      ?`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:#FEF3C7;color:#D97706">⏳ Early out pending</span>${earlyReason?`<div style="font-size:9px;color:#92400E;margin-top:2px">💬 ${earlyReason}</div>`:''}`
-      :earlyApproved
-      ?`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:#EDE9FE;color:#4C1D95">⚡ Early out approved</span>${earlyReason?`<div style="font-size:9px;color:#4C1D95;margin-top:2px">💬 ${earlyReason}</div>`:''}`
-      :`<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:8px;${isAtt?'background:#DCFCE7;color:#166534':isAbs?'background:#FEE2E2;color:#991B1B':'background:#F4EDE3;color:#94A3B8'}">${status||'Pending'}</span>`;
-    const zone=gDZ(p.id,todaySelIdx)||'--';
-    const sh=getDayShift(p.id,todaySelIdx);
-    return`<tr>
-      <td style="font-size:11px;font-family:monospace;color:var(--g4);white-space:nowrap">${p.patroller_id_num||'--'}</td><td class="lt" style="font-weight:600">${p.name}</td>
-      <td style="font-size:11px">${zone}</td>
-      <td style="font-size:11px">${sh?`${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}-${fmtT(getEffectiveEndTime(p.id,sh,today)||sh.end_time)}${(rec?.late_mins||0)>0?` <span style="color:#D97706;font-size:9px">⚠+${rec.late_mins}m</span>`:''}`:'-'}</td>
-      <td>${statusBadge}</td>
-      <td style="font-size:11px">${inT}${rec?.clock_in_map?` <a href="${rec.clock_in_map}" target="_blank" style="color:#FF5900"><i class="ti ti-map-pin" style="font-size:10px"></i></a>`:''}</td>
-      <td style="font-size:11px">${outT}${rec?.clock_out_map?` <a href="${rec.clock_out_map}" target="_blank" style="color:#FF5900"><i class="ti ti-map-pin" style="font-size:10px"></i></a>`:''}</td>
-      <td style="font-size:11px">${dur}</td>
-      ${canEdit()?`<td style="white-space:nowrap">
-        ${earlyReq?`
-          <button onclick="approveEarlyClockOut('${earlyReq.id}','${attIdFromEarly}')" style="padding:3px 9px;border-radius:6px;border:1.5px solid #C4B5FD;background:#EDE9FE;color:#4C1D95;font-family:inherit;font-size:11px;cursor:pointer;font-weight:600">✓ Approve early out</button>
-          <button onclick="rejectEarlyClockOut('${earlyReq.id}')" style="padding:3px 9px;border-radius:6px;border:1.5px solid #fca5a5;background:transparent;color:#991B1B;font-family:inherit;font-size:11px;cursor:pointer;font-weight:600;margin-left:4px">✗ Reject</button>
-        `:`
-          <button onclick="markAttendance('${p.id}','${p.name.replace(/'/g,"\'")}','Attended')" style="padding:4px 10px;border-radius:6px;border:1.5px solid #86efac;background:${isAtt?'#DCFCE7':'transparent'};color:#166534;font-family:inherit;font-size:11px;cursor:pointer;font-weight:600">✓ Attended</button>
-          <button onclick="markAttendance('${p.id}','${p.name.replace(/'/g,"\'")}','Absent')" style="padding:4px 10px;border-radius:6px;border:1.5px solid #fca5a5;background:${isAbs?'#FEE2E2':'transparent'};color:#991B1B;font-family:inherit;font-size:11px;cursor:pointer;font-weight:600;margin-left:4px">✗ Absent</button>
-        `}
-      </td>`:''}
-    </tr>`;
-  };
+  // Build rows grouped by date
+  const rowsByDate=dates.map(ds=>{
+    const dayRecs=allAtt.filter(a=>a.date===ds);
+    const jsDay=new Date(ds+'T00:00:00Z').getUTCDay();
+    const dayName=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][jsDay];
+    const workingPats=patrollers.filter(p=>gDZ(p.id,jsDay));
+    if(!workingPats.length&&!dayRecs.length)return'';
+    const header=`<tr style="background:var(--g1)"><td colspan="9" style="padding:5px 10px;font-size:10px;font-weight:600;color:var(--g3)">${dayName} · ${ds}${ds===today?' <span style="font-size:8px;background:#FF5900;color:#fff;padding:0 3px;border-radius:3px">Today</span>':''}</td></tr>`;
+    const rows=workingPats.map(p=>{
+      const rec=dayRecs.find(a=>a.patroller_id===p.id);
+      const sh=getDayShift(p.id,jsDay);
+      const onVac=isOnVacationDate(p.id,ds);
+      const isAbs=isAbsentOnDate(p.id,ds);
+      const st=onVac?`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">🌴 Vacation</span>`:
+        isAbs?`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#FEE2E2;color:#991B1B">✗ Absent</span>`:
+        rec?.status?.startsWith('Early out')?`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">⚡ Early out</span>`:
+        rec?.clock_in?`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#DCFCE7;color:#166534">Attended</span>`:
+        `<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:var(--g1);color:var(--g3)">Pending</span>`;
+      const inT=rec?.clock_in?new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'—';
+      const outT=rec?.clock_out?new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'—';
+      let dur='—';
+      if(rec?.clock_in&&rec?.clock_out){const ms=new Date(rec.clock_out)-new Date(rec.clock_in);const h=Math.floor(ms/3600000);const m=Math.floor((ms%3600000)/60000);dur=h>0?`${h}h ${m}m`:`${m}m`;}
+      return`<tr>
+        <td style="font-size:10px;font-family:monospace;color:var(--g3)">${p.patroller_id_num||'—'}</td>
+        <td style="font-weight:600">${p.name}</td>
+        <td style="font-size:10px">${gDZ(p.id,jsDay)||'—'}</td>
+        <td style="font-size:10px">${sh?(sh.shift_type==='morning'?'☀️':'🌙')+' '+fmtT(sh.start_time)+'–'+fmtT(sh.end_time):'—'}</td>
+        <td>${st}</td>
+        <td style="font-size:10px;font-family:monospace">${inT}</td>
+        <td style="font-size:10px;font-family:monospace">${outT}</td>
+        <td style="font-size:10px">${dur}</td>
+        <td>${canEdit()?`<button class="edit-btn" style="background:var(--green-l);color:var(--green);border-color:#86efac" onclick="markAtt('${p.id}','${ds}','Attended')" title="Attended"><i class="ti ti-check"></i></button><button class="edit-btn" style="background:var(--red-l);color:var(--red-d);border-color:#fca5a5" onclick="markAtt('${p.id}','${ds}','Absent')" title="Absent"><i class="ti ti-x"></i></button>`:''}</td>
+      </tr>`;
+    }).join('');
+    return header+rows;
+  }).join('');
 
   return`
-  <div style="background:#0F4D22;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Attendance · ${today}</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Attended</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${attended}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Absent</div><div style="font-size:24px;font-weight:500;color:#FCA5A5">${absent}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">On vacation</div><div style="font-size:24px;font-weight:500;color:#C4B5FD">${onVacCount}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Scheduled</div><div style="font-size:24px;font-weight:500;color:#fff">${workingPats.length+vacPats.length}</div></div></div></div></div>
-  <div class="toolbar">
-    <input type="date" value="${today}" onchange="D.attDate=this.value;render()" style="padding:7px 11px;border-radius:var(--r8);border:1.5px solid var(--g2);font-family:inherit;font-size:12.5px">
-    <button class="btn" onclick="dlAttendance()"><i class="ti ti-download"></i>Export CSV</button>
-    <span style="font-size:12px;color:var(--g3)">${workingPats.length} scheduled · ${vacPats.length} on vacation · ${offPats.length} off</span>
+  <div style="background:#0F4D22;border-radius:12px;padding:14px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden">
+    <div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div>
+    <div style="position:relative;z-index:1">
+      ${drBar('att',fromDT,toDT)}
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px">
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total shifts</div><div style="font-size:22px;font-weight:500;color:#93C5FD">${totalShifts}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Attended</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${attended}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Absent</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">${absent}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Unique pats</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${uniquePats}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Att rate</div><div style="font-size:22px;font-weight:500;color:${attRate>=70?'#4ADE80':attRate>=40?'#FCD34D':'#FCA5A5'}">${attRate}%</div></div>
+      </div>
+    </div>
   </div>
-  ${workingPats.length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-calendar-off" style="font-size:40px;display:block;margin-bottom:10px"></i>No one scheduled for this day.</div>`:`
-  <div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr><th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Name</th><th>Zone</th><th>Shift</th><th>Status</th><th>Clock In</th><th>Clock Out</th><th>Duration</th>${canEdit()?'<th>Actions</th>':''}</tr></thead><tbody>${workingPats.map(mkRow).join('')}</tbody></table></div></div>`}
-  ${vacPats.length>0?`<div style="margin-top:16px"><div style="font-size:11px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🌴 On Vacation</div><div style="display:flex;gap:8px;flex-wrap:wrap">${vacPats.map(p=>`<span style="background:#EDE9FE;color:#4C1D95;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:500">${p.name}</span>`).join('')}</div></div>`:''}
-  ${offPats.length>0?`<div style="margin-top:12px"><div style="font-size:11px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Off Today</div><div style="display:flex;gap:8px;flex-wrap:wrap">${offPats.map(p=>`<span style="background:var(--g1);color:var(--g4);padding:4px 12px;border-radius:20px;font-size:12px">${p.name}</span>`).join('')}</div></div>`:''}`;
+  ${canEdit()?`<div style="margin-bottom:8px"><button class="btn" onclick="dlAttendance()"><i class="ti ti-download"></i>Export CSV</button></div>`:''}
+  <div class="tcard" style="padding:0;overflow:hidden">
+    <div style="padding:9px 13px;border-bottom:0.5px solid var(--g2);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:space-between">Records <span style="font-size:10px;font-weight:400;color:var(--g3)">${dates.length} day${dates.length!==1?'s':''} · ${fromDate} → ${toDate}</span></div>
+    <div class="t-scroll"><table style="min-width:700px"><thead><tr>
+      <th>ID</th><th>Name</th><th>Zone</th><th>Shift</th><th>Status</th><th>Clock in</th><th>Clock out</th><th>Duration</th>${canEdit()?'<th>Actions</th>':''}
+    </tr></thead><tbody>${rowsByDate||'<tr><td colspan="9" style="padding:30px;text-align:center;color:var(--g3)">No records in this range</td></tr>'}</tbody></table></div>
+  </div>`;
 }
 
 function getWeekStartForDate(dateStr){
@@ -3789,9 +3761,20 @@ function hourlyView(){
 function tasksView(){
   const ed=canEdit();
   const all=D.tasks||[];
-  const running=all.filter(t=>t.status==='Running').length;
-  const completed=all.filter(t=>t.status==='Completed').length;
-  const pen=all.filter(t=>t.status==='Pending').length;
+  drDefault('tasks');
+  const tkFromDT=D.tasksFrom;const tkToDT=D.tasksTo;
+  const tkFromDate=drDate(tkFromDT);const tkToDate=drDate(tkToDT);
+  const filteredTasks=all.filter(t=>{
+    const ds=t.start_time?t.start_time.slice(0,10):(t.date||'');
+    return ds>=tkFromDate&&ds<=tkToDate;
+  });
+  const running=filteredTasks.filter(t=>t.status==='Running').length;
+  const completed=filteredTasks.filter(t=>t.status==='Completed').length;
+  const pen=filteredTasks.filter(t=>t.status==='Pending').length;
+  const tkUnique=new Set(filteredTasks.map(t=>t.patroller_id).filter(Boolean)).size;
+  const tkTotalMs=filteredTasks.reduce((s,t)=>{if(t.start_time&&t.end_time){const ms=new Date(t.end_time)-new Date(t.start_time);return s+(ms>0?ms:0);}return s;},0);
+  const tkH=Math.floor(tkTotalMs/3600000);const tkM=Math.floor((tkTotalMs%3600000)/60000);
+  const tkDurStr=tkH>0?`${tkH}h ${tkM}m`:`${tkM}m`;
 
   const getStatusStyle=(status)=>{
     if(status==='Running')return'background:#DCFCE7;color:#166534;font-weight:700';
@@ -3800,7 +3783,7 @@ function tasksView(){
     return'background:var(--g1);color:var(--g3)';
   };
 
-  const rows=all.map(t=>{
+  const rows=filteredTasks.map(t=>{
     const col=TASK_COLORS[t.task_type]||'#411517';
     const bg=TASK_BG[t.task_type]||'#F4EDE3';
     const duration=t.start_time&&t.end_time?`${t.start_time} → ${t.end_time}`:t.start_time?`Started: ${t.start_time}`:'--';
@@ -3818,7 +3801,7 @@ function tasksView(){
       :t.start_time?`Started: ${t.start_time}`:'--';
     const statusDisplay=t.status==='Running'?`<i class="ti ti-circle-filled" style="font-size:6px;margin-right:4px;animation:pulse 1.5s infinite"></i>${t.status}`:`${t.status==='Completed'?'✓':''} ${t.status}`;
     
-    return`<tr>
+  return`<div style="background:#2C2C2A;border-radius:12px;padding:14px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1">${drBar('tasks',tkFromDT,tkToDT)}<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total tasks</div><div style="font-size:22px;font-weight:500;color:#fff">${filteredTasks.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Completed</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${completed}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Running</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${running}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total duration</div><div style="font-size:16px;font-weight:500;color:#93C5FD">${tkDurStr}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Patrollers</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${tkUnique}</div></div></div></div></div>
       <td style="font-size:11px;font-family:monospace;color:var(--g4);white-space:nowrap">${(()=>{const _tp=D.patrollers.find(x=>x.id===t.patroller_id);return _tp?.patroller_id_num||'--';})()}</td><td class="lt" style="font-weight:600">${t.patroller_name||'--'}</td>
       <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${bg};color:${col}">${t.task_type}</span></td>
       <td style="font-family:monospace;font-size:11px">${t.date||'--'}</td>
@@ -4907,6 +4890,11 @@ function performanceView(){
     }
 
     if(subTab==='evaluation'){
+      drDefault('eval');
+      const evFromDT=D.evalFrom;const evToDT=D.evalTo;
+      const evFromDate=drDate(evFromDT);const evToDate=drDate(evToDT);
+      // Filter evaluations in date range
+      const rangeEvals=D.evaluations.filter(e=>{const ds=e.eval_date||e.month+'-01';return ds>=evFromDate&&ds<=evToDate;});
       const evalTableRows=sorted.map(({p,evalAvg,evalAvgRaw,evals},i)=>{
         const isBest=i===0&&evalAvg!==null;
         return'<tr '+(isBest?'style="background:rgba(255,89,0,.04)"':'')+'>'+
@@ -4925,11 +4913,11 @@ function performanceView(){
         return'<tr><td class="lt" style="font-weight:600">'+(pat?.name||'--')+'</td><td style="font-size:11px;color:var(--g3)">'+dt+'</td><td style="font-size:11px;color:var(--g3)">'+(e.location||'--')+'</td><td>'+ePill(pct)+'</td><td style="font-size:11px;color:var(--g3)">'+(e.evaluator_name||'--')+'</td></tr>';
       }).join('');
 
-      return segHtml+
+      return segHtml+drBar('eval',evFromDT,evToDT)+
         '<div style="background:#26215C;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Evaluation · '+selMonth+'</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'+
         '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Best</div><div style="font-size:13px;font-weight:500;color:#C4B5FD">'+(sorted[0]?.p.name.split(' ')[0]||'--')+'</div></div>'+
         '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Team avg</div><div style="font-size:22px;font-weight:500;color:#AFA9EC">'+(teamAvgEval?teamAvgEval+'%':'--')+'</div></div>'+
-        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Evals done</div><div style="font-size:22px;font-weight:500;color:#fff">'+(D.evaluations.filter(e=>(e.month||e.eval_date?.slice(0,7))===selMonth).length)+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Evals done</div><div style="font-size:22px;font-weight:500;color:#fff">'+(rangeEvals.length)+'</div></div>'+
         '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Needs attention</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">'+(sorted.filter(d=>d.evalAvg!==null&&d.evalAvg<60).length)+'</div></div>'+
         '</div></div></div>'+
         '<div style="display:grid;grid-template-columns:360px 1fr;gap:12px">'+
@@ -4971,12 +4959,15 @@ function performanceView(){
     }
 
     if(subTab==='coaching'){
+      drDefault('coaching');
+      const coFromDT=D.coachingFrom;const coToDT=D.coachingTo;
+      const coFromDate=drDate(coFromDT);const coToDate=drDate(coToDT);
       const coachMonths=[...new Set([...D.coachingAssignments.map(a=>a.month||a.assigned_date?.slice(0,7)).filter(Boolean),curMonth])].sort().reverse();
       const selCoachMonth=D.coachingMonth||curMonth;
       const cMonthSel='<select onchange="D.coachingMonth=this.value;render()" style="padding:4px 8px;border-radius:7px;border:1.5px solid var(--g2);font-size:11px;font-family:inherit">'+
         coachMonths.map(m=>'<option value="'+m+'" '+(m===selCoachMonth?'selected':'')+'>'+m+'</option>').join('')+'</select>';
 
-      const monthAssignments=D.coachingAssignments.filter(a=>(a.month||a.assigned_date?.slice(0,7))===selCoachMonth);
+      const monthAssignments=D.coachingAssignments.filter(a=>{const ds=a.assigned_date||((a.month||'')+'- 01');const aDate=a.assigned_date||a.month+'-01';return aDate>=coFromDate&&aDate<=coToDate;});
       const monthCaseIds=new Set(monthAssignments.map(a=>a.case_id));
       const filteredCases=D.coachingCases.filter(c=>monthCaseIds.has(c.id)||(c.batch_date&&c.batch_date.startsWith(selCoachMonth)&&!D.coachingAssignments.find(a=>a.case_id===c.id)));
       const unassignedCases=filteredCases.filter(c=>!D.coachingAssignments.find(a=>a.case_id===c.id));
@@ -5039,7 +5030,7 @@ function performanceView(){
           '</tr>';
       }).join('');
 
-      return segHtml+
+      return segHtml+drBar('coaching',coFromDT,coToDT)+
         '<div style="background:#085041;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Coaching · '+selCoachMonth+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'+
         '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Total cases</div><div style="font-size:22px;font-weight:500;color:#fff">'+(monthAssignments.length)+'</div></div>'+
         '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">On time</div><div style="font-size:22px;font-weight:500;color:#4ADE80">'+(totalDone)+'</div></div>'+
