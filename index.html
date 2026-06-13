@@ -2442,6 +2442,32 @@ function renderModal(){
   }
   if(m.type==='changepw'){box.innerHTML=`<div class="modal-title"><i class="ti ti-key"></i>Change password</div><div class="msg msg-err" id="cpw-e"></div><div class="msg msg-ok" id="cpw-ok"></div><div class="fg"><label>New password</label><div class="pw-wrap"><input type="password" id="cpw1" placeholder="Min 8 chars"><button class="pw-eye" onclick="togglePw('cpw1',this)"><i class="ti ti-eye"></i></button></div></div><div class="fg"><label>Confirm</label><div class="pw-wrap"><input type="password" id="cpw2" placeholder="Repeat"><button class="pw-eye" onclick="togglePw('cpw2',this)"><i class="ti ti-eye"></i></button></div></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="doCPW()"><i class="ti ti-check"></i>Update</button></div>`;return;}
   if(m.type==='absencereason'){box.innerHTML=`<div class="modal-title"><i class="ti ti-calendar-off"></i>Mark as Absent - ${m.patName}</div><div class="fg"><label>Reason for absence</label><select id="ar-reason"><option value="">-- Select reason --</option><option value="No show">No show</option><option value="Sick leave">Sick leave</option></select></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="const r=document.getElementById('ar-reason').value;if(!r){alert('Please select a reason');return;}confirmAbsenceReason('${m.patId}','${m.patName}','${m.status}',r)"><i class="ti ti-check"></i>Confirm</button></div>`;return;}
+  if(m.type==='editattendance'){
+    const _earec=(D.attendance||[]).find(a=>a.patroller_id===m.patId&&a.date===m.dateStr);
+    const _curStatus=_earec?.status||'No record';
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-pencil"></i>Edit Attendance · ${m.patName}</div>
+      <div style="font-size:11px;color:var(--g3);margin-bottom:12px">Date: <b>${m.dateStr}</b> · Current: <b>${_curStatus}</b></div>
+      <div class="fg"><label>New status</label><select id="ea-status">
+        <option value="Attended">✓ Attended</option>
+        <option value="Absent">✗ Absent</option>
+      </select></div>
+      <div class="fg" id="ea-reason-wrap" style="display:none"><label>Reason for absence</label><select id="ea-reason">
+        <option value="No show">No show</option>
+        <option value="Sick leave">Sick leave</option>
+      </select></div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeM()">Cancel</button>
+        <button class="btn btn-primary" onclick="
+          const st=document.getElementById('ea-status').value;
+          const rs=st==='Absent'?document.getElementById('ea-reason').value:'';
+          saveAttendanceEdit('${m.patId}','${m.patName}','${m.dateStr}',st,rs)
+        "><i class="ti ti-check"></i>Save</button>
+      </div>`;
+    document.getElementById('ea-status').addEventListener('change',function(){
+      document.getElementById('ea-reason-wrap').style.display=this.value==='Absent'?'block':'none';
+    });
+    return;
+  }
   
   if(m.type==='biometric_new_device'){
     box.innerHTML=`<div class="modal-title"><i class="ti ti-alert-circle" style="color:var(--amber)"></i>New Device Detected</div>
@@ -3401,6 +3427,19 @@ async function confirmAbsenceReason(patId,patName,status,reason){
   await reload();
 }
 
+// ── EDIT ATTENDANCE (admin/lead can change already-marked records) ──
+function editAttendance(patId,patName,dateStr){
+  openM({type:'editattendance',patId,patName,dateStr});
+}
+async function saveAttendanceEdit(patId,patName,dateStr,newStatus,reason){
+  const existing=(D.attendance||[]).find(a=>a.patroller_id===patId&&a.date===dateStr);
+  const now=new Date().toISOString();
+  const finalStatus=reason?`${newStatus} (${reason})`:newStatus;
+  if(existing){await sb.from('attendance').update({status:finalStatus,updated_at:now,marked_by:D.profile.id}).eq('id',existing.id);}
+  else{await sb.from('attendance').insert({patroller_id:patId,patroller_name:patName,date:dateStr,status:finalStatus,marked_by:D.profile.id,updated_at:now});}
+  closeM();await reload();
+}
+
 // ── MY ATTENDANCE VIEW (patroller/coordinator) ──
 function myAttendanceView(){
   const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
@@ -3556,8 +3595,14 @@ function attendanceView(){
       } else if(rec?.clock_in&&rec?.clock_out){
         st=`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:600;background:#DCFCE7;color:#166534">✓ Attended</span>`;
       } else if(rec?.clock_in&&!rec?.clock_out){
-        st=`<div><span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:600;background:#DCFCE7;color:#166534">🟢 On shift</span><div style="font-size:9px;color:#166534;margin-top:1px">No clock-out yet</div></div>`;
-        rowBg='rgba(22,101,52,0.03)';
+        const _hasPendingEarly=earlyTask&&earlyTask.status==='Pending';
+        const _earlyOutTime=_hasPendingEarly&&earlyTask.start_time?earlyTask.start_time:'';
+        st=`<div>
+          <span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:600;background:${_hasPendingEarly?'#FEF3C7':'#DCFCE7'};color:${_hasPendingEarly?'#D97706':'#166534'}">${_hasPendingEarly?'⏳ Early out pending':'🟢 On shift'}</span>
+          <div style="font-size:9px;color:${_hasPendingEarly?'#D97706':'#166534'};margin-top:1px">${_hasPendingEarly?`Requested early out${_earlyOutTime?' at '+_earlyOutTime:''}` :'No clock-out yet'}</div>
+          ${_hasPendingEarly&&canEdit()?`<div style="margin-top:4px"><button class="edit-btn" style="background:#DCFCE7;color:#166534;border-color:#86EFAC;font-size:9px" onclick="approveEarlyOut('${earlyTask.id}')">✓ Approve early out</button> <button class="edit-btn" style="background:#FEE2E2;color:#991B1B;border-color:#FCA5A5;font-size:9px" onclick="rejectEarlyOut('${earlyTask.id}')">✗ Reject</button></div>`:''}
+        </div>`;
+        rowBg=_hasPendingEarly?'rgba(217,119,6,0.05)':'rgba(22,101,52,0.03)';
       } else if(isToday2){
         // Today + scheduled + no clock-in
         st=`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#FEF3C7;color:#92400E">⏰ Not clocked in</span>`;
@@ -3574,11 +3619,15 @@ function attendanceView(){
         <td style="font-size:10px;color:var(--g3)">${gDZ(p.id,jsDay)||'—'}</td>
         <td style="font-size:10px">${sh?(sh.shift_type==='morning'?'☀️':'🌙')+' '+fmtT(sh.start_time)+'–'+fmtT(sh.end_time):'—'}</td>
         <td>${st}</td>
-        <td style="font-size:10px;font-family:monospace;font-weight:${rec?.clock_in?'600':'400'};color:${rec?.clock_in?'#166534':'var(--g3)'}">${inT}</td>
-        <td style="font-size:10px;font-family:monospace;font-weight:${rec?.clock_out?'600':'400'};color:${rec?.clock_out?'#0C447C':rec?.clock_in?'#DC2626':'var(--g3)'}">${outT}${rec?.clock_in&&!rec?.clock_out&&isToday2?'<span style="font-size:8px;color:#DC2626;margin-left:3px">Missing</span>':''}</td>
+        <td style="font-size:10px;font-family:monospace;font-weight:${rec?.clock_in?'600':'400'};color:${rec?.clock_in?'#166534':'var(--g3)'}">
+          ${inT}${rec?.clock_in_map?`<a href="${rec.clock_in_map}" target="_blank" title="View clock-in location" style="margin-left:5px;color:#16A34A;text-decoration:none;font-size:12px"><i class="ti ti-map-pin"></i></a>`:''}
+        </td>
+        <td style="font-size:10px;font-family:monospace;font-weight:${rec?.clock_out?'600':'400'};color:${rec?.clock_out?'#0C447C':rec?.clock_in?'#DC2626':'var(--g3)'}">
+          ${outT}${rec?.clock_in&&!rec?.clock_out&&isToday2?'<span style="font-size:8px;color:#DC2626;margin-left:3px">Missing</span>':''}${rec?.clock_out_map?`<a href="${rec.clock_out_map}" target="_blank" title="View clock-out location" style="margin-left:5px;color:#0C447C;text-decoration:none;font-size:12px"><i class="ti ti-map-pin"></i></a>`:''}
+        </td>
         <td style="font-size:10px;font-weight:600;color:${dur!=='—'?'#FF5900':'var(--g3)'}">${dur}</td>
-        <td style="font-size:9px;color:#7C3AED;max-width:120px">${earlyReason&&!rec?.status?.startsWith('Early out')?`⚡ ${earlyReason}`:''}</td>
-        <td>${canEdit()?`<button class="edit-btn" style="background:var(--green-l);color:var(--green);border-color:#86efac" onclick="markAttendance('${p.id}','${p.name}','Attended')" title="Mark attended"><i class="ti ti-check"></i></button><button class="edit-btn" style="background:var(--red-l);color:var(--red-d);border-color:#fca5a5" onclick="markAttendance('${p.id}','${p.name}','Absent')" title="Mark absent"><i class="ti ti-x"></i></button>`:''}</td>
+        <td style="font-size:9px;color:#7C3AED;max-width:120px">${earlyReason?`⚡ ${earlyReason}`:''}</td>
+        <td style="white-space:nowrap">${canEdit()?`${(rec&&(rec.clock_in||rec.status==='Attended'||rec.status?.startsWith('Absent')||rec.status?.startsWith('Early out')))?`<button class="edit-btn" style="background:var(--g1);color:var(--g4);border-color:var(--g2)" onclick="editAttendance('${p.id}','${p.name}','${ds}')" title="Edit attendance"><i class="ti ti-pencil"></i> Edit</button>`:`<button class="edit-btn" style="background:var(--green-l);color:var(--green);border-color:#86efac" onclick="markAttendance('${p.id}','${p.name}','Attended')" title="Mark attended"><i class="ti ti-check"></i></button><button class="edit-btn" style="background:var(--red-l);color:var(--red-d);border-color:#fca5a5" onclick="markAttendance('${p.id}','${p.name}','Absent')" title="Mark absent"><i class="ti ti-x"></i></button>`}`:''}</td>
       </tr>`;
     }).join('');
     return header+rows;
@@ -3995,10 +4044,9 @@ function tasksView(){
     <button class="btn btn-primary" onclick="openM({type:'taskreq'})"><i class="ti ti-plus"></i>Start New Task</button>
     <button class="btn" onclick="dlTasks()"><i class="ti ti-download"></i>Export CSV</button>
   </div>
-  ${all.length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-checklist" style="font-size:40px;display:block;margin-bottom:10px;opacity:.4"></i>No tasks yet.</div>`:`
   <div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr>
     <th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Patroller</th><th>Type</th><th>Date</th><th>Time</th><th>Duration</th><th>Description</th><th>Status</th>${ed?'<th>Actions</th>':''}
-  </tr></thead><tbody>${rows}</tbody></table></div></div>`}`;
+  </tr></thead><tbody>${filteredTasks.length===0?`<tr><td colspan="9" style="padding:30px;text-align:center;color:var(--g3)">${all.length===0?'No tasks yet.':'No tasks in this date range — try adjusting the date filter above.'}</td></tr>`:rows}</tbody></table></div></div>`;
 }
 
 // ── MY TASKS VIEW (patroller) ──
@@ -4604,14 +4652,23 @@ async function submitEarlyClockOut(patId,attId,adjEndStr){
 }
 
 async function approveEarlyClockOut(taskId,attId){
-  // Complete the clock out
+  // Complete the clock out — admin approves, no geolocation needed from admin side
   const now=new Date();
-  let map='';
-  try{const pos=await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000}));map=`https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;}catch(e){}
-  await sb.from('attendance').update({clock_out:now.toISOString(),clock_out_map:map||null,status:'Attended'}).eq('id',attId);
+  // Use the requested early out time from the task if available (more accurate than now)
+  const task=D.tasks.find(x=>x.id===taskId);
+  let clockOutTime=now.toISOString();
+  if(task&&task.start_time){
+    // start_time is the time the patroller requested to clock out (HH:MM)
+    // Build a proper ISO from the attendance date + that time
+    const attRec=(D.attendance||[]).find(a=>a.id===attId);
+    if(attRec&&attRec.date){
+      clockOutTime=new Date(attRec.date+'T'+task.start_time+':00+03:00').toISOString();
+    }
+  }
+  await sb.from('attendance').update({clock_out:clockOutTime,status:'Early out - Approved'}).eq('id',attId);
   await sb.from('task_requests').update({status:'Approved',reviewed_by:D.profile.id,updated_at:now.toISOString()}).eq('id',taskId);
   await reload();
-  addNotification('Early clock out approved','success');
+  addNotification('Early clock out approved — patroller clocked out','success');
 }
 
 async function rejectEarlyClockOut(taskId){
