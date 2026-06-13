@@ -1852,10 +1852,43 @@ function mySchedView(){
   </div>`:'';
 
   // ── Nav ──
-  const weekNav=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-    <button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button>
-    <span style="font-size:13px;font-weight:600;color:#411517">Week ${wn} · ${fmt(dates[0])} – ${fmt(dates[6])}</span>
-    <button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button>
+  const msDefFrom=dates[0].toISOString().split('T')[0]+'T00:00';
+  const msDefTo=dates[6].toISOString().split('T')[0]+'T23:59';
+  const mySchedFromDT=D.mySchedFrom||msDefFrom;
+  const mySchedToDT=D.mySchedTo||msDefTo;
+  if(!D.mySchedFrom||D.woff===0)D.mySchedFrom=msDefFrom;
+  if(!D.mySchedTo||D.woff===0)D.mySchedTo=msDefTo;
+  const bhrMs=getBahrainNow();
+  const yMs=bhrMs.getUTCFullYear(),moMs=String(bhrMs.getUTCMonth()+1).padStart(2,'0'),dMs=String(bhrMs.getUTCDate()).padStart(2,'0');
+  const yestMs=new Date(bhrMs.getTime()-86400000);
+  const yyMs=yestMs.getUTCFullYear(),ymMs=String(yestMs.getUTCMonth()+1).padStart(2,'0'),ydMs=String(yestMs.getUTCDate()).padStart(2,'0');
+  const nxMsStart=new Date(dates[0].getTime()+7*86400000);
+  const nxMsEnd=new Date(dates[6].getTime()+7*86400000);
+  const mySchedPresets=[
+    {label:'Today',    f:`${yMs}-${moMs}-${dMs}T00:00`,   t:`${yMs}-${moMs}-${dMs}T23:59`},
+    {label:'Yesterday',f:`${yyMs}-${ymMs}-${ydMs}T00:00`, t:`${yyMs}-${ymMs}-${ydMs}T23:59`},
+    {label:'This week',f:msDefFrom,                       t:msDefTo},
+    {label:'Next week',f:nxMsStart.toISOString().split('T')[0]+'T00:00',t:nxMsEnd.toISOString().split('T')[0]+'T23:59'},
+  ];
+  const mySchedPresetBtns=mySchedPresets.map(p=>{
+    const on=mySchedFromDT===p.f&&mySchedToDT===p.t;
+    return`<button onclick="D.mySchedFrom='${p.f}';D.mySchedTo='${p.t}';D.woff=0;render()" style="padding:0 11px;height:32px;border-radius:7px;border:0.5px solid ${on?'#FF5900':'var(--g2)'};background:${on?'rgba(255,89,0,.12)':'var(--g1)'};color:${on?'#FF5900':'var(--g3)'};font-size:11px;font-weight:500;cursor:pointer;font-family:inherit">${p.label}</button>`;
+  }).join('');
+  const weekNav=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;flex-wrap:wrap;background:var(--sur);border:0.5px solid var(--g2);border-radius:10px;padding:8px 12px">
+    <div style="display:flex;align-items:center;background:var(--g1);border:0.5px solid var(--g2);border-radius:7px;padding:0 10px;height:32px;min-width:150px">
+      <input type="datetime-local" id="myschedFrom" value="${mySchedFromDT}" onchange="D.mySchedFrom=this.value" style="background:transparent;border:none;outline:none;color:var(--color-text-primary);font-size:11px;font-family:inherit;font-weight:500;width:100%;cursor:pointer">
+    </div>
+    <span style="opacity:.4;font-size:14px">→</span>
+    <div style="display:flex;align-items:center;background:var(--g1);border:0.5px solid var(--g2);border-radius:7px;padding:0 10px;height:32px;min-width:150px">
+      <input type="datetime-local" id="myschedTo" value="${mySchedToDT}" onchange="D.mySchedTo=this.value" style="background:transparent;border:none;outline:none;color:var(--color-text-primary);font-size:11px;font-family:inherit;font-weight:500;width:100%;cursor:pointer">
+    </div>
+    <button onclick="const mf=document.getElementById('myschedFrom');const mt=document.getElementById('myschedTo');if(mf)D.mySchedFrom=mf.value;if(mt)D.mySchedTo=mt.value;D.woff=0;render()" style="padding:0 13px;height:32px;border-radius:7px;border:1.5px solid #FF5900;background:transparent;color:#FF5900;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Apply</button>
+    <div style="display:flex;gap:4px">${mySchedPresetBtns}</div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+      <button class="nav-btn" onclick="D.woff--;render()"><i class="ti ti-chevron-left"></i></button>
+      <span style="font-size:12px;font-weight:600;color:#411517;white-space:nowrap">Week ${wn} · ${fmt(dates[0])} – ${fmt(dates[6])}</span>
+      <button class="nav-btn" onclick="D.woff++;render()"><i class="ti ti-chevron-right"></i></button>
+    </div>
   </div>`;
 
   // ── Week table ──
@@ -2174,13 +2207,58 @@ function render(){
     if(D.tab==='schedule'){D.view='week';}
     else if(D.tab==='schedule-daily'){D.view='date';}
     else if(D.tab==='schedule-hourly'){D.view='hourly';}
-    const schedLabels={'week':'Weekly schedule','date':'Daily schedule','hourly':'Hourly schedule'};
     const stripe='<div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div>';
-    const{am,pm,off}=summ(activePats());
+    const{am:amS,pm:pmS,off:offS}=summ(activePats());
     const todayIdx2=todayDayIdx();
-    const onToday=am[todayIdx2]+pm[todayIdx2];
-    const offToday=off[todayIdx2];
-    const schedHero=`<div style="background:#1A3A2A;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden">${stripe}<div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">${schedLabels[D.view]||'Schedule'} · Week ${wn} · ${fmt(dates[0])} – ${fmt(dates[6])}</div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">On today</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${onToday}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">AM today</div><div style="font-size:22px;font-weight:500;color:#FF8C42">${am[todayIdx2]}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">PM today</div><div style="font-size:22px;font-weight:500;color:#C4B5FD">${pm[todayIdx2]}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Off today</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">${offToday}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total staff</div><div style="font-size:22px;font-weight:500">${activePats().length}</div></div></div></div></div>`;
+    const onToday=amS[todayIdx2]+pmS[todayIdx2];
+    const offToday=offS[todayIdx2];
+    const bhr2=getBahrainNow();
+    const sy=bhr2.getUTCFullYear(),smo=String(bhr2.getUTCMonth()+1).padStart(2,'0'),sd=String(bhr2.getUTCDate()).padStart(2,'0');
+    const yest2=new Date(bhr2.getTime()-86400000);
+    const syy=yest2.getUTCFullYear(),sym=String(yest2.getUTCMonth()+1).padStart(2,'0'),syd=String(yest2.getUTCDate()).padStart(2,'0');
+    const defFrom=dates[0].toISOString().split('T')[0]+'T00:00';
+    const defTo=dates[6].toISOString().split('T')[0]+'T23:59';
+    const nxStart=new Date(dates[0].getTime()+7*86400000);
+    const nxEnd=new Date(dates[6].getTime()+7*86400000);
+    const nxf=nxStart.toISOString().split('T')[0]+'T00:00';
+    const nxt=nxEnd.toISOString().split('T')[0]+'T23:59';
+    if(!D.schedFrom||D.woff===0)D.schedFrom=defFrom;
+    if(!D.schedTo||D.woff===0)D.schedTo=defTo;
+    const schedFromDT=D.schedFrom;
+    const schedToDT=D.schedTo;
+    const spresets=[
+      {label:'Today',    f:`${sy}-${smo}-${sd}T00:00`,   t:`${sy}-${smo}-${sd}T23:59`},
+      {label:'Yesterday',f:`${syy}-${sym}-${syd}T00:00`, t:`${syy}-${sym}-${syd}T23:59`},
+      {label:'This week',f:defFrom,                      t:defTo},
+      {label:'Next week',f:nxf,                          t:nxt},
+    ];
+    const spresetBtns=spresets.map(p=>{
+      const on=schedFromDT===p.f&&schedToDT===p.t;
+      return`<button onclick="D.schedFrom='${p.f}';D.schedTo='${p.t}';D.woff=0;render()" style="padding:0 12px;height:34px;border-radius:8px;border:0.5px solid ${on?'rgba(255,89,0,.7)':'rgba(255,255,255,.2)'};background:${on?'rgba(255,89,0,.25)':'rgba(255,255,255,.07)'};color:${on?'#FF8C42':'rgba(255,255,255,.75)'};font-size:11px;font-weight:500;cursor:pointer;font-family:inherit">${p.label}</button>`;
+    }).join('');
+    const schedHero=`<div style="background:#1A3A2A;border-radius:12px;padding:14px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden">${stripe}<div style="position:relative;z-index:1">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.55;min-width:28px">FROM</span>
+        <div style="display:flex;align-items:center;background:rgba(0,0,0,.25);border:0.5px solid rgba(255,255,255,.18);border-radius:8px;padding:0 10px;height:34px;min-width:160px">
+          <input type="datetime-local" id="sched-from-input" value="${schedFromDT}" onchange="D.schedFrom=this.value" style="background:transparent;border:none;outline:none;color:#fff;font-size:12px;font-family:inherit;font-weight:500;width:100%;cursor:pointer;color-scheme:dark">
+        </div>
+        <span style="opacity:.4;font-size:16px">→</span>
+        <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.55;min-width:14px">TO</span>
+        <div style="display:flex;align-items:center;background:rgba(0,0,0,.25);border:0.5px solid rgba(255,255,255,.18);border-radius:8px;padding:0 10px;height:34px;min-width:160px">
+          <input type="datetime-local" id="sched-to-input" value="${schedToDT}" onchange="D.schedTo=this.value" style="background:transparent;border:none;outline:none;color:#fff;font-size:12px;font-family:inherit;font-weight:500;width:100%;cursor:pointer;color-scheme:dark">
+        </div>
+        <button onclick="const sf=document.getElementById('sched-from-input');const st=document.getElementById('sched-to-input');if(sf)D.schedFrom=sf.value;if(st)D.schedTo=st.value;D.woff=0;render()" style="padding:0 16px;height:34px;border-radius:8px;border:1.5px solid #FF5900;background:transparent;color:#FF8C42;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Apply</button>
+        <div style="display:flex;gap:5px;margin-left:2px">${spresetBtns}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">On today</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${onToday}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">AM today</div><div style="font-size:22px;font-weight:500;color:#FF8C42">${amS[todayIdx2]}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">PM today</div><div style="font-size:22px;font-weight:500;color:#C4B5FD">${pmS[todayIdx2]}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Off today</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">${offToday}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total staff</div><div style="font-size:22px;font-weight:500">${activePats().length}</div></div>
+      </div>
+      <div style="font-size:9px;opacity:.35;margin-top:7px">Week ${wn} · ${fmt(dates[0])} – ${fmt(dates[6])}${D.woff!==0?' · <a onclick="D.woff=0;D.schedFrom=\''+defFrom+'\';D.schedTo=\''+defTo+'\';render()" style="color:#FF8C42;cursor:pointer;text-decoration:underline">↩ Current week</a>':''}</div>
+    </div></div>`;
     html=safeRender(()=>schedHero+nav+getRunningTasks()+(D.view==='week'?weekTable(canEdit()):D.view==='hourly'?hourlyView():dateView())+notesBar(),'Schedule');
   }
   else if(D.tab==='summary')html=safeRender(()=>summaryView(),'Summary');
