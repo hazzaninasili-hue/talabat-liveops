@@ -1305,16 +1305,12 @@ function timeOffView(){
   const pen=reqs.filter(r=>r.status==='Pending').length;
   const apr=reqs.filter(r=>r.status==='Approved').length;
   const rej=reqs.filter(r=>r.status==='Rejected').length;
-  drDefaultAll('timeoff');
-  const toFromDT=D.timeoffFrom;const toToDT=D.timeoffTo;
-  const toFromDate=drDate(toFromDT);const toToDate=drDate(toToDT);
-  // Filter requests that overlap the range
-  // Fallback: use created_at date if start_date/end_date missing
-  const filteredReqs=reqs.filter(r=>{
-    const rFrom=r.start_date||(r.created_at?r.created_at.slice(0,10):'');
-    const rTo=r.end_date||r.start_date||(r.created_at?r.created_at.slice(0,10):'');
-    if(!rFrom)return true; // always show records with no date
-    return rFrom<=toToDate&&rTo>=toFromDate;
+  // No date filter — show ALL requests. Pending first, then newest → oldest.
+  const _toPriority=r=>r.status==='Pending'?0:r.status==='Approved'?1:2;
+  const filteredReqs=[...reqs].sort((a,b)=>{
+    const pd=_toPriority(a)-_toPriority(b);
+    if(pd!==0)return pd;
+    return new Date(b.created_at||b.start_date)-new Date(a.created_at||a.start_date);
   });
   const fPen=filteredReqs.filter(r=>r.status==='Pending').length;
   const fApr=filteredReqs.filter(r=>r.status==='Approved').length;
@@ -1325,9 +1321,9 @@ function timeOffView(){
     const sc=r.status==='Approved'?'background:var(--green-l);color:var(--green)':r.status==='Rejected'?'background:var(--red-l);color:var(--red-d)':'background:var(--amber-l);color:var(--amber-d)';
     return`<tr><td class="lt" style="white-space:nowrap">${r.patroller_name||'--'}</td><td style="font-family:monospace;font-size:10.5px">${r.patroller_code||'--'}</td><td style="white-space:nowrap;font-size:10.5px;font-weight:500">${r.request_type}</td><td style="font-family:monospace;font-size:10.5px">${r.start_date}</td><td style="font-family:monospace;font-size:10.5px">${r.end_date}</td><td style="font-weight:700">${days}</td><td><span class="pct-badge" style="${sc};white-space:nowrap">${r.status}</span></td><td style="font-size:10.5px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.comment||'--'}</td><td>${r.support_doc_url?`<a href="${r.support_doc_url}" target="_blank" style="font-size:10.5px;color:var(--blue)"><i class="ti ti-external-link"></i></a>`:'--'}</td>${isAL?`<td style="white-space:nowrap">${r.status==='Pending'?`<button class="edit-btn" style="background:var(--green-l);color:var(--green);border-color:#86efac" onclick="reviewTO('${r.id}','Approved')" title="Approve"><i class="ti ti-check"></i></button><button class="edit-btn" style="background:var(--red-l);color:var(--red-d);border-color:#fca5a5" onclick="reviewTO('${r.id}','Rejected')" title="Reject"><i class="ti ti-x"></i></button>`:''}<button class="icon-btn" onclick="delTO('${r.id}')"><i class="ti ti-trash"></i></button></td>`:''}</tr>`;
   }).join('');
-  return`<div style="background:#412402;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Time off requests</div>${drBar('timeoff',toFromDT,toToDT)}<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Pending</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${fPen}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Approved</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${fApr}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Rejected</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">${fRej}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total requests</div><div style="font-size:22px;font-weight:500;color:#fff">${filteredReqs.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total days off</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${totalDays}</div></div></div></div></div>
+  return`<div style="background:#412402;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Time off requests · ${filteredReqs.length} total</div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Pending</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${fPen}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Approved</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${fApr}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Rejected</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">${fRej}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total requests</div><div style="font-size:22px;font-weight:500;color:#fff">${filteredReqs.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total days off</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${totalDays}</div></div></div></div></div>
   <div class="toolbar"><button class="btn btn-primary" onclick="openM({type:'timeoff'})"><i class="ti ti-plus"></i>New request</button>${isAL?`<button class="btn" onclick="dlTO()"><i class="ti ti-download"></i>Export CSV</button><button class="btn" style="background:#FEE2E2;color:#991B1B;border-color:#FCA5A5" onclick="openDeleteHistoryModal('timeoff')"><i class="ti ti-trash"></i>Delete Historical</button>`:''}</div>
-  <div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr><th class="lt">Name</th><th>ID</th><th>Leave type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th><th>Comment</th><th>Doc</th>${isAL?'<th>Actions</th>':''}</tr></thead><tbody>${filteredReqs.length===0?`<tr><td colspan="10" style="padding:30px;text-align:center;color:var(--g3)">${reqs.length===0?'No time-off requests yet.':'No requests in this date range — adjust the filter above.'}</td></tr>`:rows}</tbody></table></div></div>`;
+  <div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr><th class="lt">Name</th><th>ID</th><th>Leave type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th><th>Comment</th><th>Doc</th>${isAL?'<th>Actions</th>':''}</tr></thead><tbody>${filteredReqs.length===0?`<tr><td colspan="10" style="padding:30px;text-align:center;color:var(--g3)">No time-off requests yet.</td></tr>`:rows}</tbody></table></div></div>`;
 }
 
 // ── COMBINED TIME OFF & TASKS VIEW ──
@@ -2474,7 +2470,8 @@ function renderModal(){
   if(m.type==='changepw'){box.innerHTML=`<div class="modal-title"><i class="ti ti-key"></i>Change password</div><div class="msg msg-err" id="cpw-e"></div><div class="msg msg-ok" id="cpw-ok"></div><div class="fg"><label>New password</label><div class="pw-wrap"><input type="password" id="cpw1" placeholder="Min 8 chars"><button class="pw-eye" onclick="togglePw('cpw1',this)"><i class="ti ti-eye"></i></button></div></div><div class="fg"><label>Confirm</label><div class="pw-wrap"><input type="password" id="cpw2" placeholder="Repeat"><button class="pw-eye" onclick="togglePw('cpw2',this)"><i class="ti ti-eye"></i></button></div></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="doCPW()"><i class="ti ti-check"></i>Update</button></div>`;return;}
   if(m.type==='deletehistory'){
     const labels={attendance:'Attendance',tasks:'Tasks',timeoff:'Time Off'};
-    box.innerHTML=`<div class="modal-title" style="color:#DC2626"><i class="ti ti-trash" style="color:#DC2626"></i>Delete Historical ${labels[m.dataType]||''} Data</div>
+    const dtype=m.dataType;
+    box.innerHTML=`<div class="modal-title" style="color:#DC2626"><i class="ti ti-trash" style="color:#DC2626"></i>Delete Historical ${labels[dtype]||''} Data</div>
       <div style="background:#FEE2E2;border:1.5px solid #FCA5A5;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#991B1B">
         <strong>⚠️ Warning:</strong> This permanently deletes records from the database. This cannot be undone.
       </div>
@@ -2484,14 +2481,7 @@ function renderModal(){
       <div style="font-size:11px;color:var(--g3);margin-top:6px">Only admin can do this. Records on or after the selected date are kept.</div>
       <div class="modal-footer">
         <button class="btn" onclick="closeM()">Cancel</button>
-        <button class="btn" style="background:#DC2626;color:#fff;border-color:#DC2626" onclick="
-          const d=document.getElementById('del-cut-date').value;
-          if(!d){alert('Please select a date');return;}
-          if(!confirm('Delete all ${labels[m.dataType]||''} records before '+d+'? This cannot be undone.'))return;
-          ${{attendance:'deleteHistoricalData(\'attendance\',d,\'attendance\')',
-             tasks:'deleteHistoricalTasks(d)',
-             timeoff:'deleteHistoricalTimeOff(d)'}[m.dataType]||'closeM()'};
-        "><i class="ti ti-trash"></i>Delete Records</button>
+        <button class="btn" style="background:#DC2626;color:#fff;border-color:#DC2626" onclick="execDeleteHistorical('${dtype}')"><i class="ti ti-trash"></i>Delete Records</button>
       </div>`;return;
   }
   if(m.type==='absencereason'){box.innerHTML=`<div class="modal-title"><i class="ti ti-calendar-off"></i>Mark as Absent - ${m.patName}</div><div class="fg"><label>Reason for absence</label><select id="ar-reason"><option value="">-- Select reason --</option><option value="No show">No show</option><option value="Sick leave">Sick leave</option></select></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="const r=document.getElementById('ar-reason').value;if(!r){alert('Please select a reason');return;}confirmAbsenceReason('${m.patId}','${m.patName}','${m.status}',r)"><i class="ti ti-check"></i>Confirm</button></div>`;return;}
@@ -3772,6 +3762,17 @@ function dlAttendance(){
 
 
 // ── DELETE HISTORICAL DATA (admin only) ──
+async function execDeleteHistorical(dtype){
+  const d=document.getElementById('del-cut-date').value;
+  if(!d){alert('Please select a date');return;}
+  if(!confirm('Delete all '+dtype+' records before '+d+'? This CANNOT be undone.'))return;
+  document.querySelector('#modal .btn[onclick^="execDelete"]').disabled=true;
+  if(dtype==='attendance') await deleteHistoricalData('attendance',d,'attendance');
+  else if(dtype==='tasks') await deleteHistoricalTasks(d);
+  else if(dtype==='timeoff') await deleteHistoricalTimeOff(d);
+  else closeM();
+}
+
 async function deleteHistoricalData(table,beforeDate,label){
   const{error}=await sb.from(table).delete().lt('date',beforeDate);
   if(error){alert('Error: '+error.message);return;}
@@ -4093,14 +4094,12 @@ function hourlyView(){
 function tasksView(){
   const ed=canEdit();
   const all=D.tasks||[];
-  drDefaultAll('tasks');
-  const tkFromDT=D.tasksFrom;const tkToDT=D.tasksTo;
-  const tkFromDate=drDate(tkFromDT);const tkToDate=drDate(tkToDT);
-  const filteredTasks=all.filter(t=>{
-    // t.date is always YYYY-MM-DD; t.start_time is HH:MM (not a date string)
-    const ds=t.date||(t.created_at?t.created_at.slice(0,10):'');
-    if(!ds)return true; // include tasks with no date
-    return ds>=tkFromDate&&ds<=tkToDate;
+  // No date filter — show ALL tasks. Running first, then Pending, then rest newest→oldest.
+  const _tkPriority=t=>t.status==='Running'?0:t.status==='Pending'?1:2;
+  const filteredTasks=[...all].sort((a,b)=>{
+    const pd=_tkPriority(a)-_tkPriority(b);
+    if(pd!==0)return pd;
+    return new Date(b.created_at||b.date)-new Date(a.created_at||a.date);
   });
   const running=filteredTasks.filter(t=>t.status==='Running').length;
   const completed=filteredTasks.filter(t=>t.status==='Completed').length;
@@ -4117,11 +4116,7 @@ function tasksView(){
     return'background:var(--g1);color:var(--g3)';
   };
 
-  const rows=[...filteredTasks].sort((a,b)=>{
-    const da=a.start_time?a.start_time.slice(0,10):(a.date||'');
-    const db=b.start_time?b.start_time.slice(0,10):(b.date||'');
-    return db.localeCompare(da);
-  }).map(t=>{
+  const rows=filteredTasks.map(t=>{
     const col=TASK_COLORS[t.task_type]||'#411517';
     const bg=TASK_BG[t.task_type]||'#F4EDE3';
     const duration=t.start_time&&t.end_time?`${t.start_time} → ${t.end_time}`:t.start_time?`Started: ${t.start_time}`:'--';
@@ -4160,7 +4155,7 @@ function tasksView(){
     </tr>`;
   }).join('');
 
-  return`<style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}</style><div style="background:#2C2C2A;border-radius:12px;padding:14px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1">${drBar('tasks',tkFromDT,tkToDT)}<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total tasks</div><div style="font-size:22px;font-weight:500;color:#fff">${filteredTasks.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Completed</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${completed}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Running</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${running}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total duration</div><div style="font-size:16px;font-weight:500;color:#93C5FD">${tkDurStr}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Patrollers</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${tkUnique}</div></div></div></div></div>
+  return`<style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}</style><div style="background:#2C2C2A;border-radius:12px;padding:14px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total tasks</div><div style="font-size:22px;font-weight:500;color:#fff">${filteredTasks.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Completed</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${completed}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Running</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${running}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total duration</div><div style="font-size:16px;font-weight:500;color:#93C5FD">${tkDurStr}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Patrollers</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${tkUnique}</div></div></div></div></div>
   <div class="toolbar">
     <button class="btn btn-primary" onclick="openM({type:'taskreq'})"><i class="ti ti-plus"></i>Start New Task</button>
     <button class="btn" onclick="dlTasks()"><i class="ti ti-download"></i>Export CSV</button>
@@ -4175,13 +4170,12 @@ function tasksView(){
 function myTasksView(){
   const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
   const allMyTasks=pat?(D.tasks||[]).filter(t=>t.patroller_id===pat.id):[];
-  drDefaultAll('myTasks');
-  const tkFromDT=D.myTasksFrom;const tkToDT=D.myTasksTo;
-  const tkFromDate=drDate(tkFromDT);const tkToDate=drDate(tkToDT);
-  const myTasks=allMyTasks.filter(t=>{
-    const ds=t.date||(t.created_at?t.created_at.slice(0,10):'');
-    if(!ds)return true;
-    return ds>=tkFromDate&&ds<=tkToDate;
+  // No date filter — show all tasks. Running first, Pending second, then newest→oldest.
+  const myTasks=[...allMyTasks].sort((a,b)=>{
+    const pa=a.status==='Running'?0:a.status==='Pending'?1:2;
+    const pb=b.status==='Running'?0:b.status==='Pending'?1:2;
+    if(pa!==pb)return pa-pb;
+    return new Date(b.created_at||b.date)-new Date(a.created_at||a.date);
   });
   const pen=myTasks.filter(t=>t.status==='Pending').length;
   const apr=myTasks.filter(t=>t.status==='Approved').length;
@@ -4209,7 +4203,7 @@ function myTasksView(){
     </tr>`;
   }).join('');
 
-  return`<div style="background:#2C2C2A;border-radius:12px;padding:14px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1">${drBar('myTasks',tkFromDT,tkToDT)}<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total</div><div style="font-size:22px;font-weight:500;color:#fff">${myTasks.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Approved</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${apr}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Pending</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${pen}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Duration</div><div style="font-size:16px;font-weight:500;color:#93C5FD">${tkDurStr2}</div></div></div></div></div>
+  return`<div style="background:#2C2C2A;border-radius:12px;padding:14px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total</div><div style="font-size:22px;font-weight:500;color:#fff">${myTasks.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Approved</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${apr}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Pending</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${pen}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Duration</div><div style="font-size:16px;font-weight:500;color:#93C5FD">${tkDurStr2}</div></div></div></div></div>
   <div class="toolbar"><button class="btn btn-primary" onclick="openM({type:'taskreq'})"><i class="ti ti-plus"></i>New task request</button></div>
   ${myTasks.length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-checklist" style="font-size:40px;display:block;margin-bottom:10px;opacity:.4"></i>No task requests in this range.</div>`:`
   <div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr>
