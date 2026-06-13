@@ -1063,40 +1063,54 @@ function dateView(){
 function summaryView(){
   const dates=wDates();const pts=activePats();
   const patrollers=pts.filter(p=>getUtype(p)==='patroller');
-  const{am,pm,off}=summ(pts);
   const ds2=d=>d.toISOString().split('T')[0];
   const today=todayStr();
 
-  // Inline shift active check
+  // ── Date selector for historical view ──
+  const selDate=D.summaryDate||today;
+  const isLive=selDate===today;
+
+  // ── Accurate shift-active check using Bahrain local time ──
   const nowBahrain=getBahrainNow();
-  const nowMins=nowBahrain.getUTCHours()*60+nowBahrain.getUTCMinutes()+3*60; // UTC+3
-  const isShiftActive=(sh)=>{
+  const nowH=nowBahrain.getUTCHours()+3; // UTC+3
+  const nowMinsBhr=(nowH%24)*60+nowBahrain.getUTCMinutes();
+  const isShiftNowActive=(sh)=>{
     if(!sh||!sh.start_time||!sh.end_time)return false;
     const[sh_h,sh_m]=sh.start_time.split(':').map(Number);
     const[eh,em]=sh.end_time.split(':').map(Number);
-    const start=sh_h*60+sh_m;let end=eh*60+em;
-    if(end<=start)end+=24*60;
-    const now2=(nowMins%1440)<start?(nowMins%1440)+24*60:(nowMins%1440);
+    const start=sh_h*60+sh_m; let end=eh*60+em;
+    if(end<=start)end+=24*60; // overnight
+    const now2=nowMinsBhr<start?nowMinsBhr+24*60:nowMinsBhr;
     return now2>=start&&now2<=end;
   };
 
-  // Live status counts
-  const onShift=patrollers.filter(p=>{
-    const todayIdx=new Date(today+'T00:00:00Z').getUTCDay();
-    return gDZ(p.id,todayIdx)&&isShiftActive(getDayShift(p.id,todayIdx));
-  }).length;
-  const onVacToday=patrollers.filter(p=>isOnVacationToday(p.id)).length;
-  const absentToday=(D.attendance||[]).filter(a=>a.date===today&&a.status&&a.status.startsWith('Absent')).length;
-  const runningTasks=(D.tasks||[]).filter(t=>t.status==='Running').length;
+  // ── Day index for selected date ──
+  const selDateObj=new Date(selDate+'T00:00:00Z');
+  const selIdx=selDateObj.getUTCDay(); // 0=Sun..6=Sat
+
+  // ── Counts for selected date ──
+  const scheduledPats=patrollers.filter(p=>gDZ(p.id,selIdx)&&!isOnVacationDate(p.id,selDate));
+  const vacPats=patrollers.filter(p=>isOnVacationDate(p.id,selDate));
+  const absentPats=patrollers.filter(p=>{
+    const a=(D.attendance||[]).find(r=>r.patroller_id===p.id&&r.date===selDate);
+    return a?.status?.startsWith('Absent');
+  });
+  const offPats=patrollers.filter(p=>!gDZ(p.id,selIdx)&&!isOnVacationDate(p.id,selDate));
+
+  // Live clocked-in (only meaningful for today)
+  const clockedIn=isLive?patrollers.filter(p=>{
+    const a=(D.attendance||[]).find(r=>r.patroller_id===p.id&&r.date===today);
+    return a?.clock_in&&!a?.clock_out;
+  }):[];
+
+  // Running tasks (live only)
+  const runningTasks=isLive?(D.tasks||[]).filter(t=>t.status==='Running').length:0;
 
   // Quick action counts
   const pendingTO=(D.timeoff||[]).filter(t=>t.status==='Pending').length;
   const savedMonth=D.incMonth||(getBahrainNow().getUTCFullYear()+'-'+String(getBahrainNow().getUTCMonth()+1).padStart(2,'0'));
   const monthPayout=(D.incentiveData||[]).filter(d=>d.month===savedMonth&&d.payout_total!=null).reduce((s,d)=>s+(d.payout_total||0),0);
-
-  // Performance score for current month
-  const ps=getPerfSettings();
-  const curMonth=savedMonth;
+  const ps=getPerfSettings();const curMonth=savedMonth;
   const teamPerfScores=patrollers.map(p=>{
     const ev=D.evaluations.filter(e=>e.patroller_id===p.id&&(e.month||e.eval_date?.slice(0,7))===curMonth);
     const ea=ev.length?Math.round(ev.reduce((s,e)=>s+evalScore(e),0)/ev.length):null;
@@ -1105,49 +1119,55 @@ function summaryView(){
   }).filter(s=>s!==null);
   const teamAvgScore=teamPerfScores.length?Math.round(teamPerfScores.reduce((a,b)=>a+b,0)/teamPerfScores.length):null;
 
-  // Patroller status cards
-  const todayIdx2=new Date(today+'T00:00:00Z').getUTCDay();
+  // ── Patroller cards for selected date ──
   const patrollerCards=patrollers.map(p=>{
-    const z=gDZ(p.id,todayIdx2);
-    const sh=getDayShift(p.id,todayIdx2);
-    const onVac=isOnVacationToday(p.id);
-    const attRec=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===today);
-    const isAbs=isAbsentOnDate(p.id,today);
-    const ini2=ini(p.name);
-
-    let status='',statusPill='',borderCol='var(--g2)',avBg='var(--g1)',avCol='var(--g4)';
-    if(onVac){status='On vacation';statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">🌴 Vacation</span>`;borderCol='#A78BFA';}
-    else if(isAbs){status='Absent';statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#FEE2E2;color:#991B1B">✗ Absent</span>`;borderCol='#F87171';avBg='#FEE2E2';avCol='#991B1B';}
-    else if(!z){statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:var(--g1);color:var(--g3)">Off day</span>`;}
-    else if(attRec?.status?.startsWith('Early out')){
-      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">⚡ Early out ${attRec.status.includes('Approved')?'approved':'pending'}</span>`;
+    const z=gDZ(p.id,selIdx);
+    const sh=getDayShift(p.id,selIdx);
+    const onVac=isOnVacationDate(p.id,selDate);
+    const attRec=(D.attendance||[]).find(a=>a.patroller_id===p.id&&a.date===selDate);
+    const isAbs=isAbsentOnDate(p.id,selDate);
+    let statusPill='',borderCol='var(--g2)',avBg='var(--g1)',avCol='var(--g4)';
+    if(onVac){
+      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">🌴 Vacation</span>`;
+      borderCol='#A78BFA';
+    } else if(isAbs){
+      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#FEE2E2;color:#991B1B">✗ Absent</span>`;
+      borderCol='#F87171';avBg='#FEE2E2';avCol='#991B1B';
+    } else if(!z){
+      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:var(--g1);color:var(--g3)">Off day</span>`;
+    } else if(attRec?.status?.startsWith('Early out')){
+      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">⚡ Early out${attRec.status.includes('Approved')?' approved':' pending'}</span>`;
       borderCol='#A78BFA';avBg='#EDE9FE';avCol='#4C1D95';
-    }
-    else if(attRec?.clock_in){
+    } else if(attRec?.clock_in&&attRec?.clock_out){
+      const inT=new Date(attRec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+      const outT=new Date(attRec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#DBEAFE;color:#1E40AF">✓ ${inT}→${outT}</span>`;
+      borderCol='#60A5FA';avBg='#DBEAFE';avCol='#1E40AF';
+    } else if(attRec?.clock_in){
       const inT=new Date(attRec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
       statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#DCFCE7;color:#166534">🟢 On shift · in ${inT}</span>`;
       borderCol='#4ADE80';avBg='#DCFCE7';avCol='#166534';
-    } else if(z&&sh&&isShiftActive(sh)){
+    } else if(z&&sh&&isLive&&isShiftNowActive(sh)){
       statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:var(--g1);color:var(--g3)">⏰ Not clocked in</span>`;
     } else if(z&&sh){
-      const shiftLabel=sh.shift_type==='morning'?'☀️':'🌙';
-      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:var(--g1);color:var(--g3)">${shiftLabel} Starts ${fmtT(sh.start_time)}</span>`;
+      const sl=sh.shift_type==='morning'?'☀️':'🌙';
+      statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:var(--g1);color:var(--g3)">${sl} ${fmtT(sh.start_time)}–${fmtT(sh.end_time)}</span>`;
     }
-    const zoneLabel=z?z.substring(0,18)+(z.length>18?'…':''):'';
-    const shiftLabel=sh?(sh.shift_type==='morning'?'☀️':'🌙')+' '+fmtT(sh.start_time)+'–'+fmtT(sh.end_time):'';
+    const zl=z?z.substring(0,18)+(z.length>18?'…':''):'';
+    const sl2=sh?(sh.shift_type==='morning'?'☀️':'🌙')+' '+fmtT(sh.start_time)+'–'+fmtT(sh.end_time):'';
     return`<div style="display:flex;align-items:center;gap:9px;background:var(--sur);border:0.5px solid var(--g2);border-left:3px solid ${borderCol};border-radius:0 9px 9px 0;padding:8px 11px;margin-bottom:6px">
-      <div style="width:28px;height:28px;border-radius:50%;background:${avBg};color:${avCol};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;flex-shrink:0">${ini2}</div>
+      <div style="width:28px;height:28px;border-radius:50%;background:${avBg};color:${avCol};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;flex-shrink:0">${ini(p.name)}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
-        <div style="font-size:10px;color:var(--g3)">${z?zoneLabel+' · '+shiftLabel:sh?shiftLabel:''}</div>
+        <div style="font-size:10px;color:var(--g3)">${z?zl+' · '+sl2:sl2||'No shift'}</div>
       </div>
       <div>${statusPill}</div>
     </div>`;
   }).join('');
 
-  // Weekly summary rows
+  // ── Weekly summary rows ──
   const weekRows=dates.map((d,i)=>{
-    const ds=ds2(d);const isToday=ds===today;
+    const ds=ds2(d);const isToday=ds===today;const isSel=ds===selDate;
     const dayAtts=(D.attendance||[]).filter(a=>a.date===ds);
     const att=dayAtts.filter(a=>a.status==='Attended').length;
     const abs=dayAtts.filter(a=>a.status&&a.status.startsWith('Absent')).length;
@@ -1155,9 +1175,9 @@ function summaryView(){
     const early=dayAtts.filter(a=>a.status&&a.status.includes('Early out')).length;
     const duty=patrollers.filter(p=>gDZ(p.id,i)).length;
     if(duty===0&&att===0&&abs===0)return'';
-    return`<tr${isToday?' style="background:rgba(255,89,0,.04)"':''}>
-      <td style="font-size:10px;font-family:monospace;color:var(--g4)">${SD[i]} ${ds.slice(5).replace('-','/')}</td>
-      ${isToday?`<td style="text-align:center"><b>${duty}</b></td>`:`<td style="text-align:center;color:var(--g3)">${duty}</td>`}
+    return`<tr style="${isSel?'background:rgba(255,89,0,.07);':''}${isToday&&!isSel?'background:rgba(255,89,0,.03);':''}" onclick="D.summaryDate='${ds}';render()" title="View ${ds}" style="cursor:pointer">
+      <td style="font-size:10px;font-family:monospace;color:var(--g4);cursor:pointer">${SD[i]} ${ds.slice(5).replace('-','/')}${isToday?' <span style="font-size:8px;background:#FF5900;color:#fff;padding:0 4px;border-radius:3px">Today</span>':''}${isSel&&!isToday?' <span style="font-size:8px;background:#411517;color:#fff;padding:0 4px;border-radius:3px">Viewing</span>':''}</td>
+      <td style="text-align:center;${isToday?'font-weight:700':''}">${duty}</td>
       <td style="text-align:center">${att?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#DCFCE7;color:#166534">${att}</span>`:'—'}</td>
       <td style="text-align:center">${abs?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#FEE2E2;color:#991B1B">${abs}</span>`:'—'}</td>
       <td style="text-align:center">${late?`<span style="display:inline-block;padding:1px 6px;border-radius:6px;font-size:10px;font-weight:600;background:#FEF3C7;color:#92400E">${late}</span>`:'—'}</td>
@@ -1165,7 +1185,7 @@ function summaryView(){
     </tr>`;
   }).filter(Boolean).join('');
 
-  // Individual attendance this week
+  // ── Individual grid ──
   const indivRows=patrollers.map(p=>{
     const cells=dates.map((d,i)=>{
       const ds=ds2(d);
@@ -1189,39 +1209,55 @@ function summaryView(){
     </tr>`;
   }).join('');
 
+  // ── Hero tile values ──
+  const tileScheduled=scheduledPats.length;
+  const tileLive=isLive?clockedIn.length:
+    (D.attendance||[]).filter(a=>a.date===selDate&&(a.status==='Attended'||a.clock_in)).length;
+  const tileOnTask=runningTasks;
+  const tileOff=offPats.length;
+  const tileAbsent=absentPats.length;
+  const tileVac=vacPats.length;
+
   return`
   <div style="background:#1A0507;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden">
     <div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div>
     <div style="position:relative;z-index:1">
-      <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px">
-        <div style="width:7px;height:7px;border-radius:50%;background:#4ADE80"></div>
-        <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.6">Live · ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'})} · Today</div>
-        <div style="margin-left:auto;font-size:10px;opacity:.35">Week ${wNum(dates[0])} · ${fmt(dates[0])} – ${fmt(dates[6])}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="width:7px;height:7px;border-radius:50%;background:${isLive?'#4ADE80':'#FCD34D'}"></div>
+          <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.7">${isLive?'Live · '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'Historical'} · ${selDate}</div>
+        </div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:7px">
+          <input type="date" value="${selDate}" max="${today}" onchange="D.summaryDate=this.value;render()" style="padding:3px 8px;border-radius:6px;border:0.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:11px;font-family:inherit;cursor:pointer">
+          ${!isLive?`<button onclick="D.summaryDate='${today}';render()" style="padding:3px 9px;border-radius:6px;border:0.5px solid rgba(255,255,255,.3);background:rgba(255,89,0,.4);color:#fff;font-size:10px;font-family:inherit;cursor:pointer">↩ Today</button>`:''}
+          <span style="font-size:10px;opacity:.35">Week ${wNum(dates[0])} · ${fmt(dates[0])} – ${fmt(dates[6])}</span>
+        </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
-        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">On shift</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${onShift}</div></div>
-        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Off duty</div><div style="font-size:24px;font-weight:500;opacity:.45">${patrollers.length-onShift-onVacToday-absentToday}</div></div>
-        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Absent</div><div style="font-size:24px;font-weight:500;color:#FCA5A5">${absentToday}</div></div>
-        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">On vacation</div><div style="font-size:24px;font-weight:500;color:#C4B5FD">${onVacToday}</div></div>
-        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">On task</div><div style="font-size:24px;font-weight:500;color:#FCD34D">${runningTasks}</div></div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:7px">
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Scheduled</div><div style="font-size:22px;font-weight:500;color:#93C5FD">${tileScheduled}</div></div>
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">${isLive?'Live (clocked in)':'Attended'}</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${tileLive}</div></div>
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">On task</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${tileOnTask}</div></div>
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Off day</div><div style="font-size:22px;font-weight:500;opacity:.5">${tileOff}</div></div>
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Absent</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">${tileAbsent}</div></div>
+        <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Vacation</div><div style="font-size:22px;font-weight:500;color:#C4B5FD">${tileVac}</div></div>
       </div>
     </div>
   </div>
 
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
-    <div class="tcard" style="padding:10px;text-align:center;background:#FFF0E6;border-color:#F0997B;cursor:pointer" onclick="setTab('attendance')"><i class="ti ti-clock-check" style="font-size:18px;color:#FF5900;display:block;margin-bottom:4px"></i><div style="font-size:11px;font-weight:600">Attendance</div><div style="font-size:10px;color:#993C1D;margin-top:2px">${onShift} on shift today</div></div>
+    <div class="tcard" style="padding:10px;text-align:center;background:#FFF0E6;border-color:#F0997B;cursor:pointer" onclick="setTab('attendance')"><i class="ti ti-clock-check" style="font-size:18px;color:#FF5900;display:block;margin-bottom:4px"></i><div style="font-size:11px;font-weight:600">Attendance</div><div style="font-size:10px;color:#993C1D;margin-top:2px">${tileLive} on shift today</div></div>
     <div class="tcard" style="padding:10px;text-align:center;cursor:pointer" onclick="setTab('timeoff')"><i class="ti ti-calendar-off" style="font-size:18px;color:#BA7517;display:block;margin-bottom:4px"></i><div style="font-size:11px;font-weight:600">Time off</div><div style="font-size:10px;color:${pendingTO>0?'#BA7517':'var(--g3)'};font-weight:${pendingTO>0?600:400};margin-top:2px">${pendingTO>0?pendingTO+' pending':'No pending'}</div></div>
     <div class="tcard" style="padding:10px;text-align:center;cursor:pointer" onclick="setTab('incentive')"><i class="ti ti-cash" style="font-size:18px;color:#166534;display:block;margin-bottom:4px"></i><div style="font-size:11px;font-weight:600">${savedMonth.replace('-','/')} payout</div><div style="font-size:10px;color:#166534;font-weight:600;margin-top:2px">${monthPayout>0?'BHD '+monthPayout.toFixed(3):'Not saved yet'}</div></div>
-    <div class="tcard" style="padding:10px;text-align:center;cursor:pointer" onclick="setTab('performance')"><i class="ti ti-chart-infographic" style="font-size:18px;color:#185FA5;display:block;margin-bottom:4px"></i><div style="font-size:11px;font-weight:600">Team score</div><div style="font-size:10px;color:#185FA5;font-weight:600;margin-top:2px">${teamAvgScore!==null?teamAvgScore+'% avg':'No data'}</div></div>
+    <div class="tcard" style="padding:10px;text-align:center;cursor:pointer" onclick="setTab('scores')"><i class="ti ti-chart-infographic" style="font-size:18px;color:#185FA5;display:block;margin-bottom:4px"></i><div style="font-size:11px;font-weight:600">Team score</div><div style="font-size:10px;color:#185FA5;font-weight:600;margin-top:2px">${teamAvgScore!==null?teamAvgScore+'% avg':'No data'}</div></div>
   </div>
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
     <div>
-      <div style="font-size:9px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Team today</div>
+      <div style="font-size:9px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Team · ${selDate}${isLive?' (Live)':''}</div>
       ${patrollerCards}
     </div>
     <div>
-      <div style="font-size:9px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Weekly summary</div>
+      <div style="font-size:9px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Weekly summary <span style="font-size:9px;font-weight:400;color:var(--g3);text-transform:none">— click a row to view that day</span></div>
       <div class="tcard" style="padding:0;overflow:hidden;margin-bottom:8px">
         <table style="width:100%;border-collapse:collapse">
           <thead><tr style="background:var(--g1)">
@@ -2962,6 +2998,7 @@ function todayDayIdx(){
 }
 function getMyAttRecord(){const today=todayStr();return(D.attendance||[]).find(a=>a.patroller_id===(D.patrollers.find(p=>p.user_id===D.profile.id)?.id)&&a.date===today);}
 function isOnVacationToday(pid){const today=todayStr();return D.timeoff.find(t=>t.patroller_id===pid&&t.status==='Approved'&&today>=t.start_date&&today<=t.end_date);}
+function isOnVacationDate(pid,ds){return D.timeoff.find(t=>t.patroller_id===pid&&t.status==='Approved'&&ds>=t.start_date&&ds<=t.end_date);}
 function fmtDateTime(ts){if(!ts)return'--';const d=new Date(ts);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});}
 function mapsLink(lat,lng){return`https://www.google.com/maps?q=${lat},${lng}`;}
 
