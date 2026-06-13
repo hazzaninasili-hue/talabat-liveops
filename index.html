@@ -1119,6 +1119,12 @@ function drDefault(pfx){
   if(!D[pfx+'From'])D[pfx+'From']=today+'T00:00';
   if(!D[pfx+'To'])D[pfx+'To']=today+'T23:59';
 }
+// Show ALL records by default (no date restriction until user applies a filter)
+function drDefaultAll(pfx){
+  if(!D[pfx+'From'])D[pfx+'From']='2020-01-01T00:00';
+  const today=todayStr();
+  if(!D[pfx+'To'])D[pfx+'To']=today+'T23:59';
+}
 // Helper: check if a date string is within a range
 function inRange(dateStr,fromDT,toDT){
   const f=drDate(fromDT),t=drDate(toDT);
@@ -1292,7 +1298,7 @@ function timeOffView(){
   const pen=reqs.filter(r=>r.status==='Pending').length;
   const apr=reqs.filter(r=>r.status==='Approved').length;
   const rej=reqs.filter(r=>r.status==='Rejected').length;
-  drDefault('timeoff');
+  drDefaultAll('timeoff');
   const toFromDT=D.timeoffFrom;const toToDT=D.timeoffTo;
   const toFromDate=drDate(toFromDT);const toToDate=drDate(toToDT);
   // Filter requests that overlap the range
@@ -3534,7 +3540,7 @@ function myAttendanceView(){
   }
 
   // History
-  drDefault('myAtt');
+  drDefaultAll('myAtt');
   const maFromDT=D.myAttFrom;const maToDT=D.myAttTo;
   const maFromDate=drDate(maFromDT);const maToDate=drDate(maToDT);
   const myRecs=(D.attendance||[]).filter(a=>a.patroller_id===pat.id&&inRange(a.date,maFromDT,maToDT));
@@ -3565,7 +3571,7 @@ function attendanceView(){
   const pts=activePats();
   const patrollers=pts.filter(p=>getUtype(p)==='patroller');
   const today=todayStr();
-  drDefault('att');
+  drDefaultAll('att');
   const fromDT=D.attFrom;const toDT=D.attTo;
   const fromDate=drDate(fromDT);const toDate=drDate(toDT);
   const dates=[];
@@ -4012,7 +4018,7 @@ function hourlyView(){
 function tasksView(){
   const ed=canEdit();
   const all=D.tasks||[];
-  drDefault('tasks');
+  drDefaultAll('tasks');
   const tkFromDT=D.tasksFrom;const tkToDT=D.tasksTo;
   const tkFromDate=drDate(tkFromDT);const tkToDate=drDate(tkToDT);
   const filteredTasks=all.filter(t=>{
@@ -4089,7 +4095,7 @@ function tasksView(){
 function myTasksView(){
   const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
   const allMyTasks=pat?(D.tasks||[]).filter(t=>t.patroller_id===pat.id):[];
-  drDefault('myTasks');
+  drDefaultAll('myTasks');
   const tkFromDT=D.myTasksFrom;const tkToDT=D.myTasksTo;
   const tkFromDate=drDate(tkFromDT);const tkToDate=drDate(tkToDT);
   const myTasks=allMyTasks.filter(t=>{
@@ -5181,7 +5187,7 @@ function performanceView(){
 
     // ── OVERVIEW ──
     if(subTab==='overview'){
-      drDefault('overview');
+      drDefaultAll('overview');
       const ovFromDT=D.overviewFrom;const ovToDT=D.overviewTo;
       const ovFromDate=drDate(ovFromDT);const ovToDate=drDate(ovToDT);
       const patCards=sorted.map((d,i)=>{
@@ -5254,7 +5260,7 @@ function performanceView(){
     }
 
     if(subTab==='evaluation'){
-      drDefault('eval');
+      drDefaultAll('eval');
       const evFromDT=D.evalFrom;const evToDT=D.evalTo;
       const evFromDate=drDate(evFromDT);const evToDate=drDate(evToDT);
       // Filter evaluations in date range
@@ -5314,16 +5320,53 @@ function performanceView(){
                 '<div class="t-scroll"><table style="min-width:400px"><thead><tr><th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Patroller</th><th>Evals</th><th>Avg rating</th><th>Eval score</th><th></th></tr></thead><tbody>'+evalTableRows+'</tbody></table></div>')+
             '</div>'+
             '<div class="tcard" style="padding:14px">'+
-              '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px"><i class="ti ti-list" style="margin-right:4px"></i>Recent evaluations</div>'+
-              (recentRows?'<div class="t-scroll"><table><thead><tr><th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Patroller</th><th>Date</th><th>Location</th><th>Score</th><th>By</th></tr></thead><tbody>'+recentRows+'</tbody></table></div>':
-                '<div style="padding:20px;text-align:center;color:var(--g3)">No evaluations for '+selMonth+'</div>')+
+            '<div class="tcard" style="padding:14px">'+
+              '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
+                '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-list-details" style="margin-right:4px"></i>Evaluation Log</div>'+
+                '<span style="font-size:10px;color:var(--g3)">'+D.evaluations.length+' total records</span>'+
+              '</div>'+
+              (D.evaluations.length===0?
+                '<div style="padding:20px;text-align:center;color:var(--g3)">No evaluations yet</div>':
+                (()=>{
+                  const logRows=D.evaluations.slice().sort((a,b)=>new Date(b.eval_date)-new Date(a.eval_date)).map(e=>{
+                    const _lp=D.patrollers.find(p=>p.id===e.patroller_id);
+                    const _pct=evalScore(e);
+                    const _dt=e.eval_date?new Date(e.eval_date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit',timeZone:'Asia/Bahrain'}):'--';
+                    const _mo=e.month||e.eval_date?.slice(0,7)||'--';
+                    const _rBg=r=>r>=4?'#DBEAFE':r>=3?'#DCFCE7':r>=2?'#FEF3C7':'#FEE2E2';
+                    const _rCo=r=>r>=4?'#1E40AF':r>=3?'#166534':r>=2?'#92400E':'#991B1B';
+                    const _rb=r=>r?`<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:${_rBg(r)};color:${_rCo(r)}">${r}</span>`:' <span style="color:var(--g3);font-size:9px">—</span>';
+                    const _sc=_pct>=75?'#1E40AF':_pct>=60?'#166534':_pct>=40?'#92400E':'#991B1B';
+                    return '<tr>'+
+                      '<td style="font-family:monospace;font-size:10px;color:var(--g3)">'+ (_lp?.patroller_id_num||'--')+'</td>'+
+                      '<td style="font-weight:600;white-space:nowrap">'+ (_lp?.name||'--')+'</td>'+
+                      '<td style="font-family:monospace;font-size:10px;white-space:nowrap">'+_dt+'</td>'+
+                      '<td style="font-size:10px;text-align:center;font-family:monospace;font-weight:600;background:rgba(93,63,211,.06)">'+_mo+'</td>'+
+                      '<td style="font-size:10px;color:var(--g3)">'+ (e.location||'--')+'</td>'+
+                      '<td style="text-align:center">'+_rb(e.q1)+'</td>'+
+                      '<td style="text-align:center">'+_rb(e.q2)+'</td>'+
+                      '<td style="text-align:center">'+_rb(e.q3)+'</td>'+
+                      '<td style="text-align:center">'+_rb(e.q4)+'</td>'+
+                      '<td style="text-align:center">'+_rb(e.q5)+'</td>'+
+                      '<td><span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:'+ _sc+'22;color:'+_sc+'">'+_pct+'%</span></td>'+
+                      '<td style="font-size:10px;color:var(--g3);white-space:nowrap">'+ (e.evaluator_name||'--')+'</td>'+
+                      `<td style="font-size:10px;color:var(--g3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.comment||'').replace(/"/g,'&quot;')}">${e.comment||'--'}</td>`+
+                      `<td><button onclick="openEvalEdit('${e.id}')" style="font-size:10px;padding:2px 6px;border-radius:5px;border:0.5px solid var(--g2);background:none;cursor:pointer;font-family:inherit;color:var(--g3)">Edit</button></td>`+
+                      '</tr>';
+                  }).join('');
+                  return '<div class="t-scroll"><table style="min-width:860px"><thead><tr>'+
+                    '<th style="font-size:9px">ID</th><th class="lt" style="font-size:9px">Patroller</th><th style="font-size:9px;white-space:nowrap">Date</th><th style="font-size:9px;background:rgba(93,63,211,.06)">Month</th><th style="font-size:9px">Location</th>'+
+                    '<th style="font-size:9px;text-align:center">Q1</th><th style="font-size:9px;text-align:center">Q2</th><th style="font-size:9px;text-align:center">Q3</th><th style="font-size:9px;text-align:center">Q4</th><th style="font-size:9px;text-align:center">Q5</th>'+
+                    '<th style="font-size:9px">Score</th><th style="font-size:9px">Evaluated by</th><th style="font-size:9px">Comment</th><th></th>'+
+                    '</tr></thead><tbody>'+logRows+'</tbody></table></div>';
+                })()
+              )+
             '</div>'+
-          '</div>'+
         '</div>';
     }
 
     if(subTab==='coaching'){
-      drDefault('coaching');
+      drDefaultAll('coaching');
       const coFromDT=D.coachingFrom;const coToDT=D.coachingTo;
       const coFromDate=drDate(coFromDT);const coToDate=drDate(coToDT);
       const coachMonths=[...new Set([...D.coachingAssignments.map(a=>a.month||a.assigned_date?.slice(0,7)).filter(Boolean),curMonth])].sort().reverse();
@@ -5417,7 +5460,7 @@ function performanceView(){
     }
 
     if(subTab==='audit'){
-      drDefault('audit');
+      drDefaultAll('audit');
       const auFromDT=D.auditFrom;const auToDT=D.auditTo;
       const auFromDate=drDate(auFromDT);const auToDate=drDate(auToDT);
       // Filter tasks in date range for adjusted target calc
@@ -5484,7 +5527,7 @@ function performanceView(){
   const last3p=myMonths.slice(0,3);
 
   if(subTab==='myperformance'){
-    drDefault('myPerf');
+    drDefaultAll('myPerf');
     const mpFromDT=D.myPerfFrom;const mpToDT=D.myPerfTo;
     const mpFromDate=drDate(mpFromDT);const mpToDate=drDate(mpToDT);
     const myTrendBars=last3p.map(m=>{
@@ -5528,7 +5571,7 @@ function performanceView(){
   }
 
   if(subTab==='mycoaching'){
-    drDefault('myCoaching');
+    drDefaultAll('myCoaching');
     const mcoFromDT=D.myCoachingFrom;const mcoToDT=D.myCoachingTo;
     const mcoFromDate=drDate(mcoFromDT);const mcoToDate=drDate(mcoToDT);
     const myAssignments=myPat?D.coachingAssignments.filter(a=>{
@@ -5560,7 +5603,7 @@ function performanceView(){
   }
 
   if(subTab==='mytarget'){
-    drDefault('myTarget');
+    drDefaultAll('myTarget');
     const mtFromDT=D.myTargetFrom;const mtToDT=D.myTargetTo;
     const mtFromDate=drDate(mtFromDT);const mtToDate=drDate(mtToDT);
     // Filter tasks in range for task hours calc
@@ -5769,7 +5812,7 @@ function overtimeView(){
   }).join('');
   const otNow=getBahrainNow();
   const otCurMonth=otNow.getUTCFullYear()+'-'+String(otNow.getUTCMonth()+1).padStart(2,'0');
-  drDefault('ot');
+  drDefaultAll('ot');
   const otFromDT=D.otFrom;const otToDT=D.otTo;
   const otFromDate=drDate(otFromDT);const otToDate=drDate(otToDT);
   const otThisMonth=(D.overtimeRequests||[]).filter(ot=>ot.start_datetime&&ot.start_datetime.slice(0,10)>=otFromDate&&ot.start_datetime.slice(0,10)<=otToDate);
@@ -5941,7 +5984,7 @@ function incentiveView(){
   const myPat=D.patrollers.find(p=>p.user_id===D.profile?.id);
   const now=getBahrainNow();
   const curMonth=now.getUTCFullYear()+'-'+String(now.getUTCMonth()+1).padStart(2,'0');
-  drDefault('incentive');
+  drDefaultAll('incentive');
   const incFromDT=D.incentiveFrom;const incToDT=D.incentiveTo;
   const incFromDate=drDate(incFromDT);const incToDate=drDate(incToDT);
   const months=getIncentiveMonths();
