@@ -3337,7 +3337,10 @@ function myAttendanceView(){
   }
 
   // History
-  const myRecs=(D.attendance||[]).filter(a=>a.patroller_id===pat.id).slice(0,30);
+  drDefault('myAtt');
+  const maFromDT=D.myAttFrom;const maToDT=D.myAttTo;
+  const maFromDate=drDate(maFromDT);const maToDate=drDate(maToDT);
+  const myRecs=(D.attendance||[]).filter(a=>a.patroller_id===pat.id&&inRange(a.date,maFromDT,maToDT));
   const histRows=myRecs.map(a=>{
     const inT=a.clock_in?new Date(a.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
     const outT=a.clock_out?new Date(a.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
@@ -3355,8 +3358,8 @@ function myAttendanceView(){
   }).join('');
 
   return`${clockWidget}
-  <div style="background:#0F4D22;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">My attendance history</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Attended this month</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${myRecs.filter(r=>r.status==='Attended').length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Absent</div><div style="font-size:24px;font-weight:500;color:#FCA5A5">${myRecs.filter(r=>r.status&&r.status.startsWith('Absent')).length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Records</div><div style="font-size:24px;font-weight:500;color:#fff">${myRecs.length}</div></div></div></div></div>
-  ${myRecs.length===0?`<div style="padding:30px;text-align:center;color:var(--g3)">No attendance records yet.</div>`:`
+  <div style="background:#0F4D22;border-radius:12px;padding:14px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1">${drBar('myAtt',maFromDT,maToDT)}<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Attended</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${myRecs.filter(r=>r.status==='Attended').length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Absent</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">${myRecs.filter(r=>r.status&&r.status.startsWith('Absent')).length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Records</div><div style="font-size:22px;font-weight:500;color:#fff">${myRecs.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Att rate</div><div style="font-size:22px;font-weight:500;color:${myRecs.length?'#4ADE80':'#fff'}">${myRecs.length?Math.round(myRecs.filter(r=>r.status==='Attended').length/myRecs.length*100)+'%':'—'}</div></div></div></div></div>
+  ${myRecs.length===0?`<div style="padding:30px;text-align:center;color:var(--g3)">No attendance records in this range.</div>`:`
   <div class="tcard"><div class="t-scroll"><table><thead><tr><th class="lt">Date</th><th>Status</th><th>Clock In</th><th>Clock Out</th><th>Duration</th><th>In Location</th><th>Out Location</th></tr></thead><tbody>${histRows}</tbody></table></div></div>`}`;
 }
 
@@ -3801,8 +3804,9 @@ function tasksView(){
       :t.start_time?`Started: ${t.start_time}`:'--';
     const statusDisplay=t.status==='Running'?`<i class="ti ti-circle-filled" style="font-size:6px;margin-right:4px;animation:pulse 1.5s infinite"></i>${t.status}`:`${t.status==='Completed'?'✓':''} ${t.status}`;
     
-  return`<div style="background:#2C2C2A;border-radius:12px;padding:14px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1">${drBar('tasks',tkFromDT,tkToDT)}<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total tasks</div><div style="font-size:22px;font-weight:500;color:#fff">${filteredTasks.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Completed</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${completed}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Running</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${running}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total duration</div><div style="font-size:16px;font-weight:500;color:#93C5FD">${tkDurStr}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Patrollers</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${tkUnique}</div></div></div></div></div>
-      <td style="font-size:11px;font-family:monospace;color:var(--g4);white-space:nowrap">${(()=>{const _tp=D.patrollers.find(x=>x.id===t.patroller_id);return _tp?.patroller_id_num||'--';})()}</td><td class="lt" style="font-weight:600">${t.patroller_name||'--'}</td>
+  return`<tr>
+      <td style="font-size:11px;font-family:monospace;color:var(--g4);white-space:nowrap">${(()=>{const _tp=D.patrollers.find(x=>x.id===t.patroller_id);return _tp?.patroller_id_num||'--';})()}</td>
+      <td class="lt" style="font-weight:600">${t.patroller_name||'--'}</td>
       <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${bg};color:${col}">${t.task_type}</span></td>
       <td style="font-family:monospace;font-size:11px">${t.date||'--'}</td>
       <td style="font-size:11px">${timeCell}</td>
@@ -3816,7 +3820,7 @@ function tasksView(){
     </tr>`;
   }).join('');
 
-  return`<style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}</style><div style="background:#2C2C2A;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Tasks</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Running</div><div style="font-size:24px;font-weight:500;color:#FCD34D">${running}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Completed</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${completed}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Pending</div><div style="font-size:24px;font-weight:500;color:#FCA5A5">${pen}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Total</div><div style="font-size:24px;font-weight:500;color:#fff">${all.length}</div></div></div></div></div>
+  return`<style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}</style><div style="background:#2C2C2A;border-radius:12px;padding:14px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1">${drBar('tasks',tkFromDT,tkToDT)}<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total tasks</div><div style="font-size:22px;font-weight:500;color:#fff">${filteredTasks.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Completed</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${completed}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Running</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${running}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total duration</div><div style="font-size:16px;font-weight:500;color:#93C5FD">${tkDurStr}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Patrollers</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${tkUnique}</div></div></div></div></div>
   <div class="toolbar">
     <button class="btn btn-primary" onclick="openM({type:'taskreq'})"><i class="ti ti-plus"></i>Start New Task</button>
     <button class="btn" onclick="dlTasks()"><i class="ti ti-download"></i>Export CSV</button>
@@ -3830,9 +3834,19 @@ function tasksView(){
 // ── MY TASKS VIEW (patroller) ──
 function myTasksView(){
   const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
-  const myTasks=pat?(D.tasks||[]).filter(t=>t.patroller_id===pat.id):[];
+  const allMyTasks=pat?(D.tasks||[]).filter(t=>t.patroller_id===pat.id):[];
+  drDefault('myTasks');
+  const tkFromDT=D.myTasksFrom;const tkToDT=D.myTasksTo;
+  const tkFromDate=drDate(tkFromDT);const tkToDate=drDate(tkToDT);
+  const myTasks=allMyTasks.filter(t=>{
+    const ds=t.start_time?t.start_time.slice(0,10):(t.date||'');
+    return ds>=tkFromDate&&ds<=tkToDate;
+  });
   const pen=myTasks.filter(t=>t.status==='Pending').length;
   const apr=myTasks.filter(t=>t.status==='Approved').length;
+  const tkTotalMs=myTasks.reduce((s,t)=>{if(t.start_time&&t.end_time){const ms=new Date(t.end_time.length<13?t.date+'T'+t.end_time:t.end_time)-new Date(t.start_time.length<13?t.date+'T'+t.start_time:t.start_time);return s+(ms>0?ms:0);}return s;},0);
+  const tkH=Math.floor(tkTotalMs/3600000);const tkM=Math.floor((tkTotalMs%3600000)/60000);
+  const tkDurStr2=tkH>0?`${tkH}h ${tkM}m`:`${tkM}m`;
   const rows=myTasks.map(t=>{
     const col=TASK_COLORS[t.task_type]||'#411517';
     const bg=TASK_BG[t.task_type]||'#F4EDE3';
@@ -3843,24 +3857,25 @@ function myTasksView(){
       const[eh,em]=(t.end_time+':00').split(':').map(Number);
       let m=(eh*60+em)-(sh*60+sm);if(m<0)m+=24*60;return m;
     })();
-    const durLabel2=durMins2>0?(durMins2>=60?`${Math.floor(durMins2/60)}h ${durMins2%60}m`:`${durMins2}m`):'';
+    const dl2=durMins2>0?(durMins2>=60?`${Math.floor(durMins2/60)}h ${durMins2%60}m`:`${durMins2}m`):'--';
     return`<tr>
       <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${bg};color:${col}">${t.task_type}</span></td>
       <td style="font-family:monospace;font-size:11px">${t.date||'--'}</td>
-      <td style="font-size:11px">${t.start_time||'--'} → ${t.end_time||'--'}</td>
-      <td style="font-size:11px;font-weight:700;color:#FF5900">${durLabel2||'--'}</td>
-      <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.description||'--'}</td>
+      <td style="font-size:11px">${t.start_time&&t.end_time?`${t.start_time} → ${t.end_time}`:t.start_time?`Started: ${t.start_time}`:'--'}</td>
+      <td style="font-size:11px;font-weight:700;color:#FF5900">${dl2}</td>
+      <td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.description||'--'}</td>
       <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;${sc}">${t.status}</span></td>
     </tr>`;
   }).join('');
 
-  return`<div style="background:#2C2C2A;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">My tasks</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Pending</div><div style="font-size:24px;font-weight:500;color:#FCD34D">${pen}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Approved</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${apr}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Total</div><div style="font-size:24px;font-weight:500;color:#fff">${myTasks.length}</div></div></div></div></div>
+  return`<div style="background:#2C2C2A;border-radius:12px;padding:14px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1">${drBar('myTasks',tkFromDT,tkToDT)}<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total</div><div style="font-size:22px;font-weight:500;color:#fff">${myTasks.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Approved</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${apr}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Pending</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${pen}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Duration</div><div style="font-size:16px;font-weight:500;color:#93C5FD">${tkDurStr2}</div></div></div></div></div>
   <div class="toolbar"><button class="btn btn-primary" onclick="openM({type:'taskreq'})"><i class="ti ti-plus"></i>New task request</button></div>
-  ${myTasks.length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-checklist" style="font-size:40px;display:block;margin-bottom:10px;opacity:.4"></i>No task requests yet.<br><span style="font-size:12px">Submit a request for a task or meeting.</span></div>`:`
+  ${myTasks.length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-checklist" style="font-size:40px;display:block;margin-bottom:10px;opacity:.4"></i>No task requests in this range.</div>`:`
   <div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr>
     <th>Type</th><th>Date</th><th>Time</th><th>Duration</th><th>Description</th><th>Status</th>
   </tr></thead><tbody>${rows}</tbody></table></div></div>`}`;
 }
+
 
 async function reviewTask(id,status){
   await sb.from('task_requests').update({status,reviewed_by:D.profile.id,updated_at:new Date().toISOString()}).eq('id',id);
