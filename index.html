@@ -5068,7 +5068,12 @@ function performanceView(){
     }
 
     if(subTab==='audit'){
-      return segHtml+
+      drDefault('audit');
+      const auFromDT=D.auditFrom;const auToDT=D.auditTo;
+      const auFromDate=drDate(auFromDT);const auToDate=drDate(auToDT);
+      // Filter tasks in date range for adjusted target calc
+      const auTasks=(D.tasks||[]).filter(t=>{const ds=t.start_time?t.start_time.slice(0,10):(t.date||'');return ds>=auFromDate&&ds<=auToDate;});
+      return segHtml+drBar('audit',auFromDT,auToDT)+
         '<div style="background:#27500A;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Audit targets · '+selMonth+'</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'+
         '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Base total</div><div style="font-size:22px;font-weight:500;color:#C0DD97">'+(ps.targetTotal)+'</div></div>'+
         '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Base unique</div><div style="font-size:22px;font-weight:500;color:#C0DD97">'+(ps.targetUnique)+'</div></div>'+
@@ -5171,7 +5176,15 @@ function performanceView(){
   }
 
   if(subTab==='mycoaching'){
-    const myAssignments=myPat?D.coachingAssignments.filter(a=>a.patroller_id===myPat.id&&(a.month||a.assigned_date?.slice(0,7))===curMonth):[];
+    drDefault('myCoaching');
+    const mcoFromDT=D.myCoachingFrom;const mcoToDT=D.myCoachingTo;
+    const mcoFromDate=drDate(mcoFromDT);const mcoToDate=drDate(mcoToDT);
+    const myAssignments=myPat?D.coachingAssignments.filter(a=>{
+      if(a.patroller_id!==myPat.id)return false;
+      const ds=a.assigned_date||((a.month||'')+'- 01');
+      const aDate=a.assigned_date||a.month+'-01';
+      return aDate>=mcoFromDate&&aDate<=mcoToDate;
+    }):[];
     let myBreach=0,myDupe=0;
     myAssignments.forEach(a=>{
       const c=D.coachingCases.find(x=>x.id===a.case_id);if(!c)return;
@@ -5185,7 +5198,7 @@ function performanceView(){
     Object.values(seen2).forEach(cnt=>{if(cnt>1)myDupe+=(cnt-1)*2;});
     const finalCS=Math.max(0,100-myBreach-myDupe);
 
-    return segHtml+'<div style="background:#085041;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">My coaching · '+curMonth+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Assigned</div><div style="font-size:22px;font-weight:500;color:#fff">'+((myAssignments.length))+'</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Completed</div><div style="font-size:22px;font-weight:500;color:#4ADE80">'+((completedA.length))+'</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">SLA breached</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">'+((myBreach))+'</div></div></div></div></div>'+
+    return segHtml+drBar('myCoaching',mcoFromDT,mcoToDT)+'<div style="background:#085041;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">My coaching · '+curMonth+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Assigned</div><div style="font-size:22px;font-weight:500;color:#fff">'+((myAssignments.length))+'</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Completed</div><div style="font-size:22px;font-weight:500;color:#4ADE80">'+((completedA.length))+'</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">SLA breached</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">'+((myBreach))+'</div></div></div></div></div>'+
       '<div class="tcard" style="padding:14px">'+
         '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid var(--g1);font-size:12px"><span>Base score</span><span style="font-weight:700">100</span></div>'+
         '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:0.5px solid var(--g1);font-size:12px"><span>SLA breaches × −1pt</span><span style="font-weight:700;color:'+(myBreach>0?'#DC2626':'var(--g3)');'">'+(myBreach>0?'−'+myBreach:'0')+'</span></div>'+
@@ -5195,7 +5208,16 @@ function performanceView(){
   }
 
   if(subTab==='mytarget'){
-    return segHtml+'<div style="background:#27500A;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">My audit target · '+curMonth+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Adj. total</div><div style="font-size:18px;font-weight:500;color:#C0DD97">'+((myAdj.adjTotal.toLocaleString()))+'</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Adj. unique</div><div style="font-size:18px;font-weight:500;color:#C0DD97">'+((myAdj.adjUnique.toLocaleString()))+'</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Task hrs</div><div style="font-size:18px;font-weight:500;color:#FCD34D">'+((myTaskHrs.toFixed(1)+'h'))+'</div></div></div></div></div>'+
+    drDefault('myTarget');
+    const mtFromDT=D.myTargetFrom;const mtToDT=D.myTargetTo;
+    const mtFromDate=drDate(mtFromDT);const mtToDate=drDate(mtToDT);
+    // Filter tasks in range for task hours calc
+    const mtTasks=(D.tasks||[]).filter(t=>{
+      if(myPat&&t.patroller_id!==myPat.id)return false;
+      const ds=t.start_time?t.start_time.slice(0,10):(t.date||'');
+      return ds>=mtFromDate&&ds<=mtToDate;
+    });
+    return segHtml+drBar('myTarget',mtFromDT,mtToDT)+'<div style="background:#27500A;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">My audit target · '+curMonth+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Adj. total</div><div style="font-size:18px;font-weight:500;color:#C0DD97">'+((myAdj.adjTotal.toLocaleString()))+'</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Adj. unique</div><div style="font-size:18px;font-weight:500;color:#C0DD97">'+((myAdj.adjUnique.toLocaleString()))+'</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Task hrs</div><div style="font-size:18px;font-weight:500;color:#FCD34D">'+((myTaskHrs.toFixed(1)+'h'))+'</div></div></div></div></div>'+
       '<div class="tcard" style="padding:14px">'+
         '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px"><i class="ti ti-target" style="margin-right:4px"></i>My audit target — '+curMonth+'</div>'+
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'+
