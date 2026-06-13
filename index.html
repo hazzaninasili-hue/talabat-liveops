@@ -4835,6 +4835,9 @@ function performanceView(){
 
     // ── OVERVIEW ──
     if(subTab==='overview'){
+      drDefault('overview');
+      const ovFromDT=D.overviewFrom;const ovToDT=D.overviewTo;
+      const ovFromDate=drDate(ovFromDT);const ovToDate=drDate(ovToDT);
       const patCards=sorted.map((d,i)=>{
         const isBest=i===0;
         const isWorst=d===worst;
@@ -4865,7 +4868,7 @@ function performanceView(){
           '<div style="font-size:10px;font-weight:700;margin-top:3px;color:'+col+'">'+sc+'%</div></div>';
       }).join('');
 
-      return segHtml+
+      return segHtml+drBar('overview',ovFromDT,ovToDT)+
         '<div style="background:#0C447C;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Team performance · '+selMonth+'</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'+
         '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Team score</div><div style="font-size:22px;font-weight:500;color:#85B7EB">'+(teamAvgPerf?teamAvgPerf+'%':'--')+'</div></div>'+
         '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Avg evaluation</div><div style="font-size:22px;font-weight:500;color:#4ADE80">'+(teamAvgEval?teamAvgEval+'%':'--')+'</div></div>'+
@@ -5135,6 +5138,9 @@ function performanceView(){
   const last3p=myMonths.slice(0,3);
 
   if(subTab==='myperformance'){
+    drDefault('myPerf');
+    const mpFromDT=D.myPerfFrom;const mpToDT=D.myPerfTo;
+    const mpFromDate=drDate(mpFromDT);const mpToDate=drDate(mpToDT);
     const myTrendBars=last3p.map(m=>{
       const ev=D.evaluations.filter(e=>myPat&&e.patroller_id===myPat.id&&(e.month||e.eval_date?.slice(0,7))===m);
       const ea=ev.length?Math.round(ev.reduce((s,e)=>s+evalScore(e),0)/ev.length):null;
@@ -5147,7 +5153,7 @@ function performanceView(){
         '<div style="font-size:10px;font-weight:700;margin-top:3px;color:'+col+'">'+sc+'%</div></div>';
     }).join('');
 
-    return segHtml+
+    return segHtml+drBar('myPerf',mpFromDT,mpToDT)+
       '<div style="background:#411517;border-radius:14px;padding:18px;margin-bottom:12px;color:#fff">'+
         '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">'+
           '<div style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700">'+ini(D.profile?.full_name)+'</div>'+
@@ -5417,14 +5423,17 @@ function overtimeView(){
   }).join('');
   const otNow=getBahrainNow();
   const otCurMonth=otNow.getUTCFullYear()+'-'+String(otNow.getUTCMonth()+1).padStart(2,'0');
-  const otThisMonth=(D.overtimeRequests||[]).filter(ot=>ot.start_datetime&&ot.start_datetime.startsWith(otCurMonth));
+  drDefault('ot');
+  const otFromDT=D.otFrom;const otToDT=D.otTo;
+  const otFromDate=drDate(otFromDT);const otToDate=drDate(otToDT);
+  const otThisMonth=(D.overtimeRequests||[]).filter(ot=>ot.start_datetime&&ot.start_datetime.slice(0,10)>=otFromDate&&ot.start_datetime.slice(0,10)<=otToDate);
   const otTotalMins=otThisMonth.reduce((s,ot)=>{const ms=new Date(ot.end_datetime)-new Date(ot.start_datetime);return s+(ms>0?Math.floor(ms/60000):0);},0);
   const otHrs=Math.floor(otTotalMins/60);const otMins2=otTotalMins%60;
   const otPatTotals={};
   otThisMonth.forEach(ot=>{const pat=D.patrollers.find(p=>p.id===ot.patroller_id);const name=pat?.name||ot.patroller_name||'Unknown';if(!otPatTotals[name])otPatTotals[name]=0;const ms=new Date(ot.end_datetime)-new Date(ot.start_datetime);if(ms>0)otPatTotals[name]+=Math.floor(ms/60000);});
   const otPatRows=Object.entries(otPatTotals).sort((a,b)=>b[1]-a[1]).map(([name,m])=>{const h=Math.floor(m/60);const mn=m%60;const _otp=D.patrollers.find(p=>p.name===name);const _opid=_otp?.patroller_id_num||'';return'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f5f0ea"><div><span style="font-size:11px;font-family:monospace;color:var(--g4);margin-right:8px">'+_opid+'</span><span style="font-size:12px;font-weight:600">'+name+'</span></div><span style="font-size:12px;font-weight:700;color:#FF5900">'+h+'h '+mn+'m</span></div>';}).join('');
   const otMonthlySummaryHtml='<div style="text-align:center;margin-bottom:12px"><div style="font-size:28px;font-weight:800;color:#FF5900">'+otHrs+'h '+otMins2+'m</div><div style="font-size:11px;color:#999">Total OT this month</div></div><div style="font-size:11px;color:#DC2626;font-weight:600;margin-bottom:8px">'+otThisMonth.length+' submissions</div>'+(otPatRows||'<div style="font-size:12px;color:#999;padding:10px 0;text-align:center">No OT this month</div>');
-  const html=`<div style="background:#412402;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Overtime · ${otCurMonth}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Total hrs</div><div style="font-size:18px;font-weight:500;color:#FCD34D">${`${otHrs}h ${otMins2}m`}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Submissions</div><div style="font-size:24px;font-weight:500;color:#fff">${otThisMonth.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Patrollers w/ OT</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${Object.keys(otPatTotals).length}</div></div></div></div></div>
+  const html=`<div style="background:#412402;border-radius:12px;padding:14px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1">${drBar('ot',otFromDT,otToDT)}<div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Overtime · ${otFromDate} → ${otToDate}</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Total hrs</div><div style="font-size:18px;font-weight:500;color:#FCD34D">${`${otHrs}h ${otMins2}m`}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Submissions</div><div style="font-size:24px;font-weight:500;color:#fff">${otThisMonth.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Patrollers w/ OT</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${Object.keys(otPatTotals).length}</div></div></div></div></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
     <div class="tcard" style="padding:16px">
       <div style="font-size:12px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px"><i class="ti ti-clock-plus" style="margin-right:5px"></i>Submit Overtime</div>
@@ -5586,6 +5595,9 @@ function incentiveView(){
   const myPat=D.patrollers.find(p=>p.user_id===D.profile?.id);
   const now=getBahrainNow();
   const curMonth=now.getUTCFullYear()+'-'+String(now.getUTCMonth()+1).padStart(2,'0');
+  drDefault('incentive');
+  const incFromDT=D.incentiveFrom;const incToDT=D.incentiveTo;
+  const incFromDate=drDate(incFromDT);const incToDate=drDate(incToDT);
   const months=getIncentiveMonths();
   const selMonth=D.incMonth||curMonth;
   const pts=activePats().filter(p=>getUtype(p)==='patroller');
@@ -5666,7 +5678,7 @@ function incentiveView(){
     // Year-to-date total across all saved months
     const ytdTotal=D.incentiveData.filter(d=>d.payout_total!=null&&d.month?.startsWith(selMonth.slice(0,4))).reduce((s,d)=>s+(d.payout_total||0),0);
 
-    return`
+    return`${drBar('incentive',incFromDT,incToDT)}
     <div style="background:#2A0D0F;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style=\"position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none\"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Incentive · ${selMonth}</div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Month</div><div style="font-size:11px;font-weight:500;margin-top:2px">${monthSel}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Month total</div><div style="font-size:18px;font-weight:500;color:#FF8C42">BHD ${(patTotal+tlTotal).toFixed(3)}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">TL incentive</div><div style="font-size:18px;font-weight:500;color:#4ADE80">${tlTotal>0?'BHD '+tlTotal.toFixed(3):'--'}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Patrollers</div><div style="font-size:18px;font-weight:500;color:#85B7EB">BHD ${patTotal.toFixed(3)}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">YTD ${selMonth.slice(0,4)}</div><div style="font-size:16px;font-weight:500;color:#FCD34D">BHD ${ytdTotal.toFixed(3)}</div></div></div></div></div>
 
 
