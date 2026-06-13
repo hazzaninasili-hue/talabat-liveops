@@ -1309,7 +1309,13 @@ function timeOffView(){
   const toFromDT=D.timeoffFrom;const toToDT=D.timeoffTo;
   const toFromDate=drDate(toFromDT);const toToDate=drDate(toToDT);
   // Filter requests that overlap the range
-  const filteredReqs=reqs.filter(r=>r.start_date<=toToDate&&r.end_date>=toFromDate);
+  // Fallback: use created_at date if start_date/end_date missing
+  const filteredReqs=reqs.filter(r=>{
+    const rFrom=r.start_date||(r.created_at?r.created_at.slice(0,10):'');
+    const rTo=r.end_date||r.start_date||(r.created_at?r.created_at.slice(0,10):'');
+    if(!rFrom)return true; // always show records with no date
+    return rFrom<=toToDate&&rTo>=toFromDate;
+  });
   const fPen=filteredReqs.filter(r=>r.status==='Pending').length;
   const fApr=filteredReqs.filter(r=>r.status==='Approved').length;
   const fRej=filteredReqs.filter(r=>r.status==='Rejected').length;
