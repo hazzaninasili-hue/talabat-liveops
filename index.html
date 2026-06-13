@@ -3631,6 +3631,8 @@ function attendanceView(){
     const dayName=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][jsDay];
     const workingPats=patrollers.filter(p=>gDZ(p.id,jsDay));
     if(!workingPats.length&&!dayRecs.length)return'';
+    // Skip past dates that have zero actual DB records — they only produce "No record" ghost rows
+    if(!isToday2&&dayRecs.length===0)return'';
     const isToday2=ds===today;
     const header=`<tr style="background:var(--g1)"><td colspan="10" style="padding:5px 10px;font-size:10px;font-weight:600;color:var(--g3)">${dayName} · ${ds}${isToday2?' <span style="font-size:8px;background:#FF5900;color:#fff;padding:0 3px;border-radius:3px">Today</span>':''}</td></tr>`;
     const rows=workingPats.map(p=>{
@@ -3774,11 +3776,13 @@ async function execDeleteHistorical(dtype){
 }
 
 async function deleteHistoricalData(table,beforeDate,label){
+  // Count first so we can report how many were deleted
+  const{count,error:cErr}=await sb.from(table).select('*',{count:'exact',head:true}).lt('date',beforeDate);
   const{error}=await sb.from(table).delete().lt('date',beforeDate);
-  if(error){alert('Error: '+error.message);return;}
+  if(error){alert('Error deleting '+label+': '+error.message);return;}
   closeM();
   await reload();
-  addNotification(`Deleted ${label} records before ${beforeDate}`,'success');
+  addNotification(`Deleted ${count||0} ${label} records before ${beforeDate}`,'success');
 }
 async function deleteHistoricalTasks(beforeDate){
   const{error}=await sb.from('task_requests').delete().lt('date',beforeDate);
