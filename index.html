@@ -537,6 +537,10 @@ async function afterLogin(user){
   // Set default tab based on role
   const patRoles=['patroller','coordinator'];
   D.tab=patRoles.includes(D.profile.role)?'myschedule':'schedule';
+  // Clear all date-filter userSet flags so drDefaultAll always shows correct default range
+  ['att','timeoff','tasks','ot','eval','coaching','audit','incentive','overview',
+   'myEval','myAtt','myTasks','myPerf','myCoaching','myTarget','summary'
+  ].forEach(p=>{delete D[p+'_userSet'];delete D[p+'From'];delete D[p+'To'];});
   // Also check custom role access level
   if(D.profile.custom_role_id&&D.customRoles.length){
     const cr=D.customRoles.find(r=>r.id===D.profile.custom_role_id);
@@ -1123,7 +1127,7 @@ function drDefault(pfx){
 // D[pfx+'_userSet'] is flagged true when user hits Apply — prevents reset on re-render.
 function drDefaultAll(pfx){
   if(!D[pfx+'_userSet']){
-    D[pfx+'From']='2020-01-01T00:00';
+    D[pfx+'From']='2026-06-01T00:00';
     const today=todayStr();
     D[pfx+'To']=today+'T23:59';
   }
@@ -1316,7 +1320,7 @@ function timeOffView(){
     return`<tr><td class="lt" style="white-space:nowrap">${r.patroller_name||'--'}</td><td style="font-family:monospace;font-size:10.5px">${r.patroller_code||'--'}</td><td style="white-space:nowrap;font-size:10.5px;font-weight:500">${r.request_type}</td><td style="font-family:monospace;font-size:10.5px">${r.start_date}</td><td style="font-family:monospace;font-size:10.5px">${r.end_date}</td><td style="font-weight:700">${days}</td><td><span class="pct-badge" style="${sc};white-space:nowrap">${r.status}</span></td><td style="font-size:10.5px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.comment||'--'}</td><td>${r.support_doc_url?`<a href="${r.support_doc_url}" target="_blank" style="font-size:10.5px;color:var(--blue)"><i class="ti ti-external-link"></i></a>`:'--'}</td>${isAL?`<td style="white-space:nowrap">${r.status==='Pending'?`<button class="edit-btn" style="background:var(--green-l);color:var(--green);border-color:#86efac" onclick="reviewTO('${r.id}','Approved')" title="Approve"><i class="ti ti-check"></i></button><button class="edit-btn" style="background:var(--red-l);color:var(--red-d);border-color:#fca5a5" onclick="reviewTO('${r.id}','Rejected')" title="Reject"><i class="ti ti-x"></i></button>`:''}<button class="icon-btn" onclick="delTO('${r.id}')"><i class="ti ti-trash"></i></button></td>`:''}</tr>`;
   }).join('');
   return`<div style="background:#412402;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Time off requests</div>${drBar('timeoff',toFromDT,toToDT)}<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Pending</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${fPen}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Approved</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${fApr}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Rejected</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">${fRej}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total requests</div><div style="font-size:22px;font-weight:500;color:#fff">${filteredReqs.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total days off</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${totalDays}</div></div></div></div></div>
-  <div class="toolbar"><button class="btn btn-primary" onclick="openM({type:'timeoff'})"><i class="ti ti-plus"></i>New request</button>${isAL?`<button class="btn" onclick="dlTO()"><i class="ti ti-download"></i>Export CSV</button>`:''}</div>
+  <div class="toolbar"><button class="btn btn-primary" onclick="openM({type:'timeoff'})"><i class="ti ti-plus"></i>New request</button>${isAL?`<button class="btn" onclick="dlTO()"><i class="ti ti-download"></i>Export CSV</button><button class="btn" style="background:#FEE2E2;color:#991B1B;border-color:#FCA5A5" onclick="openDeleteHistoryModal('timeoff')"><i class="ti ti-trash"></i>Delete Historical</button>`:''}</div>
   <div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr><th class="lt">Name</th><th>ID</th><th>Leave type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th><th>Comment</th><th>Doc</th>${isAL?'<th>Actions</th>':''}</tr></thead><tbody>${filteredReqs.length===0?`<tr><td colspan="10" style="padding:30px;text-align:center;color:var(--g3)">${reqs.length===0?'No time-off requests yet.':'No requests in this date range — adjust the filter above.'}</td></tr>`:rows}</tbody></table></div></div>`;
 }
 
@@ -2462,6 +2466,28 @@ function renderModal(){
     return;
   }
   if(m.type==='changepw'){box.innerHTML=`<div class="modal-title"><i class="ti ti-key"></i>Change password</div><div class="msg msg-err" id="cpw-e"></div><div class="msg msg-ok" id="cpw-ok"></div><div class="fg"><label>New password</label><div class="pw-wrap"><input type="password" id="cpw1" placeholder="Min 8 chars"><button class="pw-eye" onclick="togglePw('cpw1',this)"><i class="ti ti-eye"></i></button></div></div><div class="fg"><label>Confirm</label><div class="pw-wrap"><input type="password" id="cpw2" placeholder="Repeat"><button class="pw-eye" onclick="togglePw('cpw2',this)"><i class="ti ti-eye"></i></button></div></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="doCPW()"><i class="ti ti-check"></i>Update</button></div>`;return;}
+  if(m.type==='deletehistory'){
+    const labels={attendance:'Attendance',tasks:'Tasks',timeoff:'Time Off'};
+    box.innerHTML=`<div class="modal-title" style="color:#DC2626"><i class="ti ti-trash" style="color:#DC2626"></i>Delete Historical ${labels[m.dataType]||''} Data</div>
+      <div style="background:#FEE2E2;border:1.5px solid #FCA5A5;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#991B1B">
+        <strong>⚠️ Warning:</strong> This permanently deletes records from the database. This cannot be undone.
+      </div>
+      <div class="fg"><label>Delete all records <strong>before</strong> this date</label>
+        <input type="date" id="del-cut-date" value="${m.cutDate||'2026-06-01'}" style="font-size:14px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--g2);font-family:inherit;width:100%">
+      </div>
+      <div style="font-size:11px;color:var(--g3);margin-top:6px">Only admin can do this. Records on or after the selected date are kept.</div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeM()">Cancel</button>
+        <button class="btn" style="background:#DC2626;color:#fff;border-color:#DC2626" onclick="
+          const d=document.getElementById('del-cut-date').value;
+          if(!d){alert('Please select a date');return;}
+          if(!confirm('Delete all ${labels[m.dataType]||''} records before '+d+'? This cannot be undone.'))return;
+          ${{attendance:'deleteHistoricalData(\'attendance\',d,\'attendance\')',
+             tasks:'deleteHistoricalTasks(d)',
+             timeoff:'deleteHistoricalTimeOff(d)'}[m.dataType]||'closeM()'};
+        "><i class="ti ti-trash"></i>Delete Records</button>
+      </div>`;return;
+  }
   if(m.type==='absencereason'){box.innerHTML=`<div class="modal-title"><i class="ti ti-calendar-off"></i>Mark as Absent - ${m.patName}</div><div class="fg"><label>Reason for absence</label><select id="ar-reason"><option value="">-- Select reason --</option><option value="No show">No show</option><option value="Sick leave">Sick leave</option></select></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="const r=document.getElementById('ar-reason').value;if(!r){alert('Please select a reason');return;}confirmAbsenceReason('${m.patId}','${m.patName}','${m.status}',r)"><i class="ti ti-check"></i>Confirm</button></div>`;return;}
   if(m.type==='editattendance'){
     const _earec=(D.attendance||[]).find(a=>a.patroller_id===m.patId&&a.date===m.dateStr);
@@ -3704,7 +3730,7 @@ function attendanceView(){
       </div>
     </div>
   </div>
-  ${canEdit()?`<div style="margin-bottom:8px"><button class="btn" onclick="dlAttendance()"><i class="ti ti-download"></i>Export CSV</button></div>`:''}
+  ${canEdit()?`<div style="margin-bottom:8px;display:flex;gap:8px"><button class="btn" onclick="dlAttendance()"><i class="ti ti-download"></i>Export CSV</button><button class="btn" style="background:#FEE2E2;color:#991B1B;border-color:#FCA5A5" onclick="openDeleteHistoryModal('attendance')"><i class="ti ti-trash"></i>Delete Historical</button></div>`:''}
   <div class="tcard" style="padding:0;overflow:hidden">
     <div style="padding:9px 13px;border-bottom:0.5px solid var(--g2);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:space-between">Records <span style="font-size:10px;font-weight:400;color:var(--g3)">${dates.length} day${dates.length!==1?'s':''} · ${fromDate} → ${toDate}</span></div>
     <div class="t-scroll"><table style="min-width:750px"><thead><tr>
@@ -3738,6 +3764,34 @@ function dlAttendance(){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.map(csvRow).join('\n')],{type:'text/csv'}));a.download='attendance.csv';a.click();
 }
 
+
+// ── DELETE HISTORICAL DATA (admin only) ──
+async function deleteHistoricalData(table,beforeDate,label){
+  const{error}=await sb.from(table).delete().lt('date',beforeDate);
+  if(error){alert('Error: '+error.message);return;}
+  closeM();
+  await reload();
+  addNotification(`Deleted ${label} records before ${beforeDate}`,'success');
+}
+async function deleteHistoricalTasks(beforeDate){
+  const{error}=await sb.from('task_requests').delete().lt('date',beforeDate);
+  if(error){alert('Error: '+error.message);return;}
+  closeM();
+  await reload();
+  addNotification(`Deleted task records before ${beforeDate}`,'success');
+}
+async function deleteHistoricalTimeOff(beforeDate){
+  const{error}=await sb.from('time_off_requests').delete().lt('start_date',beforeDate);
+  if(error){alert('Error: '+error.message);return;}
+  closeM();
+  await reload();
+  addNotification(`Deleted time-off records before ${beforeDate}`,'success');
+}
+function openDeleteHistoryModal(type){
+  const today=todayStr();
+  const defaultCut='2026-06-01';
+  openM({type:'deletehistory',dataType:type,cutDate:defaultCut});
+}
 
 const TASK_TYPES=['Task','Meeting','Training','1 on 1 Coaching','Other'];
 const TASK_COLORS={
@@ -4037,9 +4091,9 @@ function tasksView(){
   const tkFromDT=D.tasksFrom;const tkToDT=D.tasksTo;
   const tkFromDate=drDate(tkFromDT);const tkToDate=drDate(tkToDT);
   const filteredTasks=all.filter(t=>{
-    const ds=t.start_time?t.start_time.slice(0,10):(t.date||'');
-    // if date is empty, include it (don't hide unknown-date tasks)
-    if(!ds)return true;
+    // t.date is always YYYY-MM-DD; t.start_time is HH:MM (not a date string)
+    const ds=t.date||(t.created_at?t.created_at.slice(0,10):'');
+    if(!ds)return true; // include tasks with no date
     return ds>=tkFromDate&&ds<=tkToDate;
   });
   const running=filteredTasks.filter(t=>t.status==='Running').length;
@@ -4104,6 +4158,7 @@ function tasksView(){
   <div class="toolbar">
     <button class="btn btn-primary" onclick="openM({type:'taskreq'})"><i class="ti ti-plus"></i>Start New Task</button>
     <button class="btn" onclick="dlTasks()"><i class="ti ti-download"></i>Export CSV</button>
+    ${canEdit()?`<button class="btn" style="background:#FEE2E2;color:#991B1B;border-color:#FCA5A5" onclick="openDeleteHistoryModal('tasks')"><i class="ti ti-trash"></i>Delete Historical</button>`:''}
   </div>
   <div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr>
     <th style="font-size:10px;white-space:nowrap">ID</th><th class="lt">Patroller</th><th>Type</th><th>Date</th><th>Time</th><th>Duration</th><th>Description</th><th>Status</th>${ed?'<th>Actions</th>':''}
@@ -4118,7 +4173,8 @@ function myTasksView(){
   const tkFromDT=D.myTasksFrom;const tkToDT=D.myTasksTo;
   const tkFromDate=drDate(tkFromDT);const tkToDate=drDate(tkToDT);
   const myTasks=allMyTasks.filter(t=>{
-    const ds=t.start_time?t.start_time.slice(0,10):(t.date||'');
+    const ds=t.date||(t.created_at?t.created_at.slice(0,10):'');
+    if(!ds)return true;
     return ds>=tkFromDate&&ds<=tkToDate;
   });
   const pen=myTasks.filter(t=>t.status==='Pending').length;
