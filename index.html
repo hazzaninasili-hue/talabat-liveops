@@ -1124,7 +1124,7 @@ function summaryView(){
 
   // ── Per-range counts ──
   const allAtt=(D.attendance||[]).filter(a=>inRange(a.date,fromDT,toDT));
-  const attRecs=allAtt.filter(a=>a.status==='Attended'||a.clock_in);
+  const attRecs=allAtt.filter(a=>a.status==='Attended'||a.status?.startsWith('Early out')||a.clock_in);
   const absentRecs=allAtt.filter(a=>a.status&&a.status.startsWith('Absent'));
   const uniquePats=new Set(patrollers.map(p=>p.id));
   let totalShifts=0;
@@ -3511,7 +3511,7 @@ function attendanceView(){
       const isAbs=isAbsentOnDate(p.id,ds);
       const st=onVac?`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">🌴 Vacation</span>`:
         isAbs?`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#FEE2E2;color:#991B1B">✗ Absent</span>`:
-        rec?.status?.startsWith('Early out')?`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">⚡ Early out</span>`:
+        rec?.status?.startsWith('Early out')?`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">⚡ ${rec.status}</span>`:
         rec?.clock_in?`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#DCFCE7;color:#166534">Attended</span>`:
         `<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:var(--g1);color:var(--g3)">Pending</span>`;
       const inT=rec?.clock_in?new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'—';
@@ -3527,7 +3527,7 @@ function attendanceView(){
         <td style="font-size:10px;font-family:monospace">${inT}</td>
         <td style="font-size:10px;font-family:monospace">${outT}</td>
         <td style="font-size:10px">${dur}</td>
-        <td>${canEdit()?`<button class="edit-btn" style="background:var(--green-l);color:var(--green);border-color:#86efac" onclick="markAtt('${p.id}','${ds}','Attended')" title="Attended"><i class="ti ti-check"></i></button><button class="edit-btn" style="background:var(--red-l);color:var(--red-d);border-color:#fca5a5" onclick="markAtt('${p.id}','${ds}','Absent')" title="Absent"><i class="ti ti-x"></i></button>`:''}</td>
+        <td>${canEdit()?`<button class="edit-btn" style="background:var(--green-l);color:var(--green);border-color:#86efac" onclick="markAttendance('${p.id}','${p.name}','Attended')" title="Attended"><i class="ti ti-check"></i></button><button class="edit-btn" style="background:var(--red-l);color:var(--red-d);border-color:#fca5a5" onclick="markAttendance('${p.id}','${p.name}','Absent')" title="Absent"><i class="ti ti-x"></i></button>`:''}</td>
       </tr>`;
     }).join('');
     return header+rows;
@@ -3584,10 +3584,10 @@ function dlAttendance(){
 
 const TASK_TYPES=['Task','Meeting','Training','1 on 1 Coaching','Other'];
 const TASK_COLORS={
-  'Task':'#FF5900','Meeting':'#1565C0','Training':'#166534','1 on 1 Coaching':'#7C3AED','Other':'#92400E',
+  'Task':'#FF5900','Meeting':'#1565C0','Training':'#166534','1 on 1 Coaching':'#7C3AED','Other':'#92400E','Early Clock Out':'#4C1D95',
 };
 const TASK_BG={
-  'Task':'#FFF0E6','Meeting':'#E3F2FD','Training':'#DCFCE7','1 on 1 Coaching':'#EDE9FE','Other':'#FEF3C7',
+  'Task':'#FFF0E6','Meeting':'#E3F2FD','Training':'#DCFCE7','1 on 1 Coaching':'#EDE9FE','Other':'#FEF3C7','Early Clock Out':'#EDE9FE',
 };
 
 // Helper to get local date string (YYYY-MM-DD) from Date object
@@ -3881,6 +3881,8 @@ function tasksView(){
   const tkFromDate=drDate(tkFromDT);const tkToDate=drDate(tkToDT);
   const filteredTasks=all.filter(t=>{
     const ds=t.start_time?t.start_time.slice(0,10):(t.date||'');
+    // if date is empty, include it (don't hide unknown-date tasks)
+    if(!ds)return true;
     return ds>=tkFromDate&&ds<=tkToDate;
   });
   const running=filteredTasks.filter(t=>t.status==='Running').length;
@@ -3923,10 +3925,15 @@ function tasksView(){
       <td style="font-family:monospace;font-size:11px">${t.date||'--'}</td>
       <td style="font-size:11px">${timeCell}</td>
       <td style="font-size:11px;font-weight:700;color:#FF5900">${durLabel||'--'}</td>
-      <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.description||'--'}</td>
+      <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${t.description||''}">${
+        t.task_type==='Early Clock Out'&&t.description
+          ?`<span style="font-size:9px;background:#FEF3C7;color:#92400E;padding:2px 6px;border-radius:4px">${t.description.replace(/Early clock out request\. Reason: /,'').split('. Att')[0]}</span>`
+          :(t.description||'--')
+      }</td>
       <td><span style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:8px;${getStatusStyle(t.status)}">${statusDisplay}</span></td>
       ${ed?`<td style="white-space:nowrap">
-        ${t.status==='Running'?`<button class="btn btn-primary" style="padding:4px 10px;font-size:10px" onclick="endTask('${t.id}','${t.patroller_name}')"><i class="ti ti-player-stop"></i>End</button>`:``}
+        ${t.status==='Running'?`<button class="btn btn-primary" style="padding:4px 10px;font-size:10px" onclick="endTask('${t.id}','${t.patroller_name}')"><i class="ti ti-player-stop"></i>End</button>`:''}
+        ${t.task_type==='Early Clock Out'&&t.status==='Pending'?`<button class="btn" style="padding:4px 10px;font-size:10px;background:#DCFCE7;color:#166534;border-color:#86EFAC" onclick="approveEarlyOut('${t.id}')"><i class="ti ti-check"></i>Approve</button> <button class="btn" style="padding:4px 10px;font-size:10px;background:#FEE2E2;color:#991B1B;border-color:#FCA5A5" onclick="rejectEarlyOut('${t.id}')"><i class="ti ti-x"></i>Reject</button>`:''}
         <button class="icon-btn" onclick="delTask('${t.id}')"><i class="ti ti-trash"></i></button>
       </td>`:''}
     </tr>`;
@@ -4562,6 +4569,33 @@ async function rejectEarlyClockOut(taskId){
   addNotification('Early clock out rejected — patroller must complete shift','warning');
 }
 
+// Wrapper functions used from tasks table (look up attId from description)
+async function approveEarlyOut(taskId){
+  const t=D.tasks.find(x=>x.id===taskId);
+  if(!t)return;
+  // Extract attId from description: "...Att ID: <uuid>"
+  const m=(t.description||'').match(/Att ID: ([a-f0-9-]+)/i);
+  const attId=m?m[1]:null;
+  if(attId){
+    await approveEarlyClockOut(taskId,attId);
+  } else {
+    // No att ID — just approve the task, update attendance by patroller+date
+    await sb.from('task_requests').update({status:'Approved',reviewed_by:D.profile.id,updated_at:new Date().toISOString()}).eq('id',taskId);
+    if(t.patroller_id&&t.date){
+      await sb.from('attendance').update({status:'Early out - Approved'}).eq('patroller_id',t.patroller_id).eq('date',t.date);
+    }
+    await reload();
+    addNotification('Early clock out approved','success');
+  }
+}
+async function rejectEarlyOut(taskId){
+  const t=D.tasks.find(x=>x.id===taskId);
+  if(t?.patroller_id&&t?.date){
+    await sb.from('attendance').update({status:'Early out - Rejected'}).eq('patroller_id',t.patroller_id).eq('date',t.date);
+  }
+  await rejectEarlyClockOut(taskId);
+}
+
 // ── YEAR END LEAVE CARRY FORWARD ──
 async function runYearEndCarryForward(){
   // Call this manually on Jan 1 to lock annual remaining as new carry forward
@@ -4620,6 +4654,26 @@ function showToast(msg,type='info'){
   t.innerHTML=`<i class="ti ${icons[type]}" style="font-size:15px;color:${cols[type]};flex-shrink:0"></i><div style="flex:1;font-size:12px;color:#2A0D0F;line-height:1.4">${msg}</div><button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:#A08070;font-size:16px;line-height:1;padding:0">×</button>`;
   toast.appendChild(t);
   setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},4000);
+}
+
+// PWA install prompt
+let _deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();_deferredPrompt=e;const btn=document.getElementById('install-btn');if(btn)btn.style.display='flex';});
+function installApp(){if(_deferredPrompt){_deferredPrompt.prompt();_deferredPrompt.userChoice.then(()=>{_deferredPrompt=null;const btn=document.getElementById('install-btn');if(btn)btn.style.display='none';});}}
+
+// downloadReport — leave balance CSV export
+function downloadReport(type){
+  if(type==='leave'){
+    const rows=[['ID','Name','Annual Entitle','Annual Used','Annual Left','Sick Entitle','Sick Used','Carry Fwd']];
+    D.patrollers.forEach(p=>{
+      const b=(D.leaveBalances||[]).find(lb=>lb.patroller_id===p.id)||{};
+      const annualE=b.annual_entitlement||30;
+      const annualU=(b.annual_consumed||0)+(D.timeoff||[]).filter(t=>t.patroller_id===p.id&&t.status==='Approved'&&t.leave_type==='Annual').reduce((s,t)=>s+(t.days||0),0);
+      rows.push([p.patroller_id_num||'',p.name,annualE,annualU,Math.max(0,annualE-annualU),b.sick_entitlement||15,b.sick_consumed||0,b.annual_carry_forward||0]);
+    });
+    const csv=rows.map(r=>r.join(',')).join('\r\n');
+    const a=document.createElement('a');a.href='data:text/csv,'+encodeURIComponent(csv);a.download='leave_balance_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  }
 }
 
 function addNotification(msg,type='info'){
