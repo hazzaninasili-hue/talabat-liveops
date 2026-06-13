@@ -3631,9 +3631,9 @@ function attendanceView(){
     const dayName=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][jsDay];
     const workingPats=patrollers.filter(p=>gDZ(p.id,jsDay));
     if(!workingPats.length&&!dayRecs.length)return'';
+    const isToday2=ds===today;
     // Skip past dates that have zero actual DB records — they only produce "No record" ghost rows
     if(!isToday2&&dayRecs.length===0)return'';
-    const isToday2=ds===today;
     const header=`<tr style="background:var(--g1)"><td colspan="10" style="padding:5px 10px;font-size:10px;font-weight:600;color:var(--g3)">${dayName} · ${ds}${isToday2?' <span style="font-size:8px;background:#FF5900;color:#fff;padding:0 3px;border-radius:3px">Today</span>':''}</td></tr>`;
     const rows=workingPats.map(p=>{
       const rec=dayRecs.find(a=>a.patroller_id===p.id);
