@@ -1036,10 +1036,27 @@ function dateView(){
             const outT=new Date(ps.rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
             attBadge=`<div style="margin-top:2px"><span style="font-size:9px;font-weight:700;background:#EAF1FD;color:#1565C0;padding:1px 5px;border-radius:4px">✓ ${inT}→${outT}</span></div>`;
           } else if(ps.status==='early_out_pending'){
-            attBadge=`<div style="margin-top:2px"><span style="font-size:9px;font-weight:700;background:#FEF3C7;color:#D97706;padding:1px 5px;border-radius:4px">⏳ Early out pending</span></div>`;
+            // Find the early out reason from tasks
+            const earlyTask2=(D.tasks||[]).find(t=>t.patroller_id===p.id&&(t.date===dayStr||(t.start_time||'').slice(0,10)===dayStr)&&t.task_type==='Early Clock Out');
+            const earlyReason2=earlyTask2?.description?.replace(/Early clock out request\. Reason: /i,'').split('. Att')[0]||'';
+            const inT2=ps.rec?.clock_in?new Date(ps.rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'';
+            attBadge=`<div style="margin-top:2px">
+              <span style="font-size:9px;font-weight:700;background:#FEF3C7;color:#D97706;padding:1px 5px;border-radius:4px">⏳ Early out pending${inT2?' · in '+inT2:''}</span>
+              ${earlyReason2?`<span style="font-size:9px;color:#7C3AED;margin-left:3px;font-style:italic">— ${earlyReason2}</span>`:''}
+            </div>`;
           } else if(ps.status==='scheduled'&&dayStr===todayStr()){
-            // upcoming shift today — show scheduled time
-            attBadge=`<div style="margin-top:2px"><span style="font-size:9px;color:var(--g3);padding:1px 4px;border-radius:4px;background:var(--g1)">⏰ Upcoming</span></div>`;
+            // Check if shift has already started — if so, "Not clocked in" is more accurate
+            const nowM=getBahrainMinutes();
+            const shStartM=sh?((parseInt(sh.start_time)||0)*60+(parseInt((sh.start_time||'').split(':')[1])||0)):null;
+            const shiftStarted=shStartM!==null&&nowM>=(shStartM||0);
+            attBadge=shiftStarted
+              ?`<div style="margin-top:2px"><span style="font-size:9px;font-weight:700;background:#FEE2E2;color:#DC2626;padding:1px 5px;border-radius:4px">⚠ Not clocked in</span></div>`
+              :`<div style="margin-top:2px"><span style="font-size:9px;color:var(--g3);padding:1px 4px;border-radius:4px;background:var(--g1)">⏰ Upcoming</span></div>`;
+          }
+        } else if(!io&&!isAbsD&&!isOnVacationDate(p.id,dayStr)){
+          // Scheduled but no record at all (past date)
+          if(dayStr<todayStr()){
+            attBadge=`<div style="margin-top:2px"><span style="font-size:9px;font-weight:700;background:#FEF3C7;color:#92400E;padding:1px 5px;border-radius:4px">⚠ No record</span></div>`;
           }
         }
         rows+=`<div class="dc-row${io?' off':''}"${rowBg}><div class="dc-av${sh?.shift_type==='evening'?' e':''}${io?' o':''}" style="${isAbsD?'background:#DC2626;color:#fff':''}"><${isAbsD?'span title="Absent"':'span'}>${ini(p.name)}</span></div><div style="flex:1;min-width:0"><div class="dc-name">${p.name}</div><div class="dc-zone">${(()=>{const ds2=d.toISOString().split('T')[0];const ov2=D.timeoff.find(t=>t.patroller_id===p.id&&t.status==='Approved'&&ds2>=t.start_date&&ds2<=t.end_date);return ov2?'🌴 On Vacation':io?'Off Day':isAbsD?'<span style="color:#DC2626;font-weight:700">✗ Absent</span>':z;})()}${shTime&&!isAbsD?` · <span style="font-size:9px;color:var(--g3)">${shTime}</span>`:''}</div>${attBadge}</div></div>`;});
@@ -3503,31 +3520,65 @@ function attendanceView(){
     const dayName=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][jsDay];
     const workingPats=patrollers.filter(p=>gDZ(p.id,jsDay));
     if(!workingPats.length&&!dayRecs.length)return'';
-    const header=`<tr style="background:var(--g1)"><td colspan="9" style="padding:5px 10px;font-size:10px;font-weight:600;color:var(--g3)">${dayName} · ${ds}${ds===today?' <span style="font-size:8px;background:#FF5900;color:#fff;padding:0 3px;border-radius:3px">Today</span>':''}</td></tr>`;
+    const isToday2=ds===today;
+    const header=`<tr style="background:var(--g1)"><td colspan="10" style="padding:5px 10px;font-size:10px;font-weight:600;color:var(--g3)">${dayName} · ${ds}${isToday2?' <span style="font-size:8px;background:#FF5900;color:#fff;padding:0 3px;border-radius:3px">Today</span>':''}</td></tr>`;
     const rows=workingPats.map(p=>{
       const rec=dayRecs.find(a=>a.patroller_id===p.id);
       const sh=getDayShift(p.id,jsDay);
       const onVac=isOnVacationDate(p.id,ds);
-      const isAbs=isAbsentOnDate(p.id,ds);
-      const st=onVac?`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">🌴 Vacation</span>`:
-        isAbs?`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#FEE2E2;color:#991B1B">✗ Absent</span>`:
-        rec?.status?.startsWith('Early out')?`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">⚡ ${rec.status}</span>`:
-        rec?.clock_in?`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#DCFCE7;color:#166534">Attended</span>`:
-        `<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:var(--g1);color:var(--g3)">Pending</span>`;
+      // Early clock-out task for this patroller+date
+      const earlyTask=(D.tasks||[]).find(t=>t.patroller_id===p.id&&(t.date===ds||(t.start_time||'').slice(0,10)===ds)&&t.task_type==='Early Clock Out');
+      const earlyReason=earlyTask?.description?.replace(/Early clock out request\. Reason: /i,'').split('. Att')[0]||'';
+
       const inT=rec?.clock_in?new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'—';
       const outT=rec?.clock_out?new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'—';
       let dur='—';
       if(rec?.clock_in&&rec?.clock_out){const ms=new Date(rec.clock_out)-new Date(rec.clock_in);const h=Math.floor(ms/3600000);const m=Math.floor((ms%3600000)/60000);dur=h>0?`${h}h ${m}m`:`${m}m`;}
-      return`<tr>
+
+      // ── Status badge with full detail ──
+      let st,rowBg='';
+      if(onVac){
+        st=`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#EDE9FE;color:#4C1D95">🌴 Vacation</span>`;
+      } else if(rec?.status?.startsWith('Early out')){
+        const approved=rec.status.includes('Approved');
+        const rejected=rec.status.includes('Rejected');
+        const stColor=approved?'#166534':rejected?'#991B1B':'#7C3AED';
+        const stBg=approved?'#DCFCE7':rejected?'#FEE2E2':'#EDE9FE';
+        st=`<div>
+          <span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:600;background:${stBg};color:${stColor}">⚡ ${rec.status}</span>
+          ${earlyReason?`<div style="font-size:9px;color:#7C3AED;margin-top:2px;font-style:italic">Reason: ${earlyReason}</div>`:''}
+          ${earlyTask&&earlyTask.status==='Pending'&&canEdit()?`<div style="margin-top:3px"><button class="edit-btn" style="background:#DCFCE7;color:#166534;border-color:#86EFAC;font-size:9px" onclick="approveEarlyOut('${earlyTask.id}')">✓ Approve</button> <button class="edit-btn" style="background:#FEE2E2;color:#991B1B;border-color:#FCA5A5;font-size:9px" onclick="rejectEarlyOut('${earlyTask.id}')">✗ Reject</button></div>`:''}
+        </div>`;
+        rowBg=approved?'rgba(22,101,52,0.03)':'rgba(124,58,237,0.04)';
+      } else if(rec?.status?.startsWith('Absent')){
+        st=`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:600;background:#FEE2E2;color:#991B1B">✗ Absent</span>`;
+        rowBg='rgba(153,27,27,0.03)';
+      } else if(rec?.clock_in&&rec?.clock_out){
+        st=`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:600;background:#DCFCE7;color:#166534">✓ Attended</span>`;
+      } else if(rec?.clock_in&&!rec?.clock_out){
+        st=`<div><span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:600;background:#DCFCE7;color:#166534">🟢 On shift</span><div style="font-size:9px;color:#166534;margin-top:1px">No clock-out yet</div></div>`;
+        rowBg='rgba(22,101,52,0.03)';
+      } else if(isToday2){
+        // Today + scheduled + no clock-in
+        st=`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#FEF3C7;color:#92400E">⏰ Not clocked in</span>`;
+        rowBg='rgba(146,64,14,0.03)';
+      } else {
+        // Past date + scheduled + no record = missed clock-in
+        st=`<span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:500;background:#FEE2E2;color:#991B1B">⚠ No record</span>`;
+        rowBg='rgba(153,27,27,0.03)';
+      }
+
+      return`<tr style="${rowBg?'background:'+rowBg:''}">
         <td style="font-size:10px;font-family:monospace;color:var(--g3)">${p.patroller_id_num||'—'}</td>
         <td style="font-weight:600">${p.name}</td>
-        <td style="font-size:10px">${gDZ(p.id,jsDay)||'—'}</td>
+        <td style="font-size:10px;color:var(--g3)">${gDZ(p.id,jsDay)||'—'}</td>
         <td style="font-size:10px">${sh?(sh.shift_type==='morning'?'☀️':'🌙')+' '+fmtT(sh.start_time)+'–'+fmtT(sh.end_time):'—'}</td>
         <td>${st}</td>
-        <td style="font-size:10px;font-family:monospace">${inT}</td>
-        <td style="font-size:10px;font-family:monospace">${outT}</td>
-        <td style="font-size:10px">${dur}</td>
-        <td>${canEdit()?`<button class="edit-btn" style="background:var(--green-l);color:var(--green);border-color:#86efac" onclick="markAttendance('${p.id}','${p.name}','Attended')" title="Attended"><i class="ti ti-check"></i></button><button class="edit-btn" style="background:var(--red-l);color:var(--red-d);border-color:#fca5a5" onclick="markAttendance('${p.id}','${p.name}','Absent')" title="Absent"><i class="ti ti-x"></i></button>`:''}</td>
+        <td style="font-size:10px;font-family:monospace;font-weight:${rec?.clock_in?'600':'400'};color:${rec?.clock_in?'#166534':'var(--g3)'}">${inT}</td>
+        <td style="font-size:10px;font-family:monospace;font-weight:${rec?.clock_out?'600':'400'};color:${rec?.clock_out?'#0C447C':rec?.clock_in?'#DC2626':'var(--g3)'}">${outT}${rec?.clock_in&&!rec?.clock_out&&isToday2?'<span style="font-size:8px;color:#DC2626;margin-left:3px">Missing</span>':''}</td>
+        <td style="font-size:10px;font-weight:600;color:${dur!=='—'?'#FF5900':'var(--g3)'}">${dur}</td>
+        <td style="font-size:9px;color:#7C3AED;max-width:120px">${earlyReason&&!rec?.status?.startsWith('Early out')?`⚡ ${earlyReason}`:''}</td>
+        <td>${canEdit()?`<button class="edit-btn" style="background:var(--green-l);color:var(--green);border-color:#86efac" onclick="markAttendance('${p.id}','${p.name}','Attended')" title="Mark attended"><i class="ti ti-check"></i></button><button class="edit-btn" style="background:var(--red-l);color:var(--red-d);border-color:#fca5a5" onclick="markAttendance('${p.id}','${p.name}','Absent')" title="Mark absent"><i class="ti ti-x"></i></button>`:''}</td>
       </tr>`;
     }).join('');
     return header+rows;
@@ -3550,9 +3601,9 @@ function attendanceView(){
   ${canEdit()?`<div style="margin-bottom:8px"><button class="btn" onclick="dlAttendance()"><i class="ti ti-download"></i>Export CSV</button></div>`:''}
   <div class="tcard" style="padding:0;overflow:hidden">
     <div style="padding:9px 13px;border-bottom:0.5px solid var(--g2);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:space-between">Records <span style="font-size:10px;font-weight:400;color:var(--g3)">${dates.length} day${dates.length!==1?'s':''} · ${fromDate} → ${toDate}</span></div>
-    <div class="t-scroll"><table style="min-width:700px"><thead><tr>
-      <th>ID</th><th>Name</th><th>Zone</th><th>Shift</th><th>Status</th><th>Clock in</th><th>Clock out</th><th>Duration</th>${canEdit()?'<th>Actions</th>':''}
-    </tr></thead><tbody>${rowsByDate||'<tr><td colspan="9" style="padding:30px;text-align:center;color:var(--g3)">No records in this range</td></tr>'}</tbody></table></div>
+    <div class="t-scroll"><table style="min-width:750px"><thead><tr>
+      <th>ID</th><th>Name</th><th>Zone</th><th>Shift</th><th>Status</th><th>Clock in</th><th>Clock out</th><th>Duration</th><th>Early out reason</th>${canEdit()?'<th>Actions</th>':''}
+    </tr></thead><tbody>${rowsByDate||'<tr><td colspan="10" style="padding:30px;text-align:center;color:var(--g3)">No records in this range</td></tr>'}</tbody></table></div>
   </div>`;
 }
 
