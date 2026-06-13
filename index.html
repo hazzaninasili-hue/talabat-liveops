@@ -1067,10 +1067,23 @@ function summaryView(){
   const ds2=d=>d.toISOString().split('T')[0];
   const today=todayStr();
 
+  // Inline shift active check
+  const nowBahrain=getBahrainNow();
+  const nowMins=nowBahrain.getUTCHours()*60+nowBahrain.getUTCMinutes()+3*60; // UTC+3
+  const isShiftActive=(sh)=>{
+    if(!sh||!sh.start_time||!sh.end_time)return false;
+    const[sh_h,sh_m]=sh.start_time.split(':').map(Number);
+    const[eh,em]=sh.end_time.split(':').map(Number);
+    const start=sh_h*60+sh_m;let end=eh*60+em;
+    if(end<=start)end+=24*60;
+    const now2=(nowMins%1440)<start?(nowMins%1440)+24*60:(nowMins%1440);
+    return now2>=start&&now2<=end;
+  };
+
   // Live status counts
   const onShift=patrollers.filter(p=>{
     const todayIdx=new Date(today+'T00:00:00Z').getUTCDay();
-    return gDZ(p.id,todayIdx)&&shiftActive(getDayShift(p.id,todayIdx));
+    return gDZ(p.id,todayIdx)&&isShiftActive(getDayShift(p.id,todayIdx));
   }).length;
   const onVacToday=patrollers.filter(p=>isOnVacationToday(p.id)).length;
   const absentToday=(D.attendance||[]).filter(a=>a.date===today&&a.status&&a.status.startsWith('Absent')).length;
@@ -1114,7 +1127,7 @@ function summaryView(){
       const inT=new Date(attRec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
       statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:#DCFCE7;color:#166534">🟢 On shift · in ${inT}</span>`;
       borderCol='#4ADE80';avBg='#DCFCE7';avCol='#166534';
-    } else if(z&&sh&&shiftActive(sh)){
+    } else if(z&&sh&&isShiftActive(sh)){
       statusPill=`<span style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:500;background:var(--g1);color:var(--g3)">⏰ Not clocked in</span>`;
     } else if(z&&sh){
       const shiftLabel=sh.shift_type==='morning'?'☀️':'🌙';
@@ -1183,7 +1196,7 @@ function summaryView(){
       <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px">
         <div style="width:7px;height:7px;border-radius:50%;background:#4ADE80"></div>
         <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.6">Live · ${new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'})} · Today</div>
-        <div style="margin-left:auto;font-size:10px;opacity:.35">Week ${getISOWeek(dates[0])} · ${fmt(dates[0])} – ${fmt(dates[6])}</div>
+        <div style="margin-left:auto;font-size:10px;opacity:.35">Week ${wNum(dates[0])} · ${fmt(dates[0])} – ${fmt(dates[6])}</div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
         <div style="background:rgba(255,255,255,.08);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">On shift</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${onShift}</div></div>
@@ -2015,7 +2028,7 @@ function renderSidebar(){
   } else {
     html+=`<div class="sb-section">My workspace</div>`;
     html+=item('myschedule','ti-calendar-week','My schedule (weekly)');
-    html+=item('myschedule-daily','ti-calendar-day','My schedule (daily)');
+    html+=item('myschedule-daily','ti-calendar-event','My schedule (daily)');
     html+=item('myattendance','ti-clock-check','My attendance');
     html+=item('timeoff','ti-calendar-off','Time off');
     html+=item('tasks','ti-checklist','Tasks');
