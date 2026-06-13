@@ -1393,7 +1393,7 @@ function docsView(){
   const groups={};
   docs.forEach(d=>{const t=getDocType(d);if(!groups[t.label])groups[t.label]={type:t,items:[]};groups[t.label].items.push(d);});
 
-  let html=`<div class="toolbar">${ed?`<button class="btn btn-primary" onclick="openM({type:'adddoc',form:{name:'',url:'',audience:'all',emails:'',category:''}})"><i class="ti ti-plus"></i>Add document</button>`:''}<span style="font-size:12px;color:var(--g3)">${docs.length} document${docs.length!==1?'s':''}</span></div>`;
+  let html=`<div style=\"background:#2C2C2A;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden\"><div style=\"position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none\"></div><div style=\"position:relative;z-index:1\"><div style=\"font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px\">Documents</div><div style=\"display:grid;grid-template-columns:repeat(3,1fr);gap:8px\"><div style=\"background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center\"><div style=\"font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px\">Total</div><div style=\"font-size:22px;font-weight:500\">${docs.length}</div></div><div style=\"background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center\"><div style=\"font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px\">For all</div><div style=\"font-size:22px;font-weight:500;color:#4ADE80\">${docs.filter(d=>d.audience==='all').length}</div></div><div style=\"background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center\"><div style=\"font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px\">Pinned</div><div style=\"font-size:22px;font-weight:500;color:#FCD34D\">${docs.filter(d=>d.pinned).length}</div></div></div></div></div><div class="toolbar">${ed?`<button class="btn btn-primary" onclick="openM({type:'adddoc',form:{name:'',url:'',audience:'all',emails:'',category:''}})"><i class="ti ti-plus"></i>Add document</button>`:''}<span style="font-size:12px;color:var(--g3)">${docs.length} document${docs.length!==1?'s':''}</span></div>`;
 
   Object.values(groups).forEach(g=>{
     const t=g.type;
@@ -1456,7 +1456,16 @@ function operationsView(){
   if(ed && sub==='shifts') addHtml = '<button class="btn btn-primary" onclick="openM({type:\'addshift\',form:{name:\'\',start:\'08:00\',end:\'16:00\',type:\'morning\'}})"><i class="ti ti-plus"></i>Add shift</button>';
   if(ed && sub==='roles') addHtml = '<button class="btn btn-primary" onclick="openM({type:\'addrole\'})"><i class="ti ti-plus"></i>Add role</button>';
 
-  var header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">'+subHtml+addHtml+'</div>';
+  var heroLabels={areas:'Areas',shifts:'Shifts',roles:'Roles'};
+  var heroIcons={areas:'ti-map-pin',shifts:'ti-clock',roles:'ti-shield'};
+  var heroColors={areas:'#501313',shifts:'#412402',roles:'#1E3A5F'};
+  var heroBg=heroColors[sub]||'#501313';
+  var heroLabel=heroLabels[sub]||'Zone & Shifts';
+  var areaCount=D.areas.length;var shiftCount=D.shifts.length;var roleCount=(D.customRoles||[]).length;
+  var stripe='<div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div>';
+  var heroHtml='<div style="background:'+heroBg+';border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden">'+stripe+'<div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">'+heroLabel+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Areas</div><div style="font-size:22px;font-weight:500">'+areaCount+'</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Shifts</div><div style="font-size:22px;font-weight:500">'+shiftCount+'</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Roles</div><div style="font-size:22px;font-weight:500">'+roleCount+'</div></div></div></div></div>';
+
+  var header = heroHtml+'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">'+addHtml+'</div>';
 
   // AREAS
   if(sub === 'areas'){
@@ -1631,7 +1640,7 @@ function accessView(){
     </div>`:''}
   </div>`;
 
-  return`<div style="background:#2A0D0F;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Access control</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Admins</div><div style="font-size:24px;font-weight:500;color:#FF8C42">${(D.profiles||[]).filter(p=>p.role==='admin').length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Team leads</div><div style="font-size:24px;font-weight:500;color:#85B7EB">${(D.profiles||[]).filter(p=>p.role==='lead'||p.role==='editor').length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Patrollers</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${(D.profiles||[]).filter(p=>p.role==='patroller'||p.role==='coordinator').length}</div></div></div></div></div><div class="info-box info-purple"><b>Admin</b> — full access. <b>Team Lead</b> — edit schedules & roster. <b>Coordinator/Patroller</b> — view own schedule only.</div>
+  return`<div style="background:#2A0D0F;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Access control</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Admins</div><div style="font-size:24px;font-weight:500;color:#FF8C42">${D.users?.filter(u=>u.role==='admin').length||0}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Team leads</div><div style="font-size:24px;font-weight:500;color:#85B7EB">${D.patrollers.filter(p=>getUtype(p)==='lead').length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Patrollers</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${D.patrollers.filter(p=>getUtype(p)==='patroller'||getUtype(p)==='coordinator').length}</div></div></div></div></div><div class="info-box info-purple"><b>Admin</b> — full access. <b>Team Lead</b> — edit schedules & roster. <b>Coordinator/Patroller</b> — view own schedule only.</div>
   ${locSection}
   
   <div style="background:#fff;border:1.5px solid #E8DDD4;border-radius:14px;padding:16px 20px;margin-bottom:18px">
@@ -2023,7 +2032,9 @@ function renderSidebar(){
     html+=`<div class="sb-section" style="margin-top:4px">Admin</div>`;
     html+=item('leavebalance','ti-calendar-stats','Leave balance');
     html+=item('documents','ti-files','Documents');
-    html+=item('zonenshift','ti-map-pin','Zone & shifts');
+    html+=item('zonenshift','ti-map-pin','Areas');
+    html+=item('zonenshift-shifts','ti-clock','Shifts');
+    html+=item('zonenshift-roles','ti-shield','Roles');
     if(isAdmin)html+=item('access','ti-lock','Access control');
   } else {
     html+=`<div class="sb-section">My workspace</div>`;
@@ -2128,7 +2139,12 @@ function render(){
   }
   else if(D.tab==='summary')html=safeRender(()=>wNav+summaryView(),'Summary');
   else if(D.tab==='timeofftask')html=safeRender(()=>timeOffTaskView(),'Time off & Tasks');
-  else if(D.tab==='zonenshift'||D.tab==='operations'||D.tab==='areas'||D.tab==='shifts')html=safeRender(()=>operationsView(),'Zone & Shifts');
+  else if(D.tab==='zonenshift'||D.tab==='zonenshift-shifts'||D.tab==='zonenshift-roles'||D.tab==='operations'||D.tab==='areas'||D.tab==='shifts'){
+    if(D.tab==='zonenshift'||D.tab==='areas')D.opsSub='areas';
+    else if(D.tab==='zonenshift-shifts')D.opsSub='shifts';
+    else if(D.tab==='zonenshift-roles')D.opsSub='roles';
+    html=safeRender(()=>operationsView(),'Zone & Shifts');
+  }
   else if(D.tab==='documents')html=safeRender(()=>docsView(),'Documents');
   else if(D.tab==='access')html=safeRender(()=>accessView(),'Access Control');
   else if(D.tab==='leavebalance')html=safeRender(()=>leaveBalanceView(),'Leave Balance');
@@ -4775,12 +4791,12 @@ function performanceView(){
       }).join('');
 
       return segHtml+
-        '<div class="stats" style="margin-bottom:14px">'+
-          '<div class="stat" style="background:#FFF0E6;border:1px solid #FFB380"><div class="stat-label" style="color:#D94D00">Team performance</div><div class="stat-value" style="color:#FF5900">'+teamAvgPerf+'%</div></div>'+
-          '<div class="stat green"><div class="stat-label">Avg evaluation</div><div class="stat-value">'+teamAvgEval+'%<span style="font-size:11px;color:var(--g3);font-weight:400;margin-left:4px">×'+ps.evalWeight+'%</span></div></div>'+
-          '<div class="stat blue"><div class="stat-label">Avg coaching</div><div class="stat-value">'+teamAvgCoach+'%<span style="font-size:11px;color:var(--g3);font-weight:400;margin-left:4px">×'+(100-ps.evalWeight)+'%</span></div></div>'+
-          '<div class="stat"><div class="stat-label">vs last month</div><div class="stat-value" style="font-size:18px;margin-top:3px;color:'+diffCol+'">'+diffLabel+'</div></div>'+
-        '</div>'+
+        '<div style="background:#0C447C;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Team performance · '+selMonth+'</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Team score</div><div style="font-size:22px;font-weight:500;color:#85B7EB">'+(teamAvg!==null?teamAvg+'%':'--')+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Avg evaluation</div><div style="font-size:22px;font-weight:500;color:#4ADE80">'+(evalAvg!==null?evalAvg+'%':'--')+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Avg coaching</div><div style="font-size:22px;font-weight:500;color:#93C5FD">'+(coachAvg!==null?coachAvg+'%':'--')+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">vs last month</div><div style="font-size:22px;font-weight:500;color:#FCD34D">'+(vsLast!==null?(vsLast>0?'+'+vsLast+'%':(vsLast+'%')):'--')+'</div></div>'+
+        '</div></div></div>'+
         '<div style="display:grid;grid-template-columns:repeat('+Math.min(sorted.length,4)+',1fr);gap:10px;margin-bottom:14px">'+patCards+'</div>'+
         '<div class="tcard" style="padding:14px">'+
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
@@ -4833,6 +4849,12 @@ function performanceView(){
       }).join('');
 
       return segHtml+
+        '<div style="background:#26215C;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Evaluation · '+selMonth+'</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Best</div><div style="font-size:13px;font-weight:500;color:#C4B5FD">'+(sorted[0]?.p.name.split(' ')[0]||'--')+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Team avg</div><div style="font-size:22px;font-weight:500;color:#AFA9EC">'+(evalAvg!==null?evalAvg+'%':'--')+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Evals done</div><div style="font-size:22px;font-weight:500;color:#fff">'+(D.evaluations.filter(e=>(e.month||e.eval_date?.slice(0,7))===selMonth).length)+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Needs attention</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">'+(sorted.filter(d=>d.evalAvg!==null&&d.evalAvg<60).length)+'</div></div>'+
+        '</div></div></div>'+
         '<div style="display:grid;grid-template-columns:360px 1fr;gap:12px">'+
           '<div class="tcard" style="padding:14px">'+
             '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px"><i class="ti ti-clipboard-plus" style="margin-right:4px"></i>New evaluation</div>'+
@@ -4941,6 +4963,11 @@ function performanceView(){
       }).join('');
 
       return segHtml+
+        '<div style="background:#085041;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Coaching · '+selCoachMonth+'</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Total cases</div><div style="font-size:22px;font-weight:500;color:#fff">'+(monthAssignments.length)+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">On time</div><div style="font-size:22px;font-weight:500;color:#4ADE80">'+(totalDone)+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">SLA breached</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">'+(totalSLA)+'</div></div>'+
+        '</div></div></div>'+
         '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">'+
           '<div style="background:var(--g1);border-radius:10px;padding:12px"><div style="font-size:10px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Total cases</div><div style="font-size:20px;font-weight:700;color:#FF5900">'+filteredCases.length+'</div></div>'+
           '<div style="background:#DCFCE7;border-radius:10px;padding:12px;border:0.5px solid #86EFAC"><div style="font-size:10px;font-weight:600;color:#166534;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">On time</div><div style="font-size:20px;font-weight:700;color:#166534">'+totalDone+'</div></div>'+
@@ -4965,6 +4992,12 @@ function performanceView(){
 
     if(subTab==='audit'){
       return segHtml+
+        '<div style="background:#27500A;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Audit targets · '+selMonth+'</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Base total</div><div style="font-size:22px;font-weight:500;color:#C0DD97">'+(ps.targetTotal)+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Base unique</div><div style="font-size:22px;font-weight:500;color:#C0DD97">'+(ps.targetUnique)+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Working hrs</div><div style="font-size:22px;font-weight:500;color:#fff">'+(ps.workingHours)+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Eval weight</div><div style="font-size:22px;font-weight:500;color:#C0DD97">'+(ps.evalWeight+'%')+'</div></div>'+
+        '</div></div></div>'+
         '<div class="tcard" style="padding:14px;margin-bottom:10px">'+
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
             '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-settings" style="margin-right:4px"></i>Target settings <span style="font-size:10px;color:var(--g3);font-weight:400;text-transform:none;letter-spacing:0">Admin / TL only</span></div>'+
@@ -5542,13 +5575,8 @@ function incentiveView(){
     const ytdTotal=D.incentiveData.filter(d=>d.payout_total!=null&&d.month?.startsWith(selMonth.slice(0,4))).reduce((s,d)=>s+(d.payout_total||0),0);
 
     return`
-    <div class="stats" style="margin-bottom:12px">
-      <div class="stat blue"><div class="stat-label">Month</div><div style="margin-top:4px">${monthSel}</div></div>
-      <div class="stat" style="background:#FFF0E6;border:1px solid #FFB380"><div class="stat-label" style="color:#D94D00">This month total</div><div class="stat-value" style="color:#FF5900;font-size:16px">BHD ${(patTotal+tlTotal).toFixed(3)}</div><div style="font-size:10px;color:#D94D00;margin-top:2px">TL + Patrollers</div></div>
-      <div class="stat green"><div class="stat-label">TL incentive</div><div class="stat-value" style="font-size:16px">${tlTotal>0?'BHD '+tlTotal.toFixed(3):'--'}</div></div>
-      <div class="stat"><div class="stat-label">Patroller incentive</div><div class="stat-value" style="font-size:16px">BHD ${patTotal.toFixed(3)}</div></div>
-      <div class="stat amber"><div class="stat-label">Year-to-date (${selMonth.slice(0,4)})</div><div class="stat-value" style="font-size:14px">BHD ${ytdTotal.toFixed(3)}</div></div>
-    </div>
+    <div style="background:#2A0D0F;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style=\"position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none\"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Incentive · ${selMonth}</div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Month</div><div style="font-size:11px;font-weight:500;margin-top:2px">${monthSel}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Month total</div><div style="font-size:18px;font-weight:500;color:#FF8C42">BHD ${(patTotal+tlTotal).toFixed(3)}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">TL incentive</div><div style="font-size:18px;font-weight:500;color:#4ADE80">${tlTotal>0?'BHD '+tlTotal.toFixed(3):'--'}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Patrollers</div><div style="font-size:18px;font-weight:500;color:#85B7EB">BHD ${patTotal.toFixed(3)}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">YTD ${selMonth.slice(0,4)}</div><div style="font-size:16px;font-weight:500;color:#FCD34D">BHD ${ytdTotal.toFixed(3)}</div></div></div></div></div>
+
 
     <div class="tcard" style="padding:14px;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
