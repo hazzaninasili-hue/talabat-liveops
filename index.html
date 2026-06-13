@@ -1095,7 +1095,7 @@ function drBar(pfx,fromVal,toVal){
   ];
   const btns=presets.map(p=>{
     const on=fromVal===p.f&&toVal===p.t;
-    return`<button onclick="D['${pfx}From']='${p.f}';D['${pfx}To']='${p.t}';render()" style="padding:0 12px;height:34px;border-radius:8px;border:0.5px solid ${on?'rgba(255,89,0,.7)':'rgba(255,255,255,.2)'};background:${on?'rgba(255,89,0,.25)':'rgba(255,255,255,.07)'};color:${on?'#FF8C42':'rgba(255,255,255,.75)'};font-size:11px;font-weight:500;cursor:pointer;font-family:inherit">${p.label}</button>`;
+    return`<button onclick="D['${pfx}From']='${p.f}';D['${pfx}To']='${p.t}';D['${pfx}_userSet']=true;render()" style="padding:0 12px;height:34px;border-radius:8px;border:0.5px solid ${on?'rgba(255,89,0,.7)':'rgba(255,255,255,.2)'};background:${on?'rgba(255,89,0,.25)':'rgba(255,255,255,.07)'};color:${on?'#FF8C42':'rgba(255,255,255,.75)'};font-size:11px;font-weight:500;cursor:pointer;font-family:inherit">${p.label}</button>`;
   }).join('');
   return`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px">
     <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.55;min-width:28px">FROM</span>
@@ -1107,7 +1107,7 @@ function drBar(pfx,fromVal,toVal){
     <div style="display:flex;align-items:center;background:rgba(0,0,0,.25);border:0.5px solid rgba(255,255,255,.18);border-radius:8px;padding:0 10px;height:34px;min-width:160px">
       <input type="datetime-local" value="${toVal}" onchange="D['${pfx}To']=this.value" style="background:transparent;border:none;outline:none;color:#fff;font-size:12px;font-family:inherit;font-weight:500;width:100%;cursor:pointer;color-scheme:dark">
     </div>
-    <button onclick="render()" style="padding:0 16px;height:34px;border-radius:8px;border:1.5px solid #FF5900;background:transparent;color:#FF8C42;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.02em">Apply</button>
+    <button onclick="D['${pfx}_userSet']=true;render()" style="padding:0 16px;height:34px;border-radius:8px;border:1.5px solid #FF5900;background:transparent;color:#FF8C42;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.02em">Apply</button>
     <div style="display:flex;gap:5px;margin-left:2px">${btns}</div>
   </div>`;
 }
@@ -1119,11 +1119,14 @@ function drDefault(pfx){
   if(!D[pfx+'From'])D[pfx+'From']=today+'T00:00';
   if(!D[pfx+'To'])D[pfx+'To']=today+'T23:59';
 }
-// Show ALL records by default (no date restriction until user applies a filter)
+// Show ALL records by default. Only sets if not already overridden by user.
+// D[pfx+'_userSet'] is flagged true when user hits Apply — prevents reset on re-render.
 function drDefaultAll(pfx){
-  if(!D[pfx+'From'])D[pfx+'From']='2020-01-01T00:00';
-  const today=todayStr();
-  if(!D[pfx+'To'])D[pfx+'To']=today+'T23:59';
+  if(!D[pfx+'_userSet']){
+    D[pfx+'From']='2020-01-01T00:00';
+    const today=todayStr();
+    D[pfx+'To']=today+'T23:59';
+  }
 }
 // Helper: check if a date string is within a range
 function inRange(dateStr,fromDT,toDT){
@@ -1314,7 +1317,7 @@ function timeOffView(){
   }).join('');
   return`<div style="background:#412402;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Time off requests</div>${drBar('timeoff',toFromDT,toToDT)}<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px"><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Pending</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${fPen}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Approved</div><div style="font-size:22px;font-weight:500;color:#4ADE80">${fApr}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Rejected</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">${fRej}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total requests</div><div style="font-size:22px;font-weight:500;color:#fff">${filteredReqs.length}</div></div><div style="background:rgba(255,255,255,.1);border-radius:9px;padding:9px 7px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Total days off</div><div style="font-size:22px;font-weight:500;color:#FCD34D">${totalDays}</div></div></div></div></div>
   <div class="toolbar"><button class="btn btn-primary" onclick="openM({type:'timeoff'})"><i class="ti ti-plus"></i>New request</button>${isAL?`<button class="btn" onclick="dlTO()"><i class="ti ti-download"></i>Export CSV</button>`:''}</div>
-  ${reqs.length===0?`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-calendar-off" style="font-size:40px;display:block;margin-bottom:10px"></i>No time-off requests yet.</div>`:`<div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr><th class="lt">Name</th><th>ID</th><th>Leave type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th><th>Comment</th><th>Doc</th>${isAL?'<th>Actions</th>':''}</tr></thead><tbody>${rows}</tbody></table></div></div>`}`;
+  <div class="tcard"><div class="t-scroll"><table style="table-layout:auto"><thead><tr><th class="lt">Name</th><th>ID</th><th>Leave type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th><th>Comment</th><th>Doc</th>${isAL?'<th>Actions</th>':''}</tr></thead><tbody>${filteredReqs.length===0?`<tr><td colspan="10" style="padding:30px;text-align:center;color:var(--g3)">${reqs.length===0?'No time-off requests yet.':'No requests in this date range — adjust the filter above.'}</td></tr>`:rows}</tbody></table></div></div>`;
 }
 
 // ── COMBINED TIME OFF & TASKS VIEW ──
@@ -2157,6 +2160,7 @@ function renderSidebar(){
     html+=item('documents','ti-files','Documents');
     html+=`<div class="sb-section" style="margin-top:4px">Performance</div>`;
     html+=item('pat-scores','ti-chart-infographic','My scores');
+    html+=item('pat-evaluation','ti-star','My evaluation');
     html+=item('pat-coaching','ti-users','My coaching');
     html+=item('pat-targets','ti-target','My targets');
     html+=item('incentive','ti-cash','My incentive');
@@ -2337,6 +2341,7 @@ function render(){
   else if(D.tab==='attendance')html=safeRender(()=>attendanceView(),'Attendance');
   else if(D.tab==='myattendance')html=safeRender(()=>myAttendanceView(),'My Attendance');
   else if(D.tab==='pat-scores'){D.perfTab='myperformance';html=safeRender(()=>performanceView(),'My Scores');}
+  else if(D.tab==='pat-evaluation'){html=safeRender(()=>myEvaluationView(),'My Evaluation');}
   else if(D.tab==='pat-coaching'){D.perfTab='mycoaching';html=safeRender(()=>performanceView(),'My Coaching');}
   else if(D.tab==='pat-targets'){D.perfTab='mytarget';html=safeRender(()=>performanceView(),'My Targets');}
   else if(D.tab==='performance')html=safeRender(()=>overallPerfView(),'Scores & Incentive');
@@ -2350,7 +2355,17 @@ function render(){
   else if(D.tab==='timeofftask')html=safeRender(()=>timeOffTaskView(),'Time off & Tasks');
   document.getElementById('main').innerHTML=`<div class="fade-in">${html}</div>`;
 }
-function setTab(t){D.tab=t;D.ne=false;render();}
+function setTab(t){
+  D.tab=t;D.ne=false;
+  D.view=null;
+  // Clear userSet for the target tab so drDefaultAll resets to all-data view
+  const _pfxMap={attendance:'att',timeoff:'timeoff',tasks:'tasks',overtime:'ot',
+    evaluation:'eval',coaching:'coaching',scores:'overview',incentive:'incentive',
+    timeofftask:'timeoff','pat-evaluation':'myEval'};
+  const _pfx=_pfxMap[t];
+  if(_pfx)D[_pfx+'_userSet']=false;
+  render();
+}
 
 async function chRole(uid,roleRaw){
   const isCustom=roleRaw.startsWith('cr:');
@@ -3587,8 +3602,8 @@ function attendanceView(){
   dates.forEach(ds=>{const jsDay=new Date(ds+'T00:00:00Z').getUTCDay();patrollers.forEach(p=>{if(gDZ(p.id,jsDay))totalShifts++;});});
   const attRate=totalShifts>0?Math.round(attended/totalShifts*100):0;
 
-  // Build rows grouped by date
-  const rowsByDate=dates.map(ds=>{
+  // Build rows grouped by date — newest first (today on top)
+  const rowsByDate=[...dates].reverse().map(ds=>{
     const dayRecs=allAtt.filter(a=>a.date===ds);
     const jsDay=new Date(ds+'T00:00:00Z').getUTCDay();
     const dayName=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][jsDay];
@@ -4042,7 +4057,11 @@ function tasksView(){
     return'background:var(--g1);color:var(--g3)';
   };
 
-  const rows=filteredTasks.map(t=>{
+  const rows=[...filteredTasks].sort((a,b)=>{
+    const da=a.start_time?a.start_time.slice(0,10):(a.date||'');
+    const db=b.start_time?b.start_time.slice(0,10):(b.date||'');
+    return db.localeCompare(da);
+  }).map(t=>{
     const col=TASK_COLORS[t.task_type]||'#411517';
     const bg=TASK_BG[t.task_type]||'#F4EDE3';
     const duration=t.start_time&&t.end_time?`${t.start_time} → ${t.end_time}`:t.start_time?`Started: ${t.start_time}`:'--';
@@ -4665,6 +4684,122 @@ function leaveBalanceView(){
     ${pts.map(p => leaveBalanceCard(p)).join('')}
   </div>`;
 }
+
+// ── MY EVALUATION VIEW (patroller) ──
+function myEvaluationView(){
+  const myPat=D.patrollers.find(p=>p.user_id===D.profile?.id);
+  if(!myPat)return`<div style="padding:40px;text-align:center;color:var(--g3)"><i class="ti ti-user-off" style="font-size:40px;display:block;margin-bottom:10px"></i>Your account is not linked to a schedule record. Contact admin.</div>`;
+
+  drDefaultAll('myEval');
+  const fromDT=D.myEvalFrom;const toDT=D.myEvalTo;
+  const fromDate=drDate(fromDT);const toDate=drDate(toDT);
+
+  // All my evaluations sorted newest first
+  const myEvals=D.evaluations
+    .filter(e=>e.patroller_id===myPat.id)
+    .filter(e=>{const ds=e.eval_date||((e.month||'')+'01');return ds>=fromDate&&ds<=toDate;})
+    .sort((a,b)=>new Date(b.eval_date)-new Date(a.eval_date));
+
+  const allMyEvals=D.evaluations.filter(e=>e.patroller_id===myPat.id);
+
+  // Summary stats
+  const totalEvals=allMyEvals.length;
+  const avgScore=totalEvals?Math.round(allMyEvals.reduce((s,e)=>s+evalScore(e),0)/totalEvals):null;
+  const lastEval=allMyEvals.sort((a,b)=>new Date(b.eval_date)-new Date(a.eval_date))[0];
+  const lastScore=lastEval?evalScore(lastEval):null;
+  const lastDate=lastEval?.eval_date?new Date(lastEval.eval_date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Bahrain'}):'--';
+
+  // Score colour helper
+  const sc=pct=>pct>=75?'#1E40AF':pct>=60?'#166534':pct>=40?'#92400E':'#991B1B';
+  const scBg=pct=>pct>=75?'#DBEAFE':pct>=60?'#DCFCE7':pct>=40?'#FEF3C7':'#FEE2E2';
+
+  // Rating badge helper
+  const rBg=r=>r>=4?'#DBEAFE':r>=3?'#DCFCE7':r>=2?'#FEF3C7':'#FEE2E2';
+  const rCo=r=>r>=4?'#1E40AF':r>=3?'#166534':r>=2?'#92400E':'#991B1B';
+  const rb=r=>r?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:${rBg(r)};color:${rCo(r)}">${r}<span style="font-weight:400;opacity:.6;font-size:8px">/4</span></span>`:'<span style="color:var(--g3);font-size:10px">—</span>';
+
+  // Summary hero card
+  const heroCard=`
+    <div style="background:linear-gradient(135deg,#26215C,#3730A3);border-radius:16px;padding:22px;color:#fff;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+        <div style="width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700">${(myPat.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+        <div>
+          <div style="font-size:16px;font-weight:700">${myPat.name}</div>
+          <div style="font-size:11px;opacity:.55;margin-top:2px">ID: ${myPat.patroller_id_num||'--'}</div>
+        </div>
+        <div style="margin-left:auto;text-align:right">
+          <div style="font-size:9px;opacity:.5;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">Overall avg score</div>
+          <div style="font-size:34px;font-weight:700;color:${avgScore>=75?'#4ADE80':avgScore>=60?'#A5F3FC':avgScore>=40?'#FCD34D':'#FCA5A5'}">${avgScore!==null?avgScore+'%':'--'}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div style="background:rgba(255,255,255,.1);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Total evals</div>
+          <div style="font-size:24px;font-weight:700">${totalEvals}</div>
+        </div>
+        <div style="background:rgba(255,255,255,.1);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Last score</div>
+          <div style="font-size:24px;font-weight:700;color:${lastScore>=75?'#4ADE80':lastScore>=60?'#A5F3FC':lastScore>=40?'#FCD34D':'#FCA5A5'}">${lastScore!==null?lastScore+'%':'--'}</div>
+        </div>
+        <div style="background:rgba(255,255,255,.1);border-radius:10px;padding:12px;text-align:center">
+          <div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Last eval date</div>
+          <div style="font-size:12px;font-weight:600;margin-top:4px">${lastDate}</div>
+        </div>
+      </div>
+    </div>`;
+
+  // Log table
+  const logRows=myEvals.map(e=>{
+    const pct=evalScore(e);
+    const dt=e.eval_date?new Date(e.eval_date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Bahrain'}):'--';
+    const mo=e.month||e.eval_date?.slice(0,7)||'--';
+    const avgRating=evalAvgRating(e);
+    return`<tr>
+      <td style="font-family:monospace;font-size:11px;white-space:nowrap">${dt}</td>
+      <td style="font-size:11px;font-family:monospace;font-weight:600;background:rgba(93,63,211,.06);text-align:center">${mo}</td>
+      <td style="font-size:11px;color:var(--g3)">${e.location||'--'}</td>
+      ${EVAL_QUESTIONS.map(q=>`<td style="text-align:center">${rb(e[q.key])}</td>`).join('')}
+      <td style="text-align:center">
+        <span style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:8px;background:${scBg(pct)};color:${sc(pct)}">${pct}%</span>
+      </td>
+      <td style="font-size:11px;color:var(--g3);white-space:nowrap">${e.evaluator_name||'--'}</td>
+      <td style="font-size:11px;color:var(--g3);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.comment||'').replace(/"/g,'&quot;')}">${e.comment||'--'}</td>
+    </tr>`;
+  }).join('');
+
+  const noDataMsg=`<tr><td colspan="${4+EVAL_QUESTIONS.length}" style="padding:30px;text-align:center;color:var(--g3)">${allMyEvals.length===0?'No evaluations recorded yet.':'No evaluations in this date range.'}</td></tr>`;
+
+  return`
+    ${heroCard}
+    <div style="background:#26215C;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden">
+      <div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div>
+      <div style="position:relative;z-index:1">
+        <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:8px">Filter evaluations</div>
+        ${drBar('myEval',fromDT,toDT)}
+      </div>
+    </div>
+    <div class="tcard" style="padding:0;overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:0.5px solid var(--g2);display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-list-details" style="margin-right:4px"></i>My Evaluation Log</div>
+        <span style="font-size:10px;color:var(--g3)">${myEvals.length} record${myEvals.length!==1?'s':''}</span>
+      </div>
+      <div class="t-scroll">
+        <table style="min-width:700px">
+          <thead><tr>
+            <th style="font-size:9px;white-space:nowrap">Date</th>
+            <th style="font-size:9px;background:rgba(93,63,211,.06)">Month</th>
+            <th style="font-size:9px">Location</th>
+            ${EVAL_QUESTIONS.map(q=>`<th style="font-size:9px;text-align:center;max-width:44px" title="${q.label}">${q.label.split(' ').slice(0,2).join(' ')}</th>`).join('')}
+            <th style="font-size:9px">Score</th>
+            <th style="font-size:9px;white-space:nowrap">Evaluated by</th>
+            <th style="font-size:9px">Comment</th>
+          </tr></thead>
+          <tbody>${logRows||noDataMsg}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
 
 // ── MY LEAVE BALANCE VIEW (patroller) ──
 function myLeaveBalanceView(){
@@ -5343,11 +5478,7 @@ function performanceView(){
                       '<td style="font-family:monospace;font-size:10px;white-space:nowrap">'+_dt+'</td>'+
                       '<td style="font-size:10px;text-align:center;font-family:monospace;font-weight:600;background:rgba(93,63,211,.06)">'+_mo+'</td>'+
                       '<td style="font-size:10px;color:var(--g3)">'+ (e.location||'--')+'</td>'+
-                      '<td style="text-align:center">'+_rb(e.q1)+'</td>'+
-                      '<td style="text-align:center">'+_rb(e.q2)+'</td>'+
-                      '<td style="text-align:center">'+_rb(e.q3)+'</td>'+
-                      '<td style="text-align:center">'+_rb(e.q4)+'</td>'+
-                      '<td style="text-align:center">'+_rb(e.q5)+'</td>'+
+                      EVAL_QUESTIONS.map(q=>'<td style="text-align:center" title="'+q.label+'">'+_rb(e[q.key])+'</td>').join('')+
                       '<td><span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:'+ _sc+'22;color:'+_sc+'">'+_pct+'%</span></td>'+
                       '<td style="font-size:10px;color:var(--g3);white-space:nowrap">'+ (e.evaluator_name||'--')+'</td>'+
                       `<td style="font-size:10px;color:var(--g3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(e.comment||'').replace(/"/g,'&quot;')}">${e.comment||'--'}</td>`+
@@ -5356,7 +5487,7 @@ function performanceView(){
                   }).join('');
                   return '<div class="t-scroll"><table style="min-width:860px"><thead><tr>'+
                     '<th style="font-size:9px">ID</th><th class="lt" style="font-size:9px">Patroller</th><th style="font-size:9px;white-space:nowrap">Date</th><th style="font-size:9px;background:rgba(93,63,211,.06)">Month</th><th style="font-size:9px">Location</th>'+
-                    '<th style="font-size:9px;text-align:center">Q1</th><th style="font-size:9px;text-align:center">Q2</th><th style="font-size:9px;text-align:center">Q3</th><th style="font-size:9px;text-align:center">Q4</th><th style="font-size:9px;text-align:center">Q5</th>'+
+                    EVAL_QUESTIONS.map(q=>'<th style="font-size:9px;text-align:center;max-width:40px" title="'+q.label+'">'+q.label.split(' ').slice(0,2).join(' ')+'</th>').join('')+
                     '<th style="font-size:9px">Score</th><th style="font-size:9px">Evaluated by</th><th style="font-size:9px">Comment</th><th></th>'+
                     '</tr></thead><tbody>'+logRows+'</tbody></table></div>';
                 })()
