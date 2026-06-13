@@ -2709,7 +2709,7 @@ function renderModal(){
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeM()">Cancel</button>
-      <button class="btn btn-primary" onclick="submitEarlyClockOut('${m.patId}','${m.attId}','${m.adjEndStr}')"><i class="ti ti-send"></i>Submit Request</button>
+      <button class="btn btn-primary" id="early-submit-btn" onclick="this.disabled=true;this.innerHTML='<i class=\'ti ti-loader\' style=\'animation:spin .7s linear infinite\'></i> Getting location...';submitEarlyClockOut('${m.patId}','${m.attId}','${m.adjEndStr}')"><i class="ti ti-map-pin"></i> Submit & Record Location</button>
     </div>`;return;
   }
   if(m.type==='editLeaveBalance'){
@@ -3478,16 +3478,39 @@ function myAttendanceView(){
     </div>`;
   } else if(rec.clock_in&&!rec.clock_out){
     const inTime=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
-    clockWidget=`<div style="background:linear-gradient(135deg,#14532D,#166534);border-radius:16px;padding:28px;text-align:center;color:#F0FDF4;margin-bottom:20px">
-      <div style="font-size:13px;opacity:.7;margin-bottom:6px">CLOCKED IN AT ${inTime}</div>
-      <div style="font-size:16px;font-weight:600;margin-bottom:4px">${zone}</div>
-      <div style="margin-bottom:6px"><a href="${rec.clock_in_map}" target="_blank" style="color:#86efac;font-size:11px"><i class="ti ti-map-pin" style="font-size:11px"></i> View clock-in location</a></div>
-      <div style="font-size:12px;opacity:.6;margin-bottom:20px">Shift: ${sh?`${fmtT(sh.start_time)} - ${fmtT(sh.end_time)}`:''}</div>
-      <button id="clock-out-btn" onclick="doClockOut()" style="background:#FF5900;color:#fff;border:none;padding:14px 36px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px" onmouseover="this.style.background='#D94D00'" onmouseout="this.style.background='#FF5900'">
-        <i class="ti ti-clock-stop" style="font-size:18px"></i> Clock Out
-      </button>
-      <div style="font-size:11px;opacity:.5;margin-top:12px">Your location will be recorded</div>
-    </div>`;
+    // Check if there's a pending early clock-out request for this patroller today
+    const _myEarlyTask=(D.tasks||[]).find(t=>t.patroller_id===pat.id&&t.date===today&&t.task_type==='Early Clock Out'&&t.status==='Pending');
+    const _myRejTask=(D.tasks||[]).find(t=>t.patroller_id===pat.id&&t.date===today&&t.task_type==='Early Clock Out'&&t.status==='Rejected');
+    const _earlyReason=_myEarlyTask?.description?.replace(/Early clock out request\. Reason: /i,'').split('. Att')[0]||'';
+    const _earlyLocMatch=_myEarlyTask?.description?.match(/Location: (https?:\/\/\S+)/i);
+    const _earlyLoc=_earlyLocMatch?_earlyLocMatch[1]:'';
+    if(_myEarlyTask){
+      // Pending early out — show awaiting approval state
+      clockWidget=`<div style="background:linear-gradient(135deg,#78350F,#B45309);border-radius:16px;padding:28px;text-align:center;color:#FEF3C7;margin-bottom:20px">
+        <i class="ti ti-clock-pause" style="font-size:40px;display:block;margin-bottom:10px;color:#FCD34D"></i>
+        <div style="font-size:17px;font-weight:700;margin-bottom:6px">Awaiting Early Clock-Out Approval</div>
+        <div style="font-size:13px;opacity:.75;margin-bottom:4px">Clocked in at <strong>${inTime}</strong> · Zone: <strong>${zone}</strong></div>
+        ${_earlyReason?`<div style="font-size:12px;opacity:.65;margin-bottom:6px;font-style:italic">Reason: ${_earlyReason}</div>`:''}
+        ${_earlyLoc?`<div style="margin-bottom:10px"><a href="${_earlyLoc}" target="_blank" style="color:#FCD34D;font-size:11px"><i class="ti ti-map-pin"></i> Your location at request time</a></div>`:''}
+        ${rec.clock_in_map?`<div style="margin-bottom:14px"><a href="${rec.clock_in_map}" target="_blank" style="color:#FDE68A;font-size:11px"><i class="ti ti-map-pin"></i> Clock-in location</a></div>`:''}
+        <div style="background:rgba(0,0,0,.2);border-radius:10px;padding:12px;font-size:12px;opacity:.8;margin-top:6px">
+          ⏳ Your request is being reviewed by Team Lead / Admin. Please stay at your post.
+        </div>
+      </div>`;
+    } else {
+      // Normal clocked-in state (or after rejection — show Clock Out again)
+      clockWidget=`<div style="background:linear-gradient(135deg,#14532D,#166534);border-radius:16px;padding:28px;text-align:center;color:#F0FDF4;margin-bottom:20px">
+        <div style="font-size:13px;opacity:.7;margin-bottom:6px">CLOCKED IN AT ${inTime}</div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:4px">${zone}</div>
+        ${rec.clock_in_map?`<div style="margin-bottom:6px"><a href="${rec.clock_in_map}" target="_blank" style="color:#86efac;font-size:11px"><i class="ti ti-map-pin" style="font-size:11px"></i> View clock-in location</a></div>`:''}
+        <div style="font-size:12px;opacity:.6;margin-bottom:20px">Shift: ${sh?`${fmtT(sh.start_time)} - ${fmtT(sh.end_time)}`:''}</div>
+        ${_myRejTask?`<div style="background:rgba(220,38,38,.25);border-radius:8px;padding:8px 12px;font-size:12px;color:#FCA5A5;margin-bottom:14px"><i class="ti ti-x"></i> Early clock-out request was rejected — please complete your shift.</div>`:''}
+        <button id="clock-out-btn" onclick="doClockOut()" style="background:#FF5900;color:#fff;border:none;padding:14px 36px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px" onmouseover="this.style.background='#D94D00'" onmouseout="this.style.background='#FF5900'">
+          <i class="ti ti-clock-stop" style="font-size:18px"></i> Clock Out
+        </button>
+        <div style="font-size:11px;opacity:.5;margin-top:12px">Your location will be recorded</div>
+      </div>`;
+    }
   } else {
     const inTime=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
     const outTime=new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
@@ -3600,7 +3623,7 @@ function attendanceView(){
         st=`<div>
           <span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:600;background:${_hasPendingEarly?'#FEF3C7':'#DCFCE7'};color:${_hasPendingEarly?'#D97706':'#166534'}">${_hasPendingEarly?'⏳ Early out pending':'🟢 On shift'}</span>
           <div style="font-size:9px;color:${_hasPendingEarly?'#D97706':'#166534'};margin-top:1px">${_hasPendingEarly?`Requested early out${_earlyOutTime?' at '+_earlyOutTime:''}` :'No clock-out yet'}</div>
-          ${_hasPendingEarly&&canEdit()?`<div style="margin-top:4px"><button class="edit-btn" style="background:#DCFCE7;color:#166534;border-color:#86EFAC;font-size:9px" onclick="approveEarlyOut('${earlyTask.id}')">✓ Approve early out</button> <button class="edit-btn" style="background:#FEE2E2;color:#991B1B;border-color:#FCA5A5;font-size:9px" onclick="rejectEarlyOut('${earlyTask.id}')">✗ Reject</button></div>`:''}
+          ${_hasPendingEarly&&canEdit()?`<div style="margin-top:5px;display:flex;gap:5px"><button onclick="approveEarlyOut('${earlyTask.id}')" style="background:#DCFCE7;color:#166534;border:1.5px solid #86EFAC;padding:5px 10px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-check" style="font-size:12px"></i>Approve</button><button onclick="rejectEarlyOut('${earlyTask.id}')" style="background:#FEE2E2;color:#991B1B;border:1.5px solid #FCA5A5;padding:5px 10px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-x" style="font-size:12px"></i>Reject</button></div>`:''}
         </div>`;
         rowBg=_hasPendingEarly?'rgba(217,119,6,0.05)':'rgba(22,101,52,0.03)';
       } else if(isToday2){
@@ -3625,9 +3648,14 @@ function attendanceView(){
         <td style="font-size:10px;font-family:monospace;font-weight:${rec?.clock_out?'600':'400'};color:${rec?.clock_out?'#0C447C':rec?.clock_in?'#DC2626':'var(--g3)'}">
           ${outT}${rec?.clock_in&&!rec?.clock_out&&isToday2?'<span style="font-size:8px;color:#DC2626;margin-left:3px">Missing</span>':''}${rec?.clock_out_map?`<a href="${rec.clock_out_map}" target="_blank" title="View clock-out location" style="margin-left:5px;color:#0C447C;text-decoration:none;font-size:12px"><i class="ti ti-map-pin"></i></a>`:''}
         </td>
-        <td style="font-size:10px;font-weight:600;color:${dur!=='—'?'#FF5900':'var(--g3)'}">${dur}</td>
-        <td style="font-size:9px;color:#7C3AED;max-width:120px">${earlyReason?`⚡ ${earlyReason}`:''}</td>
-        <td style="white-space:nowrap">${canEdit()?`${(rec&&(rec.clock_in||rec.status==='Attended'||rec.status?.startsWith('Absent')||rec.status?.startsWith('Early out')))?`<button class="edit-btn" style="background:var(--g1);color:var(--g4);border-color:var(--g2)" onclick="editAttendance('${p.id}','${p.name}','${ds}')" title="Edit attendance"><i class="ti ti-pencil"></i> Edit</button>`:`<button class="edit-btn" style="background:var(--green-l);color:var(--green);border-color:#86efac" onclick="markAttendance('${p.id}','${p.name}','Attended')" title="Mark attended"><i class="ti ti-check"></i></button><button class="edit-btn" style="background:var(--red-l);color:var(--red-d);border-color:#fca5a5" onclick="markAttendance('${p.id}','${p.name}','Absent')" title="Mark absent"><i class="ti ti-x"></i></button>`}`:''}</td>
+        <td style="font-size:10px;font-weight:600;color:${dur!=='—'?'#FF5900':'var(--g3)'}">
+          ${dur}${rec?.clock_in&&!rec?.clock_out?`<span style="font-size:8px;color:#16A34A;margin-left:4px;font-weight:400">(ongoing)</span>`:''}
+        </td>
+        <td style="font-size:9px;color:#7C3AED;max-width:160px">
+          ${earlyReason?`<div>⚡ ${earlyReason}</div>`:''}
+          ${(()=>{const _lm=earlyTask?.description?.match(/Location: (https?:\/\/\S+)/i);return _lm?`<a href="${_lm[1]}" target="_blank" style="color:#7C3AED;font-size:9px;text-decoration:none"><i class="ti ti-map-pin" style="font-size:10px"></i> Early-out location</a>`:''})()}
+        </td>
+        <td style="white-space:nowrap">${canEdit()?`${(rec&&(rec.clock_in||rec.status==='Attended'||rec.status?.startsWith('Absent')||rec.status?.startsWith('Early out')))?`<button onclick="editAttendance('${p.id}','${p.name}','${ds}')" title="Edit attendance" style="background:var(--g1);color:var(--g4);border:1.5px solid var(--g2);padding:5px 10px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-pencil" style="font-size:12px"></i>Edit</button>`:`<button onclick="markAttendance('${p.id}','${p.name}','Attended')" title="Mark attended" style="background:var(--green-l);color:var(--green);border:1.5px solid #86efac;padding:5px 8px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-check" style="font-size:12px"></i></button><button onclick="markAttendance('${p.id}','${p.name}','Absent')" title="Mark absent" style="background:var(--red-l);color:var(--red-d);border:1.5px solid #fca5a5;padding:5px 8px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-x" style="font-size:12px"></i></button>`}`:''}</td>
       </tr>`;
     }).join('');
     return header+rows;
@@ -4637,14 +4665,21 @@ async function submitEarlyClockOut(patId,attId,adjEndStr){
   const pat=D.patrollers.find(p=>p.id===patId);
   const now=getBahrainNow();
   const timeStr=`${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')}`;
+  // Capture geolocation at the time the patroller submits — this becomes the early-out location
+  let earlyMapUrl='';
+  try{
+    const loc=await getLocation();
+    earlyMapUrl=mapsLink(loc.lat,loc.lng);
+  }catch(e){console.warn('Could not get location for early clock out:',e.message);}
   // Use the attendance record's date (clock-in date) — handles overnight shifts correctly
   const attRec=(D.attendance||[]).find(a=>a.id===attId);
   const taskDate=attRec?.date||todayStr();
+  const desc=`Early clock out request. Reason: ${reason}. Att ID: ${attId}${earlyMapUrl?'. Location: '+earlyMapUrl:''}`;
   const{error}=await sb.from('task_requests').insert({
     patroller_id:patId,patroller_name:pat?.name||'',
     task_type:'Early Clock Out',
     date:taskDate,start_time:timeStr,end_time:adjEndStr,
-    status:'Pending',description:`Early clock out request. Reason: ${reason}. Att ID: ${attId}`,
+    status:'Pending',description:desc,
   });
   if(error){alert(error.message);return;}
   closeM();await reload();
@@ -4652,29 +4687,33 @@ async function submitEarlyClockOut(patId,attId,adjEndStr){
 }
 
 async function approveEarlyClockOut(taskId,attId){
-  // Complete the clock out — admin approves, no geolocation needed from admin side
+  // Complete the clock out — admin approves, use patroller's submitted time and location
   const now=new Date();
-  // Use the requested early out time from the task if available (more accurate than now)
   const task=D.tasks.find(x=>x.id===taskId);
+  // Use requested time (start_time = time patroller submitted the request)
   let clockOutTime=now.toISOString();
-  if(task&&task.start_time){
-    // start_time is the time the patroller requested to clock out (HH:MM)
-    // Build a proper ISO from the attendance date + that time
-    const attRec=(D.attendance||[]).find(a=>a.id===attId);
-    if(attRec&&attRec.date){
-      clockOutTime=new Date(attRec.date+'T'+task.start_time+':00+03:00').toISOString();
-    }
+  const attRec=(D.attendance||[]).find(a=>a.id===attId);
+  if(task&&task.start_time&&attRec?.date){
+    clockOutTime=new Date(attRec.date+'T'+task.start_time+':00+03:00').toISOString();
   }
-  await sb.from('attendance').update({clock_out:clockOutTime,status:'Early out - Approved'}).eq('id',attId);
+  // Extract location URL from task description if captured at request time
+  let earlyMapUrl=null;
+  if(task?.description){
+    const locMatch=(task.description).match(/Location: (https?:\/\/[^\s.]+(?:\.[^\s.]+)*(?:\?[^\s]*)?)/i);
+    if(locMatch)earlyMapUrl=locMatch[1];
+  }
+  const updatePayload={clock_out:clockOutTime,status:'Early out - Approved'};
+  if(earlyMapUrl)updatePayload.clock_out_map=earlyMapUrl;
+  await sb.from('attendance').update(updatePayload).eq('id',attId);
   await sb.from('task_requests').update({status:'Approved',reviewed_by:D.profile.id,updated_at:now.toISOString()}).eq('id',taskId);
   await reload();
-  addNotification('Early clock out approved — patroller clocked out','success');
+  addNotification('Early clock out approved — patroller shift ended','success');
 }
 
 async function rejectEarlyClockOut(taskId){
   await sb.from('task_requests').update({status:'Rejected',reviewed_by:D.profile.id,updated_at:new Date().toISOString()}).eq('id',taskId);
   await reload();
-  addNotification('Early clock out rejected — patroller must complete shift','warning');
+  addNotification('Early clock out rejected — patroller notified to complete shift','warning');
 }
 
 // Wrapper functions used from tasks table (look up attId from description)
@@ -4699,7 +4738,8 @@ async function approveEarlyOut(taskId){
 async function rejectEarlyOut(taskId){
   const t=D.tasks.find(x=>x.id===taskId);
   if(t?.patroller_id&&t?.date){
-    await sb.from('attendance').update({status:'Early out - Rejected'}).eq('patroller_id',t.patroller_id).eq('date',t.date);
+    // Reset status to Attended (keeps clock_in, removes clock_out) so Clock Out button reappears
+    await sb.from('attendance').update({status:'Attended'}).eq('patroller_id',t.patroller_id).eq('date',t.date).is('clock_out',null);
   }
   await rejectEarlyClockOut(taskId);
 }
