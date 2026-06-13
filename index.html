@@ -2135,9 +2135,9 @@ function render(){
     if(D.tab==='schedule'){D.view='week';}
     else if(D.tab==='schedule-daily'){D.view='date';}
     else if(D.tab==='schedule-hourly'){D.view='hourly';}
-    html=safeRender(()=>statBar+nav+getRunningTasks()+(D.view==='week'?weekTable(canEdit()):D.view==='hourly'?hourlyView():dateView())+notesBar(),'Schedule');
+    html=safeRender(()=>nav+getRunningTasks()+(D.view==='week'?weekTable(canEdit()):D.view==='hourly'?hourlyView():dateView())+notesBar(),'Schedule');
   }
-  else if(D.tab==='summary')html=safeRender(()=>wNav+summaryView(),'Summary');
+  else if(D.tab==='summary')html=safeRender(()=>summaryView(),'Summary');
   else if(D.tab==='timeofftask')html=safeRender(()=>timeOffTaskView(),'Time off & Tasks');
   else if(D.tab==='zonenshift'||D.tab==='zonenshift-shifts'||D.tab==='zonenshift-roles'||D.tab==='operations'||D.tab==='areas'||D.tab==='shifts'){
     if(D.tab==='zonenshift'||D.tab==='areas')D.opsSub='areas';
@@ -4792,10 +4792,10 @@ function performanceView(){
 
       return segHtml+
         '<div style="background:#0C447C;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Team performance · '+selMonth+'</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'+
-        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Team score</div><div style="font-size:22px;font-weight:500;color:#85B7EB">'+(teamAvg!==null?teamAvg+'%':'--')+'</div></div>'+
-        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Avg evaluation</div><div style="font-size:22px;font-weight:500;color:#4ADE80">'+(evalAvg!==null?evalAvg+'%':'--')+'</div></div>'+
-        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Avg coaching</div><div style="font-size:22px;font-weight:500;color:#93C5FD">'+(coachAvg!==null?coachAvg+'%':'--')+'</div></div>'+
-        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">vs last month</div><div style="font-size:22px;font-weight:500;color:#FCD34D">'+(vsLast!==null?(vsLast>0?'+'+vsLast+'%':(vsLast+'%')):'--')+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Team score</div><div style="font-size:22px;font-weight:500;color:#85B7EB">'+(teamAvgPerf?teamAvgPerf+'%':'--')+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Avg evaluation</div><div style="font-size:22px;font-weight:500;color:#4ADE80">'+(teamAvgEval?teamAvgEval+'%':'--')+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Avg coaching</div><div style="font-size:22px;font-weight:500;color:#93C5FD">'+(teamAvgCoach?teamAvgCoach+'%':'--')+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">vs last month</div><div style="font-size:22px;font-weight:500;color:#FCD34D">'+(diff!==null?(diff>0?'+'+diff+'%':(diff+'%')):'--')+'</div></div>'+
         '</div></div></div>'+
         '<div style="display:grid;grid-template-columns:repeat('+Math.min(sorted.length,4)+',1fr);gap:10px;margin-bottom:14px">'+patCards+'</div>'+
         '<div class="tcard" style="padding:14px">'+
@@ -4851,7 +4851,7 @@ function performanceView(){
       return segHtml+
         '<div style="background:#26215C;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div><div style="position:relative;z-index:1"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px">Evaluation · '+selMonth+'</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'+
         '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Best</div><div style="font-size:13px;font-weight:500;color:#C4B5FD">'+(sorted[0]?.p.name.split(' ')[0]||'--')+'</div></div>'+
-        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Team avg</div><div style="font-size:22px;font-weight:500;color:#AFA9EC">'+(evalAvg!==null?evalAvg+'%':'--')+'</div></div>'+
+        '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Team avg</div><div style="font-size:22px;font-weight:500;color:#AFA9EC">'+(teamAvgEval?teamAvgEval+'%':'--')+'</div></div>'+
         '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Evals done</div><div style="font-size:22px;font-weight:500;color:#fff">'+(D.evaluations.filter(e=>(e.month||e.eval_date?.slice(0,7))===selMonth).length)+'</div></div>'+
         '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Needs attention</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">'+(sorted.filter(d=>d.evalAvg!==null&&d.evalAvg<60).length)+'</div></div>'+
         '</div></div></div>'+
@@ -4968,12 +4968,6 @@ function performanceView(){
         '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">On time</div><div style="font-size:22px;font-weight:500;color:#4ADE80">'+(totalDone)+'</div></div>'+
         '<div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">SLA breached</div><div style="font-size:22px;font-weight:500;color:#FCA5A5">'+(totalSLA)+'</div></div>'+
         '</div></div></div>'+
-        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">'+
-          '<div style="background:var(--g1);border-radius:10px;padding:12px"><div style="font-size:10px;font-weight:600;color:var(--g3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Total cases</div><div style="font-size:20px;font-weight:700;color:#FF5900">'+filteredCases.length+'</div></div>'+
-          '<div style="background:#DCFCE7;border-radius:10px;padding:12px;border:0.5px solid #86EFAC"><div style="font-size:10px;font-weight:600;color:#166534;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">On time</div><div style="font-size:20px;font-weight:700;color:#166534">'+totalDone+'</div></div>'+
-          '<div style="background:#FEE2E2;border-radius:10px;padding:12px;border:0.5px solid #FCA5A5"><div style="font-size:10px;font-weight:600;color:#DC2626;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">SLA breached</div><div style="font-size:20px;font-weight:700;color:#DC2626">'+totalSLA+'</div></div>'+
-          '<div style="background:#FEF3C7;border-radius:10px;padding:12px;border:0.5px solid #FCD34D"><div style="font-size:10px;font-weight:600;color:#92400E;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Duplicates</div><div style="font-size:20px;font-weight:700;color:#D97706">'+totalDupe+'</div></div>'+
-        '</div>'+
         '<div class="tcard" style="padding:14px;margin-bottom:10px">'+
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
             '<div style="font-size:11px;font-weight:700;color:#411517;text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-school" style="margin-right:4px"></i>Coaching score breakdown</div>'+
