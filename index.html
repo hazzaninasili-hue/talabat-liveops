@@ -882,8 +882,9 @@ function clockedInTag(rec,sh,lateReqStatus){
   const _approved=lateReqStatus==='Approved';
   const _pending=lateReqStatus==='Pending';
   if(_approved){
-    // Show normal green tag — clock-in time displayed, shift end is original
-    return`<span style="display:inline-flex;align-items:center;gap:3px;background:#DCFCE7;color:#166534;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">🟢 In ${inT}</span>`;
+    // Show green tag + "Late approved" badge (like the Early badge for Zubair)
+    return`<span style="display:inline-flex;align-items:center;gap:3px;background:#DCFCE7;color:#166534;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">🟢 In ${inT}</span>
+<div style="margin-top:2px"><span style="display:inline-flex;align-items:center;gap:2px;background:#DCFCE7;color:#166534;font-size:8px;font-weight:700;padding:1px 5px;border-radius:4px;border:1px solid #86efac">✅ Late approved</span></div>`;
   }
   if(_pending){
     return`<span style="display:inline-flex;align-items:center;gap:3px;background:#FEF3C7;color:#B45309;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">⏳ Late pending ${inT}</span>`;
@@ -4127,7 +4128,9 @@ function hourlyView(){
   }
 
   function getTasksForDay(pid){
-    return(D.tasks||[]).filter(t=>t.patroller_id===pid&&t.date===selDay&&(t.status==='Approved'||t.status==='Running'||t.status==='Completed'));
+    // Exclude Late Clock In and Early Clock Out — these are request tasks, not patrol tasks
+    const _excludeTypes=['Late Clock In','Early Clock Out'];
+    return(D.tasks||[]).filter(t=>t.patroller_id===pid&&t.date===selDay&&!_excludeTypes.includes(t.task_type)&&(t.status==='Approved'||t.status==='Running'||t.status==='Completed'));
   }
 
   function getRunningTasksForDay(pid){
@@ -5306,8 +5309,11 @@ function liveLocationsView(){
       }catch(e){console.warn('Live location refresh failed:',e);}
     },5*60*1000); // 5 minutes
   }
-  const pts=activePats().filter(p=>getUtype(p)==='patroller');
+  // Include ALL patrollers (including vacation) — activePats() excludes vacation
+  const pts=[...activePats(),...vacationPatsToday()].filter(p=>getUtype(p)==='patroller')
+    .filter((p,i,a)=>a.findIndex(x=>x.id===p.id)===i); // deduplicate
   const today=todayStr();
+  const todayIdx=todayDayIdx();
   const todayAtt=(D.attendance||[]).filter(a=>a.date===today);
   const locLog=(D.locationLog||[]).filter(l=>l.date===today)
     .sort((a,b)=>new Date(b.logged_at)-new Date(a.logged_at));
@@ -5316,21 +5322,38 @@ function liveLocationsView(){
   const offShift=todayAtt.filter(a=>a.clock_out);
   const pendingEarly=(D.tasks||[]).filter(t=>t.date===today&&t.task_type==='Early Clock Out'&&t.status==='Pending');
   const pendingLate=(D.tasks||[]).filter(t=>t.date===today&&t.task_type==='Late Clock In'&&t.status==='Pending');
+  const onVacToday=pts.filter(p=>isOnVacationDate(p.id,today));
+  const absentToday=pts.filter(p=>isAbsentOnDate(p.id,today)&&!isOnVacationDate(p.id,today));
 
   const patRows=pts.map(p=>{
+    // Use getPatrollerShiftStatus as single source of truth (same as schedule views)
+    const ps=getPatrollerShiftStatus(p.id,todayIdx,today);
     const att=todayAtt.find(a=>a.patroller_id===p.id);
     const latestLoc=locLog.find(l=>l.patroller_id===p.id);
-    const hasEarlyPending=pendingEarly.some(t=>t.patroller_id===p.id);
-    const hasLatePending=pendingLate.some(t=>t.patroller_id===p.id);
-    const isOn=att?.clock_in&&!att?.clock_out;
-    const isDone=att?.clock_out;
     const mapLink=latestLoc?.map_url||att?.clock_in_map||null;
     const lastSeen=latestLoc?.logged_at?new Date(latestLoc.logged_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):att?.clock_in?new Date(att.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):null;
-    const statusBg=hasEarlyPending?'#FEF3C7':isOn?'#DCFCE7':isDone?'#F0F0F0':'#FEE2E2';
-    const statusCol=hasEarlyPending?'#633806':isOn?'#166534':isDone?'#666':'#991B1B';
-    const statusLabel=hasEarlyPending?'⏳ Early out pending':hasLatePending?'⏰ Late req pending':isOn?'🟢 On shift':isDone?'✓ Completed':'— Not clocked in';
+    // Map getPatrollerShiftStatus results to display — same logic as schedule
+    const _statusMap={
+      vacation:  {label:'🌴 On Vacation', bg:'#EDE9FE', col:'#5B21B6', av:'#7C3AED'},
+      absent:    {label:'✗ Absent',        bg:'#FEE2E2', col:'#991B1B', av:'#DC2626'},
+      off:       {label:'☕ Off Day',       bg:'#F4EDE3', col:'#A08070', av:'#D1C4B4'},
+      completed: {label:'✓ Completed',     bg:'#EAF1FD', col:'#1565C0', av:'#888'},
+      early_out_pending:{label:'⏳ Early out pending',bg:'#FEF3C7',col:'#633806',av:'#BA7517'},
+      clocked_in:{label:'🟢 On shift',     bg:'#DCFCE7', col:'#166534', av:'#1D9E75'},
+      late:      {label:'🔴 Late — not clocked in',bg:'#FEE2E2',col:'#991B1B',av:'#DC2626'},
+      scheduled: {label:'⏰ Not yet clocked in',bg:'#F4EDE3',col:'#A08070',av:'#D1C4B4'},
+    };
+    // Handle clocked_in sub-states (pending late request)
+    let _statusKey=ps.status;
+    if(ps.status==='clocked_in'&&ps.lateReqStatus==='Pending')_statusKey='late_pending';
+    const _lateApprovedLoc=ps.status==='clocked_in'&&ps.lateReqStatus==='Approved';
+    const _latePendingLoc=ps.status==='clocked_in'&&ps.lateReqStatus==='Pending';
+    const _sm=_statusMap[_statusKey]||_statusMap['clocked_in'];
+    const statusBg=_sm.bg;
+    const statusCol=_sm.col;
+    const statusLabel=_latePendingLoc?'⏰ Late req pending':_lateApprovedLoc?'🟢 On shift (late ✅)':_sm.label;
     const initials=(p.name||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
-    const avatarColor=isOn?'#1D9E75':isDone?'#888':hasEarlyPending?'#BA7517':'#A32D2D';
+    const avatarColor=_sm.av;
     return`<tr>
       <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;border-radius:50%;background:${avatarColor};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff">${initials}</div><div><div style="font-weight:600;font-size:12px">${p.name}</div><div style="font-size:10px;color:var(--g3)">${p.patroller_id_num||''}</div></div></div></td>
       <td style="font-size:11px;color:var(--g3)">${att?.clock_in?new Date(att.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'—'}${att?.clock_in_map?` <a href="${att.clock_in_map}" target="_blank" style="color:#185FA5;font-size:10px"><i class="ti ti-map-pin" style="font-size:11px"></i></a>`:''}</td>
@@ -5358,11 +5381,12 @@ function liveLocationsView(){
     <div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div>
     <div style="position:relative;z-index:1">
       <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px"><i class="ti ti-map-2" style="font-size:12px"></i> Live patroller locations — ${today}</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
         <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">On shift</div><div style="font-size:28px;font-weight:500;color:#4ADE80">${onShift.length}</div></div>
         <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Completed</div><div style="font-size:28px;font-weight:500;color:rgba(255,255,255,.5)">${offShift.length}</div></div>
-        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Pending early out</div><div style="font-size:28px;font-weight:500;color:#FCD34D">${pendingEarly.length}</div></div>
-        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Location pings today</div><div style="font-size:28px;font-weight:500;color:#93C5FD">${locLog.length}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">🌴 On vacation</div><div style="font-size:28px;font-weight:500;color:#C4B5FD">${onVacToday.length}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Pending requests</div><div style="font-size:28px;font-weight:500;color:#FCD34D">${pendingEarly.length+pendingLate.length}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Location pings</div><div style="font-size:28px;font-weight:500;color:#93C5FD">${locLog.length}</div></div>
       </div>
     </div>
   </div>
