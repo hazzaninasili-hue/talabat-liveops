@@ -5075,7 +5075,9 @@ async function submitLateClockInRequest(){
   const desc=`Late clock-in request. Reason: ${reason}${details?'. '+details:''}. Att ID: ${attId}. Orig end: ${origEnd}. Adj end: ${adjEnd}${mapUrl?'. Location: '+mapUrl:''}`;
   const{error}=await sb.from('task_requests').insert({
     patroller_id:patId,patroller_name:pat?.name||'',
-    task_type:'Late Clock In',date:today,start_time:timeStr,
+    task_type:'Late Clock In',date:today,
+    start_time:timeStr,
+    end_time:adjEnd||origEnd||timeStr, // shift end (adjusted or original) — required NOT NULL
     status:'Pending',description:desc
   });
   if(error){alert('Error saving request: '+error.message);return;}
