@@ -395,7 +395,7 @@ function getCurrentSaturday(){
 const BASE_DATE=getCurrentSaturday();
 const LEAVE_TYPES=['Annual Leave','Sick Leave','Sick Leave 50%','Sick Leave Unpaid','Unpaid Leave','Death'];
 
-let D={user:null,profile:null,customRoles:[],leaveBalances:[],tab:'schedule',view:'week',woff:0,search:'',modal:null,ne:false,hweek:null,
+let D={user:null,profile:null,customRoles:[],leaveBalances:[],locationLog:[],tab:'schedule',view:'week',woff:0,search:'',modal:null,ne:false,hweek:null,
   shifts:[],areas:[],zones:[],patrollers:[],schedules:[],users:[],
   notesAll:{id:null,content:''},notesPat:{id:null,content:''},notesCoo:{id:null,content:''},
   docs:[],history:[],timeoff:[],attendance:[],attDate:null,opsSub:'areas',locPerms:{},tasks:[],hourlyDay:null,
@@ -584,6 +584,7 @@ async function reloadAttendance(){
 }
 async function reloadTasks(){
   try{const{data}=await wt(sb.from('task_requests').select('*').order('created_at',{ascending:false}),4000);D.tasks=data||[];}catch(e){}
+  try{const{data:_ll}=await wt(sb.from('location_log').select('*').order('logged_at',{ascending:false}).limit(500),4000);D.locationLog=_ll||[];}catch(e){D.locationLog=[];}
 }
 async function reloadTimeoff(){
   try{const{data}=await wt(sb.from('time_off_requests').select('*').order('created_at',{ascending:false}),4000);D.timeoff=data||[];}catch(e){}
@@ -623,6 +624,7 @@ async function loadAll(){
 
   try{const{data:users}=await wt(sb.from('profiles').select('*').order('full_name'),5000);D.users=users||[];}catch(e){}
   try{const{data:tk}=await wt(sb.from('task_requests').select('*').order('created_at',{ascending:false}),5000);D.tasks=tk||[];}catch(e){D.tasks=[];}
+  try{const{data:_ll2}=await wt(sb.from('location_log').select('*').order('logged_at',{ascending:false}).limit(500),5000);D.locationLog=_ll2||[];}catch(e){D.locationLog=[];}
   try{
     const{data:lp}=await wt(sb.from('location_permissions').select('*'),5000);
     D.locPerms={};(lp||[]).forEach(r=>{D.locPerms[r.patroller_id]=r;});
@@ -2142,6 +2144,7 @@ function renderSidebar(){
     html+=item('timeoff','ti-calendar-off','Time off',(pendingTO)>0?{cls:'amber',txt:pendingTO}:null);
     html+=item('tasks','ti-checklist','Tasks',(pendingTasks)>0?{cls:'amber',txt:pendingTasks}:null);
     html+=item('overtime','ti-clock-bolt','Overtime');
+    html+=item('livelocations','ti-map-2','Live locations');
     html+=`<div class="sb-section" style="margin-top:4px">Overall performance</div>`;
     html+=item('performance','ti-chart-infographic','Scores & Incentive');
     html+=item('evaluation','ti-star','Evaluation');
@@ -2358,6 +2361,7 @@ function render(){
   else if(D.tab==='timeoff')html=safeRender(()=>timeOffView(),'Time off');
   else if(D.tab==='tasks')html=safeRender(()=>tasksView(),'Tasks');
   else if(D.tab==='overtime')html=safeRender(()=>overtimeView(),'Overtime');
+  else if(D.tab==='livelocations')html=safeRender(()=>liveLocationsView(),'Live Locations');
   else if(D.tab==='timeofftask')html=safeRender(()=>timeOffTaskView(),'Time off & Tasks');
   document.getElementById('main').innerHTML=`<div class="fade-in">${html}</div>`;
 }
@@ -2642,7 +2646,41 @@ function renderModal(){
     <div class="sec-label">Daily zone assignments <span style="font-weight:400;font-size:10px;color:var(--g3)">(optional — assign zones now or later)</span></div>
     <div class="day-grid">${dA}</div><div class="day-grid-2">${dB}</div>
     <div class="msg msg-err" id="cs-e"></div>
-    <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveCreateSchedule()"><i class="ti ti-check"></i>Create schedule</button></div>`;return;
+    <div style="border-top:1.5px dashed #AFA9EC;padding-top:13px;margin-top:4px">
+      <div style="font-size:11px;font-weight:700;color:#3C3489;margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="ti ti-beach" style="font-size:14px"></i> Annual leave <span style="font-size:10px;font-weight:400;color:#534AB7;margin-left:2px">(optional — attach to this schedule)</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+        <div class="fg" style="margin:0"><label>Leave type</label><select id="cs-leave-type" style="border-color:#AFA9EC"><option value="">— No leave —</option><option value="Annual leave">Annual leave</option><option value="Sick leave">Sick leave</option><option value="Emergency">Emergency</option><option value="Unpaid">Unpaid leave</option></select></div>
+        <div class="fg" style="margin:0"><label>Leave start</label><input type="date" id="cs-leave-start" style="border-color:#AFA9EC"></div>
+        <div class="fg" style="margin:0"><label>Leave end</label><input type="date" id="cs-leave-end" style="border-color:#AFA9EC"></div>
+      </div>
+      <div id="cs-leave-balance-info" style="display:none;background:#EEEDFE;border:0.5px solid #AFA9EC;border-radius:8px;padding:8px 12px;font-size:11px;color:#3C3489"></div>
+    </div>
+    <div class="msg msg-err" id="cs-e"></div>
+    <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="saveCreateSchedule()"><i class="ti ti-check"></i>Create schedule</button></div>`;
+    // Wire up leave balance preview
+    setTimeout(()=>{
+      const updateBalance=()=>{
+        const lt=document.getElementById('cs-leave-type')?.value;
+        const ls=document.getElementById('cs-leave-start')?.value;
+        const le=document.getElementById('cs-leave-end')?.value;
+        const uid=document.getElementById('cs-uid')?.value;
+        const info=document.getElementById('cs-leave-balance-info');
+        if(!info)return;
+        if(!lt||!ls||!le||!uid){info.style.display='none';return;}
+        const u=D.users.find(x=>x.id===uid);
+        const patName=u?u.full_name:'?';
+        const days=Math.round((new Date(le)-new Date(ls))/86400000)+1;
+        if(days<1){info.style.display='none';return;}
+        const existingPat=D.patrollers.find(p=>p.user_id===uid);
+        const lb=existingPat?D.leaveBalances.find(b=>b.patroller_id===existingPat.id):null;
+        const bal=lb?((lb.annual_carry_forward||0)+(calcAnnualAccrued(lb.join_date)||0)-(lb.annual_consumed||0)):null;
+        const balAfter=bal!==null?bal-days:null;
+        info.style.display='block';
+        info.innerHTML=`<i class="ti ti-calendar-stats" style="font-size:13px"></i> <strong>${days} days</strong> of ${lt} for ${patName}${bal!==null?' · Balance: <strong>'+Math.round(bal)+' days</strong> → <strong style="color:'+(balAfter<5?'#991B1B':'#166534')+'">'+Math.round(balAfter)+' after</strong>':' · Balance not yet set (will be linked on save)'}.`;
+      };
+      ['cs-leave-type','cs-leave-start','cs-leave-end','cs-uid'].forEach(id=>{document.getElementById(id)?.addEventListener('change',updateBalance);});
+    },100);
+    return;
   }
 
   if(m.type==='taskreq'){
@@ -2703,40 +2741,32 @@ function renderModal(){
     </div>`;return;
   }
   if(m.type==='lateAlert'){
-    const lH=Math.floor(m.lateMins/60);const lM=m.lateMins%60;
-    box.innerHTML=`<div style="text-align:center;padding:10px">
-      <div style="font-size:56px;margin-bottom:10px">⏰</div>
-      <div style="font-size:18px;font-weight:700;color:#DC2626;margin-bottom:8px">You're Late for Duty</div>
-      <div style="font-size:13px;color:#A08070;margin-bottom:20px">You clocked in <strong style="color:#DC2626">${m.lLabel}</strong> after your shift start time.</div>
-      <div style="background:#FFF0E6;border:1.5px solid #FFB380;border-radius:14px;padding:16px;margin-bottom:20px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:center">
-          <div>
-            <div style="font-size:10px;color:#A08070;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Shift Started</div>
-            <div style="font-size:22px;font-weight:700;color:#411517">${m.startTime}</div>
-          </div>
-          <div>
-            <div style="font-size:10px;color:#A08070;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">You Clocked In</div>
-            <div style="font-size:22px;font-weight:700;color:#DC2626">${m.clockInTime}</div>
-          </div>
+    box.innerHTML=`<div class="modal-title" style="color:#B45309"><i class="ti ti-clock-exclamation" style="color:#B45309"></i> Late clock-in request</div>
+      <div style="background:#FEF3C7;border:1.5px solid #FCD34D;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
+        <div style="text-align:center;min-width:56px">
+          <div style="font-size:26px;font-weight:700;color:#633806">${m.lateMins}</div>
+          <div style="font-size:9px;color:#854F0B;font-weight:600;text-transform:uppercase;letter-spacing:.04em">min late</div>
+        </div>
+        <div style="border-left:1px solid #FCD34D;padding-left:12px">
+          <div style="font-size:12px;font-weight:600;color:#633806">Scheduled start: ${m.startTime} · You clocked in: ${m.clockInTime}</div>
+          <div style="font-size:11px;color:#854F0B;margin-top:3px">Shift end stays <strong>${m.origEnd}</strong> if your request is approved.</div>
+          <div style="font-size:11px;color:#854F0B;margin-top:1px">If rejected, end time adjusts to <strong>${m.adjEnd}</strong>.</div>
         </div>
       </div>
-      <div style="background:#DCFCE7;border:1.5px solid #86EFAC;border-radius:14px;padding:16px;margin-bottom:20px">
-        <div style="font-size:11px;color:#166534;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Your shift has been adjusted</div>
-        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;text-align:center">
-          <div>
-            <div style="font-size:10px;color:#A08070;margin-bottom:2px">Original end</div>
-            <div style="font-size:18px;font-weight:700;color:#A08070;text-decoration:line-through">${m.origEnd}</div>
-          </div>
-          <div style="font-size:20px">→</div>
-          <div>
-            <div style="font-size:10px;color:#166534;margin-bottom:2px">New end time</div>
-            <div style="font-size:24px;font-weight:700;color:#166534">${m.adjEnd}</div>
-          </div>
-        </div>
-      </div>
-      <div style="font-size:11px;color:#A08070;margin-bottom:16px">Your ${lH>0?lH+'h ':''}${lM}m late arrival has been added to your shift end time.</div>
-      <button class="btn btn-primary" style="width:100%;padding:12px" onclick="closeM()">Got it</button>
-    </div>`;return;
+      <div class="fg"><label>Reason for late arrival</label><select id="late-reason" style="width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:13px">
+        <option value="Traffic / road issue">Traffic / road issue</option>
+        <option value="Vehicle problem">Vehicle problem</option>
+        <option value="Personal emergency">Personal emergency</option>
+        <option value="Public transport delay">Public transport delay</option>
+        <option value="Medical reason">Medical reason</option>
+        <option value="Other">Other</option>
+      </select></div>
+      <div class="fg"><label>Additional details <span style="font-weight:400;font-size:10px;color:#aaa">(optional)</span></label><textarea id="late-details" style="width:100%;min-height:60px;padding:8px;border:1.5px solid #e0e0e0;border-radius:8px;font-family:inherit;font-size:13px;resize:vertical" placeholder="Add any extra context..."></textarea></div>
+      <div style="font-size:10px;color:#aaa;margin-bottom:10px;display:flex;align-items:center;gap:4px"><i class="ti ti-map-pin" style="font-size:12px"></i> Your clock-in location has already been recorded with this request</div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeM();addNotification('Late noted — no request submitted','info')">Skip</button>
+        <button class="btn" style="background:#BA7517;color:#fff;border-color:#BA7517" onclick="submitLateClockInRequest('${m.patId}','${m.attId}','${m.lateMins}','${m.origEnd}','${m.adjEnd}','${m.mapUrl||''}')"><i class="ti ti-send" style="font-size:13px"></i> Submit request to TL / Admin</button>
+      </div>`;return;
   }
   if(m.type==='earlyClockOut'){
     box.innerHTML=`<div class="modal-title"><i class="ti ti-clock-stop"></i>Early Clock Out Request</div>
@@ -2927,6 +2957,22 @@ async function saveCreateSchedule(){
       shift_3:dayShifts[3]||null,shift_4:dayShifts[4]||null,shift_5:dayShifts[5]||null,shift_6:dayShifts[6]||null
     });
   }
+  // Save annual leave request if specified
+  const csLeaveType=document.getElementById('cs-leave-type')?.value;
+  const csLeaveStart=document.getElementById('cs-leave-start')?.value;
+  const csLeaveEnd=document.getElementById('cs-leave-end')?.value;
+  if(np&&csLeaveType&&csLeaveStart&&csLeaveEnd){
+    const leaveDays=Math.round((new Date(csLeaveEnd)-new Date(csLeaveStart))/86400000)+1;
+    await sb.from('time_off_requests').insert({
+      patroller_id:np.id,patroller_name:np.name,
+      leave_type:csLeaveType,start_date:csLeaveStart,end_date:csLeaveEnd,
+      days:leaveDays,status:'Pending',
+      comment:'Attached to schedule creation',
+      created_at:new Date().toISOString()
+    });
+    addNotification(`Leave request (${leaveDays}d) submitted for approval`,'info');
+  }
+
   // Email patroller about updated schedule
   try{
     const patId=document.getElementById('cs-pat')?document.getElementById('cs-pat').value:'';
@@ -3309,6 +3355,8 @@ async function doClockIn(){
       status:'Attended',updated_at:nowIso
     },{onConflict:'patroller_id,date'}).select().single();
     if(error)throw error;
+    // Log location for live map
+    sb.from('location_log').insert({patroller_id:pat.id,patroller_name:pat.name,lat:loc.lat,lng:loc.lng,map_url:mapUrl,accuracy:Math.round(loc.accuracy||0),logged_at:nowIso,date:today,type:'clock_in'}).then(()=>{});
 
     // Notify patroller if late
     if(lateMins>0&&sh){
@@ -3317,7 +3365,7 @@ async function doClockIn(){
       addNotification(`⚠️ You clocked in ${lLabel} late. Shift adjusted: ${sh.start_time} → ${adjEndTime}`,'warning');
       // Show prominent modal alert
       setTimeout(()=>{
-        openM({type:'lateAlert',lateMins,lLabel,origEnd:fmtT(sh.end_time),adjEnd:adjEndTime,startTime:fmtT(sh.start_time),clockInTime:clockInTimeStr});
+        openM({type:'lateAlert',lateMins,lLabel,origEnd:fmtT(sh.end_time),adjEnd:adjEndTime,startTime:fmtT(sh.start_time),clockInTime:clockInTimeStr,patId:pat.id,attId:data?.id||'',mapUrl});
       },500);
     } else {
       addNotification('Clocked in successfully! Have a great shift 🟢','success');
@@ -3558,6 +3606,7 @@ function myAttendanceView(){
           <i class="ti ti-clock-stop" style="font-size:18px"></i> Clock Out
         </button>
         <div style="font-size:11px;opacity:.5;margin-top:12px">Your location will be recorded</div>
+        <button onclick="shareCurrentLocation()" style="margin-top:10px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);padding:7px 18px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px"><i class="ti ti-map-pin" style="font-size:13px"></i> Share my location now</button>
       </div>`;
     }
   } else {
@@ -3675,6 +3724,7 @@ function attendanceView(){
           <span style="display:inline-block;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:600;background:${_hasPendingEarly?'#FEF3C7':'#DCFCE7'};color:${_hasPendingEarly?'#D97706':'#166534'}">${_hasPendingEarly?'⏳ Early out pending':'🟢 On shift'}</span>
           <div style="font-size:9px;color:${_hasPendingEarly?'#D97706':'#166534'};margin-top:1px">${_hasPendingEarly?`Requested early out${_earlyOutTime?' at '+_earlyOutTime:''}` :'No clock-out yet'}</div>
           ${_hasPendingEarly&&canEdit()?`<div style="margin-top:5px;display:flex;gap:5px"><button onclick="approveEarlyOut('${earlyTask.id}')" style="background:#DCFCE7;color:#166534;border:1.5px solid #86EFAC;padding:5px 10px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-check" style="font-size:12px"></i>Approve</button><button onclick="rejectEarlyOut('${earlyTask.id}')" style="background:#FEE2E2;color:#991B1B;border:1.5px solid #FCA5A5;padding:5px 10px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-x" style="font-size:12px"></i>Reject</button></div>`:''}
+          ${(()=>{const _lateTask=(D.tasks||[]).find(t=>t.patroller_id===p.id&&t.date===ds&&t.task_type==='Late Clock In'&&t.status==='Pending');return _lateTask&&canEdit()?`<div style="margin-top:5px;display:flex;gap:5px"><span style="font-size:9px;font-weight:600;color:#B45309;background:#FEF3C7;padding:3px 7px;border-radius:5px;display:flex;align-items:center;gap:3px"><i class="ti ti-clock-exclamation" style="font-size:11px"></i>Late req pending</span><button onclick="approveLateClockIn('${_lateTask.id}')" style="background:#DCFCE7;color:#166534;border:1.5px solid #86EFAC;padding:5px 10px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-check" style="font-size:12px"></i>Approve</button><button onclick="rejectLateClockIn('${_lateTask.id}')" style="background:#FEE2E2;color:#991B1B;border:1.5px solid #FCA5A5;padding:5px 10px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-x" style="font-size:12px"></i>Reject</button></div>`:'';})()}
         </div>`;
         rowBg=_hasPendingEarly?'rgba(217,119,6,0.05)':'rgba(22,101,52,0.03)';
       } else if(isToday2){
@@ -4866,6 +4916,181 @@ function myLeaveBalanceView(){
   const p = D.patrollers.find(pt => pt.user_id === D.profile.id);
   if(!p) return `<div style="padding:40px;text-align:center;color:var(--g3)">Your account is not linked to a schedule record.</div>`;
   return `<div style="max-width:480px;margin:0 auto">${leaveBalanceCard(p, true)}</div>`;
+}
+
+// ── LATE CLOCK IN REQUEST ──
+async function submitLateClockInRequest(patId,attId,lateMins,origEnd,adjEnd,mapUrl){
+  const reason=document.getElementById('late-reason')?.value||'Late arrival';
+  const details=document.getElementById('late-details')?.value||'';
+  const pat=D.patrollers.find(p=>p.id===patId);
+  const now=getBahrainNow();
+  const timeStr=`${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')}`;
+  const today=todayStr();
+  const desc=`Late clock-in request. Reason: ${reason}${details?'. '+details:''}. Att ID: ${attId}. Orig end: ${origEnd}. Adj end: ${adjEnd}${mapUrl?'. Location: '+mapUrl:''}`;
+  const{error}=await sb.from('task_requests').insert({
+    patroller_id:patId,patroller_name:pat?.name||'',
+    task_type:'Late Clock In',date:today,start_time:timeStr,
+    status:'Pending',description:desc
+  });
+  if(error){alert('Error: '+error.message);return;}
+  closeM();await reload();
+  addNotification('Late clock-in request submitted — awaiting TL/Admin review','info');
+}
+
+async function approveLateClockIn(taskId){
+  const t=D.tasks.find(x=>x.id===taskId);
+  if(!t)return;
+  // Approved: shift end stays original — extract from description
+  const origEndMatch=(t.description||'').match(/Orig end: ([0-9]{2}:[0-9]{2})/);
+  const origEnd=origEndMatch?origEndMatch[1]:null;
+  const attIdMatch=(t.description||'').match(/Att ID: ([0-9a-f-]{32,36})/i);
+  const attId=attIdMatch?attIdMatch[1]:null;
+  const now=new Date().toISOString();
+  if(attId&&origEnd){
+    await sb.from('attendance').update({adj_end_time:origEnd,late_request_status:'Approved',status:'Attended'}).eq('id',attId);
+  } else if(t.patroller_id&&t.date){
+    await sb.from('attendance').update({late_request_status:'Approved'}).eq('patroller_id',t.patroller_id).eq('date',t.date);
+  }
+  await sb.from('task_requests').update({status:'Approved',reviewed_by:D.profile.id,updated_at:now}).eq('id',taskId);
+  await reload();
+  addNotification('Late clock-in approved — shift end unchanged','success');
+}
+
+async function rejectLateClockIn(taskId){
+  const t=D.tasks.find(x=>x.id===taskId);
+  if(!t)return;
+  // Rejected: overwrite start time with actual clock-in; keep adj_end_time (shorter shift)
+  const adjEndMatch=(t.description||'').match(/Adj end: ([0-9]{2}:[0-9]{2})/);
+  const adjEnd=adjEndMatch?adjEndMatch[1]:null;
+  const attIdMatch=(t.description||'').match(/Att ID: ([0-9a-f-]{32,36})/i);
+  const attId=attIdMatch?attIdMatch[1]:null;
+  const now=new Date().toISOString();
+  if(attId){
+    const updateObj={late_request_status:'Rejected'};
+    if(adjEnd)updateObj.adj_end_time=adjEnd;
+    await sb.from('attendance').update(updateObj).eq('id',attId);
+  } else if(t.patroller_id&&t.date){
+    const updateObj={late_request_status:'Rejected'};
+    if(adjEnd)updateObj.adj_end_time=adjEnd;
+    await sb.from('attendance').update(updateObj).eq('patroller_id',t.patroller_id).eq('date',t.date);
+  }
+  await sb.from('task_requests').update({status:'Rejected',reviewed_by:D.profile.id,updated_at:now}).eq('id',taskId);
+  await reload();
+  addNotification('Late clock-in rejected — schedule adjusted to actual clock-in time','warning');
+}
+
+// ── SHARE CURRENT LOCATION (patroller - manual push) ──
+async function shareCurrentLocation(){
+  const btn=event?.target;
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader" style="animation:spin .7s linear infinite"></i> Getting location...';}
+  try{
+    const loc=await getLocation();
+    const pat=D.patrollers.find(p=>p.user_id===D.profile.id);
+    if(!pat)throw new Error('No schedule found');
+    const now=new Date().toISOString();
+    const mapUrl=mapsLink(loc.lat,loc.lng);
+    await sb.from('location_log').insert({
+      patroller_id:pat.id,patroller_name:pat.name,
+      lat:loc.lat,lng:loc.lng,map_url:mapUrl,
+      accuracy:Math.round(loc.accuracy||0),
+      logged_at:now,date:todayStr(),type:'manual'
+    });
+    addNotification('Location shared with admin','success');
+    if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-map-pin"></i> Share my location now';}
+  }catch(e){
+    if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-map-pin"></i> Share my location now';}
+    alert('Could not get location: '+e.message);
+  }
+}
+
+// ── LIVE LOCATIONS VIEW ──
+function liveLocationsView(){
+  const pts=activePats().filter(p=>getUtype(p)==='patroller');
+  const today=todayStr();
+  const todayAtt=(D.attendance||[]).filter(a=>a.date===today);
+  const locLog=(D.locationLog||[]).filter(l=>l.date===today)
+    .sort((a,b)=>new Date(b.logged_at)-new Date(a.logged_at));
+
+  const onShift=todayAtt.filter(a=>a.clock_in&&!a.clock_out);
+  const offShift=todayAtt.filter(a=>a.clock_out);
+  const pendingEarly=(D.tasks||[]).filter(t=>t.date===today&&t.task_type==='Early Clock Out'&&t.status==='Pending');
+  const pendingLate=(D.tasks||[]).filter(t=>t.date===today&&t.task_type==='Late Clock In'&&t.status==='Pending');
+
+  const patRows=pts.map(p=>{
+    const att=todayAtt.find(a=>a.patroller_id===p.id);
+    const latestLoc=locLog.find(l=>l.patroller_id===p.id);
+    const hasEarlyPending=pendingEarly.some(t=>t.patroller_id===p.id);
+    const hasLatePending=pendingLate.some(t=>t.patroller_id===p.id);
+    const isOn=att?.clock_in&&!att?.clock_out;
+    const isDone=att?.clock_out;
+    const mapLink=latestLoc?.map_url||att?.clock_in_map||null;
+    const lastSeen=latestLoc?.logged_at?new Date(latestLoc.logged_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):att?.clock_in?new Date(att.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):null;
+    const statusBg=hasEarlyPending?'#FEF3C7':isOn?'#DCFCE7':isDone?'#F0F0F0':'#FEE2E2';
+    const statusCol=hasEarlyPending?'#633806':isOn?'#166534':isDone?'#666':'#991B1B';
+    const statusLabel=hasEarlyPending?'⏳ Early out pending':hasLatePending?'⏰ Late req pending':isOn?'🟢 On shift':isDone?'✓ Completed':'— Not clocked in';
+    const initials=(p.name||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+    const avatarColor=isOn?'#1D9E75':isDone?'#888':hasEarlyPending?'#BA7517':'#A32D2D';
+    return`<tr>
+      <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;border-radius:50%;background:${avatarColor};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff">${initials}</div><div><div style="font-weight:600;font-size:12px">${p.name}</div><div style="font-size:10px;color:var(--g3)">${p.patroller_id_num||''}</div></div></div></td>
+      <td style="font-size:11px;color:var(--g3)">${att?.clock_in?new Date(att.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'—'}${att?.clock_in_map?` <a href="${att.clock_in_map}" target="_blank" style="color:#185FA5;font-size:10px"><i class="ti ti-map-pin" style="font-size:11px"></i></a>`:''}</td>
+      <td style="font-size:11px;color:var(--g3)">${att?.clock_out?new Date(att.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'—'}${att?.clock_out_map?` <a href="${att.clock_out_map}" target="_blank" style="color:#185FA5;font-size:10px"><i class="ti ti-map-pin" style="font-size:11px"></i></a>`:''}</td>
+      <td><span style="font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;background:${statusBg};color:${statusCol}">${statusLabel}</span></td>
+      <td style="font-size:11px">${lastSeen?lastSeen+'<span style="font-size:9px;color:var(--g3);margin-left:3px">'+(latestLoc?'manual':'clock-in')+'</span>':'—'}</td>
+      <td>${mapLink?`<a href="${mapLink}" target="_blank" style="font-size:10px;color:#185FA5;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-map-pin" style="font-size:12px"></i> View</a>`:'—'}</td>
+    </tr>`;
+  }).join('');
+
+  const logRows=locLog.slice(0,50).map(l=>{
+    const pat=pts.find(p=>p.id===l.patroller_id);
+    const t=new Date(l.logged_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
+    return`<tr>
+      <td style="font-family:monospace;font-size:10px">${t}</td>
+      <td style="font-weight:600;font-size:12px">${pat?.name||l.patroller_name||'—'}</td>
+      <td style="font-size:10px;color:var(--g3)">${l.type||'manual'}</td>
+      <td style="font-size:10px;color:var(--g3)">${l.accuracy?'±'+l.accuracy+'m':'—'}</td>
+      <td>${l.map_url?`<a href="${l.map_url}" target="_blank" style="font-size:10px;color:#185FA5;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-map-pin" style="font-size:12px"></i> Map</a>`:'—'}</td>
+    </tr>`;
+  }).join('');
+
+  return`
+  <div style="background:#042C53;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden">
+    <div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div>
+    <div style="position:relative;z-index:1">
+      <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.55;margin-bottom:9px"><i class="ti ti-map-2" style="font-size:12px"></i> Live patroller locations — ${today}</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">On shift</div><div style="font-size:28px;font-weight:500;color:#4ADE80">${onShift.length}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Completed</div><div style="font-size:28px;font-weight:500;color:rgba(255,255,255,.5)">${offShift.length}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Pending early out</div><div style="font-size:28px;font-weight:500;color:#FCD34D">${pendingEarly.length}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Location pings today</div><div style="font-size:28px;font-weight:500;color:#93C5FD">${locLog.length}</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="background:#E6F1FB;border:1px solid #B5D4F4;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:11px;color:#0C447C;display:flex;align-items:center;gap:8px">
+    <i class="ti ti-info-circle" style="font-size:14px;flex-shrink:0"></i>
+    <span>Locations captured at clock-in, clock-out, early clock-out request, and when patrollers tap <strong>"Share my location now"</strong> in the patroller app. Pins link to Google Maps.</span>
+  </div>
+
+  <div class="tcard" style="margin-bottom:12px">
+    <div style="padding:10px 14px;border-bottom:0.5px solid var(--g2);font-size:11px;font-weight:700;color:var(--g4);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;justify-content:space-between">
+      <span><i class="ti ti-users" style="font-size:13px;margin-right:4px"></i> All patrollers — today</span>
+      <button class="btn" style="font-size:10px;padding:4px 10px" onclick="reload()"><i class="ti ti-refresh" style="font-size:11px"></i> Refresh</button>
+    </div>
+    <div class="t-scroll">
+      <table style="min-width:600px"><thead><tr>
+        <th class="lt">Patroller</th><th>Clock in</th><th>Clock out</th><th>Status</th><th>Last seen</th><th>Location</th>
+      </tr></thead><tbody>${patRows||'<tr><td colspan="6" style="padding:30px;text-align:center;color:var(--g3)">No patrollers scheduled today</td></tr>'}</tbody></table>
+    </div>
+  </div>
+
+  <div class="tcard">
+    <div style="padding:10px 14px;border-bottom:0.5px solid var(--g2);font-size:11px;font-weight:700;color:var(--g4);text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-map-pin" style="font-size:13px;margin-right:4px"></i> Location log — today (latest 50)</div>
+    <div class="t-scroll">
+      <table><thead><tr><th style="font-size:9px">Time</th><th class="lt" style="font-size:9px">Patroller</th><th style="font-size:9px">Type</th><th style="font-size:9px">Accuracy</th><th style="font-size:9px">Location</th></tr></thead>
+      <tbody>${logRows||'<tr><td colspan="5" style="padding:30px;text-align:center;color:var(--g3)">No location pings yet today.<br><span style="font-size:10px">Pings appear when patrollers clock in/out or tap "Share my location now"</span></td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>`;
 }
 
 // ── EARLY CLOCK OUT ──
