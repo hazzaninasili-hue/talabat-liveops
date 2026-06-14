@@ -847,15 +847,27 @@ function getPatrollerShiftStatus(pid,dayIdx,dateStr){
   const isToday=dateStr===todayStr();
   if(rec&&rec.clock_out)return{status:'completed',rec,sh,lateMins:rec.late_mins||0,adjEndTime:rec.adj_end_time||null};
   if(rec&&rec.clock_in&&!rec.clock_out){
-    // task.date = clock-in date (attendance date), always exact match
     const earlyReq=(D.tasks||[]).find(t=>t.patroller_id===pid&&t.date===dateStr&&t.task_type==='Early Clock Out'&&t.status==='Pending');
     if(earlyReq)return{status:'early_out_pending',rec,sh,earlyReq};
-    return{status:'clocked_in',rec,sh,lateMins:rec.late_mins||0,adjEndTime:rec.adj_end_time||null};
+    // Check late clock-in request status
+    const lateReq=(D.tasks||[]).find(t=>t.patroller_id===pid&&t.date===dateStr&&t.task_type==='Late Clock In');
+    const lateReqStatus=lateReq?.status||null;
+    // If approved: treat as on-time (no late display)
+    if(lateReqStatus==='Approved')return{status:'clocked_in',rec,sh,lateMins:0,adjEndTime:null,lateReqStatus:'Approved'};
+    // If pending: show pending state
+    if(lateReqStatus==='Pending')return{status:'clocked_in',rec,sh,lateMins:0,adjEndTime:null,lateReqStatus:'Pending'};
+    // If rejected or no request: normal (may show late mins)
+    return{status:'clocked_in',rec,sh,lateMins:lateReqStatus==='Rejected'?rec.late_mins||0:rec.late_mins||0,adjEndTime:lateReqStatus==='Rejected'?null:rec.adj_end_time||null,lateReqStatus};
   }
   if(isToday&&sh){
     const nowMins=getBahrainMinutes();
     const startMins=getShiftStartMins(sh);
-    if(startMins!==null&&nowMins>startMins)return{status:'late',lateMins:nowMins-startMins,sh,z};
+    // Only show 'late' if they haven't clocked in yet (rec is null or no clock_in)
+    if(startMins!==null&&nowMins>startMins){
+      // Check if there's a late request already submitted (they clocked in but rec not loaded yet)
+      const lateReqExists=(D.tasks||[]).some(t=>t.patroller_id===pid&&t.date===dateStr&&t.task_type==='Late Clock In');
+      if(!lateReqExists)return{status:'late',lateMins:nowMins-startMins,sh,z};
+    }
   }
   return{status:'scheduled',sh,z};
 }
@@ -864,9 +876,19 @@ function lateTag(lateMins){
   const label=h>0?`${h}h ${m}m late`:`${m}m late`;
   return`<span style="display:inline-flex;align-items:center;gap:3px;background:#FEE2E2;color:#DC2626;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;animation:pulse 2s infinite">🔴 ${label}</span>`;
 }
-function clockedInTag(rec,sh){
+function clockedInTag(rec,sh,lateReqStatus){
   const inT=rec.clock_in?new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
-  // Use stored adj_end_time from DB, fallback to calculation
+  // If late request is approved or pending: show original shift end, no adjustment
+  const _approved=lateReqStatus==='Approved';
+  const _pending=lateReqStatus==='Pending';
+  if(_approved){
+    // Show normal green tag — clock-in time displayed, shift end is original
+    return`<span style="display:inline-flex;align-items:center;gap:3px;background:#DCFCE7;color:#166534;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">🟢 In ${inT}</span>`;
+  }
+  if(_pending){
+    return`<span style="display:inline-flex;align-items:center;gap:3px;background:#FEF3C7;color:#B45309;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">⏳ Late pending ${inT}</span>`;
+  }
+  // Normal: show adj end if applicable
   let adjEndStr=rec.adj_end_time||null;
   if(!adjEndStr&&sh&&rec.late_mins>0){
     const adjEnd=getShiftEndMins(sh)+(rec.late_mins||0);
@@ -875,16 +897,23 @@ function clockedInTag(rec,sh){
   const endTag=adjEndStr&&rec.late_mins>0?`<span style="font-size:8px;color:#D97706;font-weight:700"> →${adjEndStr}</span>`:'';
   return`<span style="display:inline-flex;align-items:center;gap:3px;background:#DCFCE7;color:#166534;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">🟢 ${inT}${endTag}</span>`;
 }
-function completedTag(rec,sh){
+function completedTag(rec,sh,pid,dateStr){
   const inT=rec.clock_in?new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
   const outT=rec.clock_out?new Date(rec.clock_out).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'--';
   const mins=rec.clock_in&&rec.clock_out?Math.round((new Date(rec.clock_out)-new Date(rec.clock_in))/60000):0;
   const dur=`${Math.floor(mins/60)}h${mins%60}m`;
-  // Show late indicator if clocked in late
-  const clockInMins=parseInt(inT.split(':')[0])*60+parseInt(inT.split(':')[1]);
-  const startMins=sh?getShiftStartMins(sh):null;
-  const lateMins=startMins!==null?Math.max(0,clockInMins-startMins):0;
-  const lateTag2=lateMins>0?`<span style="background:#DC2626;color:#fff;font-size:7px;padding:1px 3px;border-radius:2px;margin-left:2px">+${lateMins}m late</span>`:'';
+  // Only show late indicator if NOT approved
+  const _lateTask=pid&&dateStr?(D.tasks||[]).find(t=>t.patroller_id===pid&&t.date===dateStr&&t.task_type==='Late Clock In'):null;
+  const _lateApproved=_lateTask?.status==='Approved';
+  let lateTag2='';
+  if(!_lateApproved){
+    const clockInMins=parseInt(inT.split(':')[0])*60+parseInt(inT.split(':')[1]);
+    const startMins=sh?getShiftStartMins(sh):null;
+    const lateMins=startMins!==null?Math.max(0,clockInMins-startMins):0;
+    lateTag2=lateMins>0?`<span style="background:#DC2626;color:#fff;font-size:7px;padding:1px 3px;border-radius:2px;margin-left:2px">+${lateMins}m late</span>`:'';
+  } else {
+    lateTag2=`<span style="background:#166534;color:#fff;font-size:7px;padding:1px 3px;border-radius:2px;margin-left:2px">✅ late approved</span>`;
+  }
   return`<span style="display:inline-flex;align-items:center;gap:3px;background:#EAF1FD;color:#1565C0;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">✓ ${inT}→${outT} ${dur}${lateTag2}</span>`;
 }
 
@@ -1017,8 +1046,8 @@ function weekTable(ed){
         const ps=getPatrollerShiftStatus(p.id,i,dayStr);
         let statusTag='';
         if(ps.status==='late')statusTag=`<div style="margin-top:2px">${lateTag(ps.lateMins)}</div>`;
-        else if(ps.status==='clocked_in')statusTag=`<div style="margin-top:2px">${clockedInTag(ps.rec,ps.sh)}</div>`;
-        else if(ps.status==='completed')statusTag=`<div style="margin-top:2px">${completedTag(ps.rec,ps.sh)}</div>`;
+        else if(ps.status==='clocked_in')statusTag=`<div style="margin-top:2px">${clockedInTag(ps.rec,ps.sh,ps.lateReqStatus)}</div>`;
+        else if(ps.status==='completed')statusTag=`<div style="margin-top:2px">${completedTag(ps.rec,ps.sh,p.id,dayStr)}</div>`;
         else if(ps.status==='early_out_pending')statusTag=`<div style="margin-top:2px"><span style="font-size:9px;font-weight:700;background:#FEF3C7;color:#D97706;padding:2px 6px;border-radius:4px">⏳ Early out pending</span></div>`;
         const shTag=sh?`<div style="font-size:8px;color:var(--g3);margin-top:1px">${sh.shift_type==='morning'?'☀️':'🌙'} ${fmtT(sh.start_time)}-${fmtT(sh.end_time)}</div>`:'';
         row+=ed?`<td><span class="zone-chip clickable" onclick="openCell('${p.id}',${i})" title="${z}">${s}</span>${shTag}${statusTag}</td>`:`<td><span class="zone-chip" title="${z}">${s}</span>${shTag}${statusTag}</td>`;
@@ -4066,10 +4095,27 @@ function hourlyView(){
       const inT=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
       const[ih,im]=inT.split(':').map(Number);
       const actualStartH=ih+im/60;
-      const actualEndH=actualStartH+plannedDurH;
-      // early_mins: how many mins before planned start (positive = early)
       const earlyMins=Math.max(0,Math.round((plannedStartH-actualStartH)*60));
       const lateMins=Math.max(0,Math.round((actualStartH-plannedStartH)*60));
+      // Check late request status — if approved, bar uses PLANNED times (no shift of bar)
+      const _lateTask=(D.tasks||[]).find(t=>t.patroller_id===p.id&&t.date===selDay&&t.task_type==='Late Clock In');
+      const _lateApproved=_lateTask?.status==='Approved';
+      const _latePending=_lateTask?.status==='Pending';
+      if(_lateApproved){
+        // Approved: bar starts at PLANNED start, ends at PLANNED end. Clock-in time shown as note only.
+        return{start:plannedStartH,end:plannedStartH+plannedDurH,plannedStart:plannedStartH,
+          type:sh.shift_type,name:sh.name,adjEnd:null,lateMins:0,earlyMins:0,
+          actualIn:inT,lateApproved:true};
+      }
+      if(_latePending){
+        // Pending: show actual clock-in start but flag as pending
+        const actualEndH=actualStartH+plannedDurH;
+        return{start:actualStartH,end:actualEndH,plannedStart:plannedStartH,
+          type:sh.shift_type,name:sh.name,adjEnd:null,lateMins,earlyMins:0,
+          actualIn:inT,latePending:true};
+      }
+      // Normal (no late request, or rejected): shift bar starts at actual clock-in
+      const actualEndH=actualStartH+plannedDurH;
       return{start:actualStartH,end:actualEndH,plannedStart:plannedStartH,type:sh.shift_type,name:sh.name,adjEnd:rec.adj_end_time||null,lateMins,earlyMins};
     }
     // Not yet clocked in — use planned times + adj_end if any
@@ -4125,31 +4171,40 @@ function hourlyView(){
         } else if(ps.status==='clocked_in'){
           bg='#DCFCE7';col='#166534';border='2px solid #16A34A';
           const inT=new Date(ps.rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
-          // Calculate actual end time = clock_in + planned shift duration
-          const[ih2,im2]=inT.split(':').map(Number);
-          const actualStartMins=ih2*60+im2;
-          const sh2=getDayShift(p.id,selIdx);
-          let shDurMins=0;
-          if(sh2&&sh2.start_time&&sh2.end_time){
-            const[psh2,psm2]=sh2.start_time.split(':').map(Number);
-            const[peh2,pem2]=sh2.end_time.split(':').map(Number);
-            let pStartM=psh2*60+psm2;let pEndM=peh2*60+pem2;
-            if(pEndM<=pStartM)pEndM+=24*60;
-            shDurMins=pEndM-pStartM;
-          }
-          const adjEndMins=actualStartMins+shDurMins;
-          const adjEndStr=`${String(Math.floor(adjEndMins/60)%24).padStart(2,'0')}:${String(adjEndMins%60).padStart(2,'0')}`;
-          const adjEndFmt=fmtT(adjEndStr);
-          // Show early badge if clocked in before planned start
           const earlyLabel=sh.earlyMins>0?`<span style="background:#7C3AED;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px">⚡ ${sh.earlyMins}m early</span>`:'';
-          // Show late dashed overlay if late (bar already shifted so overlay is from planned start to actual start — not needed now bar starts at clock-in)
-          if(ps.rec.late_mins>0){
-            // Ghost bar showing planned start window
+          if(sh.lateApproved){
+            // APPROVED: bar is at planned times. Show clock-in time + approved badge. No shift.
+            statusOverlay=`<span style="background:#166534;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px">🟢 In ${inT}</span><span style="background:#166534;color:#D4EDDA;font-size:7px;padding:1px 4px;border-radius:3px;margin-left:3px">✅ late approved</span>`;
+          } else if(sh.latePending){
+            bg='#FEF3C7';col='#B45309';border='2px solid #D97706';
+            // Show ghost from planned start to actual start
             const ghostLeft=sh.plannedStart*hourW;
             const ghostWidth=(sh.start-sh.plannedStart)*hourW;
             if(ghostWidth>0)bars+=`<div style="position:absolute;left:${ghostLeft}px;width:${ghostWidth}px;top:4px;bottom:4px;background:#FEE2E2;border:1.5px dashed #DC2626;border-radius:6px 0 0 6px;display:flex;align-items:center;justify-content:center;z-index:3"><span style="font-size:7px;color:#DC2626;font-weight:700">Late</span></div>`;
+            statusOverlay=`<span style="background:#B45309;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px">⏳ ${inT} late — pending</span>`;
+          } else {
+            // Normal or rejected — show actual start→calculated end
+            const[ih2,im2]=inT.split(':').map(Number);
+            const actualStartMins=ih2*60+im2;
+            const sh2=getDayShift(p.id,selIdx);
+            let shDurMins=0;
+            if(sh2&&sh2.start_time&&sh2.end_time){
+              const[psh2,psm2]=sh2.start_time.split(':').map(Number);
+              const[peh2,pem2]=sh2.end_time.split(':').map(Number);
+              let pStartM=psh2*60+psm2;let pEndM=peh2*60+pem2;
+              if(pEndM<=pStartM)pEndM+=24*60;
+              shDurMins=pEndM-pStartM;
+            }
+            const adjEndMins=actualStartMins+shDurMins;
+            const adjEndStr=`${String(Math.floor(adjEndMins/60)%24).padStart(2,'0')}:${String(adjEndMins%60).padStart(2,'0')}`;
+            const adjEndFmt=fmtT(adjEndStr);
+            if(ps.rec.late_mins>0||sh.lateMins>0){
+              const ghostLeft=sh.plannedStart*hourW;
+              const ghostWidth=(sh.start-sh.plannedStart)*hourW;
+              if(ghostWidth>0)bars+=`<div style="position:absolute;left:${ghostLeft}px;width:${ghostWidth}px;top:4px;bottom:4px;background:#FEE2E2;border:1.5px dashed #DC2626;border-radius:6px 0 0 6px;display:flex;align-items:center;justify-content:center;z-index:3"><span style="font-size:7px;color:#DC2626;font-weight:700">Late</span></div>`;
+            }
+            statusOverlay=`<span style="background:#166534;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px">🟢 ${inT}→${adjEndFmt}</span>${earlyLabel}`;
           }
-          statusOverlay=`<span style="background:#166534;color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px">🟢 ${inT}→${adjEndFmt}</span>${earlyLabel}`;
         } else if(ps.status==='completed'){
           bg='#EAF1FD';col='#1565C0';border='1.5px solid #1565C0';
           const inT=new Date(ps.rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
