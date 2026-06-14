@@ -802,16 +802,20 @@ function getEffectiveEndTime(patId, sh, dateStr){
   if(!sh||!sh.end_time)return null;
   dateStr=dateStr||todayStr();
   const rec=getAttRecordForDate(patId,dateStr);
-  // Use stored adj_end_time if available
+  // If late request was approved — return original shift end, no adjustment
+  if(rec&&rec.late_request_status==='Approved')return sh.end_time;
+  // Use stored adj_end_time if available and there are actual late_mins recorded
   if(rec&&rec.adj_end_time&&(rec.late_mins||0)>0)return rec.adj_end_time;
-  // Fallback: calculate from clock_in time vs shift start
-  if(rec&&rec.clock_in){
+  // Fallback: calculate from clock_in time vs shift start ONLY if no approved request
+  if(rec&&rec.clock_in&&rec.late_request_status!=='Approved'){
     const inT=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
     const clockInMins=parseInt(inT.split(':')[0])*60+parseInt(inT.split(':')[1]);
     const startMins=getShiftStartMins(sh);
     if(startMins!==null){
       const lateMins=Math.max(0,clockInMins-startMins);
-      if(lateMins>0){
+      // Only apply if there's no pending/decided request (no request = old behaviour)
+      const hasLateReq=D.tasks&&D.tasks.some(t=>t.patroller_id===patId&&t.date===dateStr&&t.task_type==='Late Clock In');
+      if(lateMins>0&&!hasLateReq){
         const adjEnd=getShiftEndMins(sh)+lateMins;
         return`${String(Math.floor(adjEnd/60)%24).padStart(2,'0')}:${String(adjEnd%60).padStart(2,'0')}`;
       }
@@ -2084,16 +2088,29 @@ function mySchedView(){
       </div>`;
     } else if(rec.clock_in&&!rec.clock_out){
       const inTime=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
-      // Calculate late mins live from clock_in vs shift start (works even without DB columns)
+      // Check late request status from DB — if approved, treat as on-time for display
+      const _lateReqStatus=rec.late_request_status||null;
+      const _lateApprovedDB=_lateReqStatus==='Approved';
+      const _lateRejectedDB=_lateReqStatus==='Rejected';
+      const _latePendingDB=_lateReqStatus===null&&(()=>{
+        const myPatId2=D.patrollers.find(p=>p.user_id===D.profile?.id)?.id;
+        return !!(D.tasks||[]).find(t=>t.patroller_id===myPatId2&&t.date===todayStr()&&t.task_type==='Late Clock In'&&t.status==='Pending');
+      })();
+      // Only calculate & show late if NOT approved
       const clockInMins2=parseInt(inTime.split(':')[0])*60+parseInt(inTime.split(':')[1]);
       const shStartMins2=shNow?getShiftStartMins(shNow):null;
-      const lateMinsRec=shStartMins2!==null?Math.max(0,clockInMins2-shStartMins2):0;
-      const adjEndMins2=shNow?getShiftEndMins(shNow)+lateMinsRec:null;
-      const adjEnd=adjEndMins2!==null&&lateMinsRec>0?`${String(Math.floor(adjEndMins2/60)%24).padStart(2,'0')}:${String(adjEndMins2%60).padStart(2,'0')}`:(rec.adj_end_time||null);
-      const lateH=Math.floor(lateMinsRec/60);const lateM=lateMinsRec%60;
+      const rawLateMins=shStartMins2!==null?Math.max(0,clockInMins2-shStartMins2):0;
+      // If approved: lateMinsRec=0, adjEnd=original end. If pending/rejected: show actual late
+      const lateMinsRec=_lateApprovedDB?0:rawLateMins;
+      const adjEnd=_lateApprovedDB?(rec.adj_end_time||null):
+        (rawLateMins>0&&shNow?`${String(Math.floor((getShiftEndMins(shNow)+rawLateMins)/60)%24).padStart(2,'0')}:${String((getShiftEndMins(shNow)+rawLateMins)%60).padStart(2,'0')}`:(rec.adj_end_time||null));
+      const lateH=Math.floor(rawLateMins/60);const lateM=rawLateMins%60;
       const lateLabel=lateH>0?`${lateH}h ${lateM}m`:`${lateM}m`;
-      const lateBadge=lateMinsRec>0?`<div style="background:rgba(220,38,38,.2);border:1px solid rgba(220,38,38,.4);border-radius:10px;padding:8px 14px;margin-bottom:12px;font-size:12px;color:#FCA5A5">
-        ⚠️ You were <strong>${lateLabel} late</strong> · Shift end adjusted: <span style="text-decoration:line-through;opacity:.7">${fmtT(shNow?.end_time)}</span> → <strong style="color:#4ADE80">${adjEnd||'--'}</strong>
+      // Badge: only show if request is pending or rejected (not if approved)
+      const lateBadge=rawLateMins>0&&!_lateApprovedDB?`<div style="background:${_lateRejectedDB?'rgba(220,38,38,.2)':'rgba(217,119,6,.2)'};border:1px solid ${_lateRejectedDB?'rgba(220,38,38,.4)':'rgba(217,119,6,.4)'};border-radius:10px;padding:8px 14px;margin-bottom:12px;font-size:12px;color:${_lateRejectedDB?'#FCA5A5':'#FCD34D'}">
+        ${_latePendingDB?'⏳ <strong>Late request pending</strong> — awaiting TL/Admin review':''}
+        ${_lateRejectedDB?`⚠️ You were <strong>${lateLabel} late</strong> · Late arrival recorded`:''}
+        ${!_latePendingDB&&!_lateRejectedDB?`⚠️ You were <strong>${lateLabel} late</strong> · Shift end adjusted: <span style="text-decoration:line-through;opacity:.7">${fmtT(shNow?.end_time)}</span> → <strong>${adjEnd||'--'}</strong>`:''}
       </div>`:'';
       clockWidget=`<div style="background:linear-gradient(135deg,#14532D,#166534);border-radius:16px;padding:24px;text-align:center;color:#F0FDF4;margin-bottom:14px">
         <div style="font-size:13px;opacity:.7;margin-bottom:4px">CLOCKED IN · ${zone}</div>
@@ -2102,8 +2119,8 @@ function mySchedView(){
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
           <div style="background:rgba(255,255,255,.1);border-radius:10px;padding:8px">
             <div style="font-size:9px;opacity:.7;text-transform:uppercase;margin-bottom:2px">Shift end</div>
-            <div style="font-size:${adjEnd&&lateMinsRec>0?'13px':'16px'};font-weight:700;${adjEnd&&lateMinsRec>0?'text-decoration:line-through;opacity:.5':''}">${fmtT(shNow?.end_time)}</div>
-            ${adjEnd&&lateMinsRec>0?`<div style="font-size:16px;font-weight:700;color:#4ADE80">${adjEnd}</div>`:''}
+            <div style="font-size:${adjEnd&&lateMinsRec>0&&!_lateApprovedDB?'13px':'16px'};font-weight:700;${adjEnd&&lateMinsRec>0&&!_lateApprovedDB?'text-decoration:line-through;opacity:.5':''}">${fmtT(shNow?.end_time)}</div>
+            ${adjEnd&&lateMinsRec>0&&!_lateApprovedDB?`<div style="font-size:16px;font-weight:700;color:#4ADE80">${adjEnd}</div>`:''}
           </div>
           <div style="background:rgba(255,255,255,.1);border-radius:10px;padding:8px">
             <div style="font-size:9px;opacity:.7;text-transform:uppercase;margin-bottom:2px">Zone</div>
@@ -3870,11 +3887,21 @@ function attendanceView(){
         <td style="font-size:10px;font-weight:600;color:${dur!=='—'?'#FF5900':'var(--g3)'}">
           ${dur}${rec?.clock_in&&!rec?.clock_out?`<span style="font-size:8px;color:#16A34A;margin-left:4px;font-weight:400">(ongoing)</span>`:''}
         </td>
-        <td style="font-size:9px;color:#7C3AED;max-width:160px">
-          ${earlyTask&&earlyTask.status==='Pending'?`
+        <td style="font-size:9px;max-width:160px">
+          ${earlyTask&&earlyTask.status==='Pending'?`<div style="color:#7C3AED">
             ${earlyReason?`<div style="font-weight:600">⚡ ${earlyReason}</div>`:''}
             ${(()=>{const _lm=earlyTask?.description?.match(/Location: (https:\/\/[^\s]+)/i);return _lm?`<a href="${_lm[1].replace(/\.$/,'')}" target="_blank" style="color:#7C3AED;font-size:9px;text-decoration:none"><i class="ti ti-map-pin" style="font-size:10px"></i> Early-out location</a>`:''})()}
-          `:''}
+          </div>`:''}
+          ${(()=>{
+            const _lateT=(D.tasks||[]).find(t=>t.patroller_id===p.id&&t.date===ds&&t.task_type==='Late Clock In');
+            if(!_lateT)return '';
+            const _lateRsn=(_lateT.description||'').replace(/Late clock-in request\.\s*Reason:\s*/i,'').split('. Att')[0].replace(/\.?\s*Location:.*$/i,'').trim();
+            const _lateSt=_lateT.status;
+            const _stCol=_lateSt==='Approved'?'#166534':_lateSt==='Rejected'?'#991B1B':'#B45309';
+            const _stBg=_lateSt==='Approved'?'#DCFCE7':_lateSt==='Rejected'?'#FEE2E2':'#FEF3C7';
+            const _stIcon=_lateSt==='Approved'?'✅':_lateSt==='Rejected'?'❌':'⏳';
+            return `<div style="margin-top:${earlyTask?'4px':'0'}"><span style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:4px;background:${_stBg};color:${_stCol}">${_stIcon} Late in</span>${_lateRsn?` <span style="color:#854F0B;font-style:italic">${_lateRsn}</span>`:''}</div>`;
+          })()}
         </td>
         <td style="white-space:nowrap">${canEdit()?`${(rec&&(rec.clock_in||rec.status==='Attended'||rec.status?.startsWith('Absent')||rec.status?.startsWith('Early out')))?`<button onclick="editAttendance('${p.id}','${p.name}','${ds}')" title="Edit attendance" style="background:var(--g1);color:var(--g4);border:1.5px solid var(--g2);padding:5px 10px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-pencil" style="font-size:12px"></i>Edit</button>`:`<button onclick="markAttendance('${p.id}','${p.name}','Attended')" title="Mark attended" style="background:var(--green-l);color:var(--green);border:1.5px solid #86efac;padding:5px 8px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-check" style="font-size:12px"></i></button><button onclick="markAttendance('${p.id}','${p.name}','Absent')" title="Mark absent" style="background:var(--red-l);color:var(--red-d);border:1.5px solid #fca5a5;padding:5px 8px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-x" style="font-size:12px"></i></button>`}`:''}</td>
       </tr>`;
@@ -3900,7 +3927,7 @@ function attendanceView(){
   <div class="tcard" style="padding:0;overflow:hidden">
     <div style="padding:9px 13px;border-bottom:0.5px solid var(--g2);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:space-between">Records <span style="font-size:10px;font-weight:400;color:var(--g3)">${dates.length} day${dates.length!==1?'s':''} · ${fromDate} → ${toDate}</span></div>
     <div class="t-scroll"><table style="min-width:750px"><thead><tr>
-      <th>ID</th><th>Name</th><th>Zone</th><th>Shift</th><th>Status</th><th>Clock in</th><th>Clock out</th><th>Duration</th><th>Early out reason</th>${canEdit()?'<th>Actions</th>':''}
+      <th>ID</th><th>Name</th><th>Zone</th><th>Shift</th><th>Status</th><th>Clock in</th><th>Clock out</th><th>Duration</th><th>Late / Early reason</th>${canEdit()?'<th>Actions</th>':''}
     </tr></thead><tbody>${rowsByDate||'<tr><td colspan="10" style="padding:30px;text-align:center;color:var(--g3)">No records in this range</td></tr>'}</tbody></table></div>
   </div>`;
 }
