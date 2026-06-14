@@ -436,6 +436,7 @@ let D={user:null,profile:null,customRoles:[],leaveBalances:[],locationLog:[],tab
   notesAll:{id:null,content:''},notesPat:{id:null,content:''},notesCoo:{id:null,content:''},
   docs:[],history:[],timeoff:[],attendance:[],attDate:null,opsSub:'areas',locPerms:{},tasks:[],hourlyDay:null,
   coachingCases:[],coachingAssignments:[],overtimeRequests:[],evaluations:[],
+  oo1Cases:[],oo1Sessions:[],oo1AccessList:[],
   coachingMonth:null,coachingShowOlder:false,evalMonth:null,
   incentiveData:[],incMonth:null,perfTab:null,perfSettings:null};
 
@@ -455,6 +456,11 @@ sb.auth.onAuthStateChange((ev,session)=>{
   if(ev==='SIGNED_OUT')showS('login');
   else if(ev==='SIGNED_IN'&&session)afterLogin(session.user);
 });
+
+// Handle one-time acknowledgement links (?ack=token) — shown before login
+if(window.location.search.includes('ack=')){
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>handleAckToken(),300);});
+}
 
 async function doLogin(){
   clearMsgs('login-err','login-ok');
@@ -675,6 +681,9 @@ async function loadAll(){
   }catch(e){D.biometricDevices=[];}
   // Coaching
   try{const{data:cc}=await wt(sb.from('coaching_cases').select('*').order('created_at',{ascending:false}),5000);D.coachingCases=cc||[];}catch(e){D.coachingCases=[];}
+  try{const{data:oo1c}=await wt(sb.from('oo1_cases').select('*').order('created_at',{ascending:false}),5000);D.oo1Cases=oo1c||[];}catch(e){D.oo1Cases=[];}
+  try{const{data:oo1s}=await wt(sb.from('oo1_sessions').select('*').order('created_at',{ascending:false}),5000);D.oo1Sessions=oo1s||[];}catch(e){D.oo1Sessions=[];}
+  try{const{data:oo1a}=await wt(sb.from('oo1_access').select('*'),3000);D.oo1AccessList=oo1a||[];}catch(e){D.oo1AccessList=[];}
   // Auto-split new unassigned coaching cases to on-duty patrollers
   try{ await autoSplitCoachingCases(); }catch(e){console.warn('Auto-split coaching failed:',e);}
   try{
@@ -2268,6 +2277,7 @@ function renderSidebar(){
     html+=item('performance','ti-chart-infographic','Scores & Incentive');
     html+=item('evaluation','ti-star','Evaluation');
     html+=item('coaching','ti-users','Coaching');
+    html+=item('1on1','ti-message-2-heart','1 on 1 Coaching');
     html+=item('audittargets','ti-target','Audit targets');
     html+=item('incentive','ti-cash','Incentive');
     html+=`<div class="sb-section" style="margin-top:4px">Admin</div>`;
@@ -2288,6 +2298,7 @@ function renderSidebar(){
     html+=item('pat-scores','ti-chart-infographic','My scores');
     html+=item('pat-evaluation','ti-star','My evaluation');
     html+=item('pat-coaching','ti-users','My coaching');
+    if((D.oo1AccessList||[]).some(a=>a.user_id===D.profile?.id))html+=item('pat-1on1','ti-message-2-heart','1 on 1 Coaching');
     html+=item('pat-targets','ti-target','My targets');
     html+=item('incentive','ti-cash','My incentive');
   }
@@ -2472,6 +2483,8 @@ function render(){
   else if(D.tab==='incentive')html=safeRender(()=>incentiveView(),'Incentive');
   else if(D.tab==='evaluation')html=safeRender(()=>evalTabView(),'Evaluation');
   else if(D.tab==='coaching')html=safeRender(()=>coachingTabView(),'Coaching');
+  else if(D.tab==='1on1')html=safeRender(()=>oo1AdminView(),'1 on 1 Coaching');
+  else if(D.tab==='pat-1on1')html=safeRender(()=>oo1PatrollerView(),'1 on 1 Coaching');
   else if(D.tab==='audittargets')html=safeRender(()=>auditTargetsTabView(),'Audit targets');
   else if(D.tab==='timeoff')html=safeRender(()=>timeOffView(),'Time off');
   else if(D.tab==='tasks')html=safeRender(()=>tasksView(),'Tasks');
@@ -2615,6 +2628,122 @@ function renderModal(){
         <button class="btn" style="background:#DC2626;color:#fff;border-color:#DC2626" onclick="execDeleteHistorical('${dtype}')"><i class="ti ti-trash"></i>Delete Records</button>
       </div>`;return;
   }
+  if(m.type==='oo1schedule'){
+    const c=m.c;const phone=(c.contact_number||'').replace(/[^0-9]/g,'');
+    const patOpts=activePats().filter(p=>getUtype(p)==='patroller').map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+    const existS=m.existingSession;
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-calendar-event" style="color:#534AB7"></i> Schedule 1-on-1 session</div>
+      <input type="hidden" id="oo1-case-id" value="${c.id}">
+      <div style="background:#EEEDFE;border:0.5px solid #AFA9EC;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <div style="width:38px;height:38px;border-radius:50%;background:#534AB7;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff">${(c.rider_name||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase()}</div>
+          <div><div style="font-weight:600;font-size:14px;color:#26215C">${c.rider_name||'—'}</div><div style="font-size:11px;color:#534AB7">${c.rider_id||''} · ${c.supplier||''} · ${c.violation_type||''}</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;color:#534AB7;margin-bottom:10px">
+          <div><span style="opacity:.6">Supplier</span><br><strong>${c.supplier||'—'}</strong></div>
+          <div><span style="opacity:.6">Violation date</span><br><strong>${c.violation_date||'—'}</strong></div>
+          <div><span style="opacity:.6">Rider ID</span><br><strong style="font-family:monospace">${c.rider_id||'—'}</strong></div>
+          <div><span style="opacity:.6">Status</span><br><strong>${c.rider_status||'—'}</strong></div>
+        </div>
+        <div style="display:flex;gap:8px">
+          ${phone?`<a href="tel:${phone}" style="font-size:11px;color:#0C447C;background:#E6F1FB;padding:5px 10px;border-radius:7px;text-decoration:none;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-phone" style="font-size:12px"></i> ${c.contact_number}</a>`:''}
+          ${phone?`<a href="https://wa.me/${phone}" target="_blank" style="font-size:11px;color:#075E54;background:#DCFCE7;padding:5px 10px;border-radius:7px;text-decoration:none;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-brand-whatsapp" style="font-size:12px"></i> WhatsApp</a>`:''}
+        </div>
+      </div>
+      <div class="fg-row">
+        <div class="fg"><label>Session date</label><input type="date" id="oo1-date" value="${existS?.session_date||''}"></div>
+        <div class="fg"><label>Session time</label><input type="time" id="oo1-time" value="${existS?.session_time||''}"></div>
+      </div>
+      <div class="fg"><label>Assigned patroller</label><select id="oo1-pat"><option value="">-- Select --</option>${patOpts}</select></div>
+      <div class="fg"><label>Location / notes</label><input type="text" id="oo1-notes" value="${existS?.notes||''}" placeholder="e.g. HRC zone entrance"></div>
+      <div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="oo1SaveSchedule()"><i class="ti ti-check"></i> Schedule session</button></div>`;
+    if(existS?.patroller_id){setTimeout(()=>{const el=document.getElementById('oo1-pat');if(el)el.value=existS.patroller_id;},50);}
+    return;
+  }
+
+  if(m.type==='oo1session'){
+    const s=m.session;const c=m.case;
+    const phone=(c.contact_number||'').replace(/[^0-9]/g,'');
+    const step=s.step||1;
+    const attended=s.rider_attended;
+    const coached=s.rider_coached;
+    const ackOutcome=s.ack_outcome||null;
+    const ackPending=s.ack_token&&!ackOutcome;
+    const ackDone=ackOutcome==='acknowledged';
+    const ackRefused=ackOutcome==='refused';
+
+    // Steps: 1=attendance, 2=coaching, 3=acknowledgement, 4=complete
+    const stepDot=(n,cur)=>{
+      const done=cur>n;const active=cur===n;
+      const bg=done?'#DCFCE7':active?'#534AB7':'var(--g1)';
+      const col=done?'#166534':active?'#fff':'var(--g3)';
+      return`<div style="width:22px;height:22px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${col};flex-shrink:0">${done?'✓':n}</div>`;
+    };
+    const stepLine=(done)=>`<div style="flex:1;height:2px;background:${done?'#DCFCE7':'var(--g2)'}"></div>`;
+    const curStep=(attended===false)?99:(!attended&&!coached)?1:(attended&&!coached)?2:(attended&&coached&&!ackOutcome)?3:4;
+
+    let stepContent='';
+    if(curStep===1){
+      stepContent=`<div style="font-size:13px;margin-bottom:14px">Did the rider attend the scheduled session?</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="oo1SetAttendance('${s.id}',true)" style="flex:1;padding:10px;background:#DCFCE7;color:#166534;border:1.5px solid #86efac;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px"><i class="ti ti-check" style="font-size:14px"></i> Yes — attended</button>
+          <button onclick="oo1SetAttendance('${s.id}',false)" style="flex:1;padding:10px;background:#FEE2E2;color:#991B1B;border:1.5px solid #FCA5A5;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px"><i class="ti ti-x" style="font-size:14px"></i> No — absent</button>
+        </div>`;
+    } else if(curStep===2){
+      stepContent=`<div style="font-size:13px;margin-bottom:14px">Was the rider coached about the violation?</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="oo1SetCoached('${s.id}',true)" style="flex:1;padding:10px;background:#DCFCE7;color:#166534;border:1.5px solid #86efac;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px"><i class="ti ti-check" style="font-size:14px"></i> Yes — coached</button>
+          <button onclick="oo1SetCoached('${s.id}',false)" style="flex:1;padding:10px;background:var(--g1);color:var(--g4);border:1.5px solid var(--g2);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">No</button>
+        </div>`;
+    } else if(curStep===3){
+      const ackUrl=s.ack_token?oo1AckUrl(s.ack_token):'';
+      stepContent=`<div style="font-size:12px;color:var(--g3);margin-bottom:12px">Send an acknowledgement link to the rider. The link expires in 30 minutes and can only be used once.</div>
+        ${ackPending?`<div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px;margin-bottom:10px;font-size:11px;color:#633806">⏳ Link sent — awaiting rider response. Refresh to check.</div>`:''}
+        ${ackDone?`<div style="background:#DCFCE7;border:1px solid #86efac;border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px;color:#166534;font-weight:600">✅ Rider acknowledged via link</div>`:''}
+        ${ackRefused?`<div style="background:#FEE2E2;border:1px solid #FCA5A5;border-radius:8px;padding:10px;margin-bottom:10px;font-size:12px;color:#991B1B;font-weight:600">❌ Rider refused to acknowledge</div>`:''}
+        ${!ackDone&&!ackRefused?`
+        ${ackUrl?`<div style="background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:#0C447C;display:flex;align-items:center;gap:8px">
+          <i class="ti ti-link" style="font-size:14px;flex-shrink:0"></i>
+          <span style="font-family:monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ackUrl}</span>
+          <button onclick="navigator.clipboard.writeText('${ackUrl}')" style="font-size:10px;padding:3px 8px;border-radius:5px;border:0.5px solid var(--g2);background:none;cursor:pointer;font-family:inherit">Copy</button>
+        </div>`:''}
+        <button id="oo1-wa-btn" onclick="oo1SendAckWhatsApp('${s.id}')" style="width:100%;padding:10px;background:#075E54;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px"><i class="ti ti-brand-whatsapp" style="font-size:15px"></i> Send acknowledgement link via WhatsApp</button>
+        <div style="font-size:10px;color:var(--g3);text-align:center;margin-bottom:12px">Opens WhatsApp with a pre-filled message · Link valid 30 min · One-time use only</div>
+        <div style="border-top:0.5px solid var(--g2);padding-top:12px">
+          <div style="font-size:12px;font-weight:600;margin-bottom:6px">If rider refuses to acknowledge:</div>
+          <div class="fg"><textarea id="oo1-session-notes" style="width:100%;min-height:60px;padding:8px;border:1.5px solid var(--g2);border-radius:8px;font-family:inherit;font-size:13px;resize:vertical" placeholder="Note reason for refusal..."></textarea></div>
+          <button onclick="oo1RefuseAck('${s.id}')" style="padding:8px 16px;background:#FEE2E2;color:#991B1B;border:1.5px solid #FCA5A5;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px"><i class="ti ti-x" style="font-size:13px"></i> Rider refused — close session</button>
+        </div>`:''}
+        ${(ackDone||ackRefused)?`<div class="fg" style="margin-top:10px"><textarea id="oo1-session-notes" style="width:100%;min-height:60px;padding:8px;border:1.5px solid var(--g2);border-radius:8px;font-family:inherit;font-size:13px;resize:vertical" placeholder="Session notes (optional)...">${s.notes||''}</textarea></div>
+        <button onclick="oo1CompleteSession('${s.id}')" style="width:100%;padding:10px;background:#534AB7;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px"><i class="ti ti-circle-check" style="font-size:14px"></i> Complete session</button>`:''}`;
+    }
+
+    box.innerHTML=`<div class="modal-title"><i class="ti ti-message-2-heart" style="color:#534AB7"></i> 1-on-1 Session</div>
+      <div style="display:flex;align-items:center;gap:10px;background:#EEEDFE;border-radius:10px;padding:10px 12px;margin-bottom:14px">
+        <div style="width:34px;height:34px;border-radius:50%;background:#534AB7;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0">${(c.rider_name||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase()}</div>
+        <div style="flex:1"><div style="font-weight:600;color:#26215C">${c.rider_name||'—'}</div><div style="font-size:11px;color:#534AB7">${c.rider_id||''} · ${c.supplier||''} · ${s.session_date||''} ${s.session_time?s.session_time.slice(0,5):''}</div></div>
+        <div style="display:flex;gap:5px">
+          ${phone?`<a href="tel:${phone}" style="font-size:10px;color:#0C447C;background:#E6F1FB;padding:4px 7px;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-phone" style="font-size:11px"></i></a>`:''}
+          ${phone?`<a href="https://wa.me/${phone}" target="_blank" style="font-size:10px;color:#075E54;background:#DCFCE7;padding:4px 7px;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-brand-whatsapp" style="font-size:11px"></i></a>`:''}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px">
+        ${stepDot(1,curStep)}${stepLine(curStep>1)}${stepDot(2,curStep)}${stepLine(curStep>2)}${stepDot(3,curStep)}${stepLine(curStep>3)}${stepDot(4,curStep)}
+      </div>
+      <div style="font-size:11px;color:var(--g3);margin-bottom:12px">
+        Step 1 ${attended?'✓ Attended':attended===false?'✗ Absent':'— Attendance'} &nbsp;·&nbsp;
+        Step 2 ${coached?'✓ Coached':coached===false?'✗ Not coached':'— Coaching'} &nbsp;·&nbsp;
+        Step 3 ${ackDone?'✅ Acknowledged':ackRefused?'❌ Refused':ackPending?'⏳ Pending':'— Acknowledgement'} &nbsp;·&nbsp;
+        Step 4 — Complete
+      </div>
+      <div style="font-size:12px;font-weight:700;color:var(--g4);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">
+        Step ${Math.min(curStep,4)} of 4 — ${['','Attendance','Coaching','Acknowledgement','Complete'][Math.min(curStep,4)]}
+      </div>
+      ${stepContent}
+      <div class="modal-footer" style="margin-top:0"><button class="btn" onclick="closeM()">Close</button></div>`;
+    return;
+  }
+
   if(m.type==='absencereason'){box.innerHTML=`<div class="modal-title"><i class="ti ti-calendar-off"></i>Mark as Absent - ${m.patName}</div><div class="fg"><label>Reason for absence</label><select id="ar-reason"><option value="">-- Select reason --</option><option value="No show">No show</option><option value="Sick leave">Sick leave</option></select></div><div class="modal-footer"><button class="btn" onclick="closeM()">Cancel</button><button class="btn btn-primary" onclick="const r=document.getElementById('ar-reason').value;if(!r){alert('Please select a reason');return;}confirmAbsenceReason('${m.patId}','${m.patName}','${m.status}',r)"><i class="ti ti-check"></i>Confirm</button></div>`;return;}
   if(m.type==='editattendance'){
     const _earec=(D.attendance||[]).find(a=>a.patroller_id===m.patId&&a.date===m.dateStr);
@@ -6785,6 +6914,564 @@ async function reassignCase(caseId,patrollerId){
   await reload();
   addNotification(`Case reassigned to ${pat.name}`,'success');
 }
+
+// ══════════════════════════════════════════════════════════════════
+// 1 ON 1 COACHING MODULE
+// ══════════════════════════════════════════════════════════════════
+
+const OO1_SHEET_CSV='https://docs.google.com/spreadsheets/d/12YJv9moeUIh-D4Nk1YUXl0HwDM1YVNQHaVZw7k5mpco/gviz/tq?tqx=out:csv&gid=964675580';
+
+// ── SYNC FROM GOOGLE SHEET ──
+async function oo1SyncFromSheet(){
+  const btn=document.getElementById('oo1-sync-btn');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader" style="animation:spin .7s linear infinite"></i> Syncing...';}
+  try{
+    const res=await fetch(OO1_SHEET_CSV);
+    if(!res.ok)throw new Error('Could not fetch sheet (check it is publicly viewable)');
+    const csv=await res.text();
+    const rows=csv.split('\n').filter(r=>r.trim());
+    if(rows.length<2){throw new Error('Sheet appears empty');}
+    // Parse CSV (handle quoted fields)
+    const parseRow=row=>{const r=[];let cur='';let inQ=false;for(let i=0;i<row.length;i++){const c=row[i];if(c==='"'){inQ=!inQ;}else if(c===','&&!inQ){r.push(cur.trim());cur='';}else{cur+=c;}}r.push(cur.trim());return r;};
+    const headers=parseRow(rows[0]).map(h=>h.replace(/"/g,'').trim().toLowerCase());
+    // Column map based on known headers
+    // Rider ID, Rider Name, Supplier, Contact Number, Rider Status, Violation Type, Frequency, Rooster Action, Action category, Violation Summary, Proof Of the Violation, Violation Date
+    const col=name=>{const idx=headers.findIndex(h=>h.includes(name.toLowerCase()));return idx;};
+    const iRiderId=col('rider id'); const iRiderName=col('rider name'); const iSupplier=col('supplier');
+    const iContact=col('contact'); const iStatus=col('rider status'); const iViolationType=col('violation type');
+    const iFrequency=col('frequency'); const iRooster=col('rooster'); const iActionCat=col('action cat');
+    const iSummary=col('violation sum'); const iProof=col('proof'); const iViolDate=col('violation date');
+    let synced=0;let skipped=0;
+    for(let i=1;i<rows.length;i++){
+      const cells=parseRow(rows[i]);
+      const riderId=cells[iRiderId]?.replace(/"/g,'')||'';
+      if(!riderId||riderId==='-'||riderId==='')continue;
+      const violDate=cells[iViolDate]?.replace(/"/g,'')||'';
+      // Check if already exists (rider_id + violation_date is unique key)
+      const existing=(D.oo1Cases||[]).find(c=>c.rider_id===riderId&&c.violation_date===violDate);
+      if(existing){skipped++;continue;}
+      const{error}=await sb.from('oo1_cases').insert({
+        rider_id:riderId,
+        rider_name:cells[iRiderName]?.replace(/"/g,'')||'',
+        supplier:cells[iSupplier]?.replace(/"/g,'')||'',
+        contact_number:cells[iContact]?.replace(/"/g,'')||'',
+        rider_status:cells[iStatus]?.replace(/"/g,'')||'',
+        violation_type:cells[iViolationType]?.replace(/"/g,'')||'',
+        frequency:cells[iFrequency]?.replace(/"/g,'')||'',
+        rooster_action:cells[iRooster]?.replace(/"/g,'')||'',
+        action_category:cells[iActionCat]?.replace(/"/g,'')||'',
+        violation_summary:cells[iSummary]?.replace(/"/g,'')||'',
+        proof_url:cells[iProof]?.replace(/"/g,'')||'',
+        violation_date:violDate,
+        status:'pending',
+        synced_at:new Date().toISOString()
+      });
+      if(!error)synced++;else console.warn('Insert error:',error.message);
+    }
+    await reload();
+    addNotification(`Synced ${synced} new cases (${skipped} already existed)`,'success');
+  }catch(e){
+    addNotification('Sync failed: '+e.message,'error');
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-refresh"></i> Sync from sheet';}
+  }
+}
+
+// ── GENERATE ONE-TIME ACK TOKEN (expires 30 min) ──
+async function oo1GenerateAckToken(sessionId){
+  const token=crypto.randomUUID();
+  const expiresAt=new Date(Date.now()+30*60*1000).toISOString();
+  const{error}=await sb.from('oo1_ack_tokens').insert({
+    token,session_id:sessionId,expires_at:expiresAt,used:false,created_at:new Date().toISOString()
+  });
+  if(error)throw new Error('Could not generate acknowledgement link: '+error.message);
+  return token;
+}
+
+function oo1AckUrl(token){
+  return REDIRECT+'?ack='+token;
+}
+
+// ── OPEN SCHEDULE SESSION MODAL ──
+function oo1OpenSchedule(caseId){
+  const c=D.oo1Cases.find(x=>x.id===caseId);
+  if(!c)return;
+  const existingSession=D.oo1Sessions.find(s=>s.case_id===caseId&&s.status!=='completed'&&s.status!=='closed');
+  openM({type:'oo1schedule',caseId,c,existingSession});
+}
+
+// ── OPEN CONDUCT SESSION ──
+function oo1OpenSession(sessionId){
+  const s=D.oo1Sessions.find(x=>x.id===sessionId);
+  const c=s?D.oo1Cases.find(x=>x.id===s.case_id):null;
+  if(!s||!c)return;
+  openM({type:'oo1session',session:s,case:c});
+}
+
+// ── SAVE SCHEDULE ──
+async function oo1SaveSchedule(){
+  const caseId=document.getElementById('oo1-case-id')?.value;
+  const date=document.getElementById('oo1-date')?.value;
+  const time=document.getElementById('oo1-time')?.value;
+  const patId=document.getElementById('oo1-pat')?.value;
+  const notes=document.getElementById('oo1-notes')?.value||'';
+  if(!date||!time||!patId){alert('Please fill in date, time and patroller.');return;}
+  const pat=D.patrollers.find(p=>p.id===patId);
+  const now=new Date().toISOString();
+  // Update existing pending session or create new
+  const existing=D.oo1Sessions.find(s=>s.case_id===caseId&&s.status==='unscheduled');
+  if(existing){
+    await sb.from('oo1_sessions').update({session_date:date,session_time:time,patroller_id:patId,patroller_name:pat?.name||'',notes,status:'scheduled',updated_at:now}).eq('id',existing.id);
+  } else {
+    await sb.from('oo1_sessions').insert({case_id:caseId,session_date:date,session_time:time,patroller_id:patId,patroller_name:pat?.name||'',notes,status:'scheduled',created_at:now,updated_at:now});
+  }
+  // Mark case as scheduled
+  await sb.from('oo1_cases').update({status:'scheduled'}).eq('id',caseId);
+  closeM();await reload();
+  addNotification('Session scheduled','success');
+}
+
+// ── SESSION STEPS ──
+async function oo1SetAttendance(sessionId,attended){
+  const now=new Date().toISOString();
+  if(attended){
+    await sb.from('oo1_sessions').update({rider_attended:true,status:'in_session',updated_at:now}).eq('id',sessionId);
+    addNotification('Attendance marked — proceed to coaching','success');
+  } else {
+    await sb.from('oo1_sessions').update({rider_attended:false,status:'closed',ack_outcome:'absent',completed_at:now,updated_at:now}).eq('id',sessionId);
+    await sb.from('oo1_cases').update({status:'completed'}).eq('id',(D.oo1Sessions.find(s=>s.id===sessionId)||{}).case_id||'');
+    addNotification('Session closed — rider absent','warning');
+  }
+  closeM();await reload();
+}
+
+async function oo1SetCoached(sessionId,coached){
+  const now=new Date().toISOString();
+  await sb.from('oo1_sessions').update({rider_coached:coached,step:3,updated_at:now}).eq('id',sessionId);
+  closeM();await reload();
+}
+
+async function oo1SendAckWhatsApp(sessionId){
+  const s=D.oo1Sessions.find(x=>x.id===sessionId);
+  const c=s?D.oo1Cases.find(x=>x.id===s.case_id):null;
+  if(!s||!c)return;
+  const btn=document.getElementById('oo1-wa-btn');
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader" style="animation:spin .7s linear infinite"></i> Generating link...';}
+  try{
+    const token=await oo1GenerateAckToken(sessionId);
+    const url=oo1AckUrl(token);
+    // Store token on session for status tracking
+    await sb.from('oo1_sessions').update({ack_token:token,ack_sent_at:new Date().toISOString(),step:3}).eq('id',sessionId);
+    const phone=(c.contact_number||'').replace(/[^0-9]/g,'');
+    const msg=encodeURIComponent(
+      `Dear ${c.rider_name||'Rider'},\n\nYou attended a 1-on-1 coaching session with Talabat Operations regarding: ${c.violation_type||'a violation'} on ${c.violation_date||''}.\n\nPlease click the link below to acknowledge this session (valid for 30 minutes):\n${url}\n\nTalabat Operations Team`
+    );
+    const waUrl=`https://wa.me/${phone}?text=${msg}`;
+    window.open(waUrl,'_blank');
+    await reload();
+    addNotification('WhatsApp opened with acknowledgement link (expires in 30 min)','success');
+  }catch(e){addNotification(e.message,'error');}
+  if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-brand-whatsapp"></i> Send acknowledgement link via WhatsApp';}
+}
+
+async function oo1RefuseAck(sessionId,notes){
+  const sessionNotes=notes||document.getElementById('oo1-session-notes')?.value||'';
+  const s=D.oo1Sessions.find(x=>x.id===sessionId);
+  const now=new Date().toISOString();
+  await sb.from('oo1_sessions').update({ack_outcome:'refused',notes:sessionNotes,status:'closed',completed_at:now,updated_at:now}).eq('id',sessionId);
+  await sb.from('oo1_cases').update({status:'completed'}).eq('id',s?.case_id||'');
+  closeM();await reload();
+  addNotification('Session closed — rider refused to acknowledge','warning');
+}
+
+async function oo1CompleteSession(sessionId){
+  const notes=document.getElementById('oo1-session-notes')?.value||'';
+  const s=D.oo1Sessions.find(x=>x.id===sessionId);
+  const now=new Date().toISOString();
+  await sb.from('oo1_sessions').update({notes,status:'completed',completed_at:now,updated_at:now}).eq('id',sessionId);
+  await sb.from('oo1_cases').update({status:'completed'}).eq('id',s?.case_id||'');
+  closeM();await reload();
+  addNotification('Session completed','success',{title:'✅ 1-on-1 Session Complete',tag:'oo1-complete'});
+}
+
+// ── TOGGLE ACCESS ──
+async function oo1ToggleAccess(userId,currentlyOn){
+  if(currentlyOn){
+    await sb.from('oo1_access').delete().eq('user_id',userId);
+  } else {
+    await sb.from('oo1_access').insert({user_id:userId,granted_by:D.profile.id,created_at:new Date().toISOString()});
+  }
+  await reload();
+}
+
+// ── ACK TOKEN HANDLER (when page loads with ?ack=token) ──
+async function handleAckToken(){
+  const params=new URLSearchParams(window.location.search);
+  const token=params.get('ack');
+  if(!token)return false;
+  // Show acknowledgement UI
+  document.body.innerHTML='';
+  const wrap=document.createElement('div');
+  wrap.style.cssText='min-height:100vh;background:#f5f0ea;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif;padding:20px';
+  wrap.innerHTML='<div style="background:#fff;border-radius:16px;padding:28px;max-width:380px;width:100%;text-align:center"><i class="ti ti-loader" style="font-size:32px;animation:spin .7s linear infinite;color:#534AB7"></i><div style="margin-top:12px;font-size:14px;color:#666">Checking link validity...</div></div>';
+  document.body.appendChild(wrap);
+  try{
+    const{data:tkRow}=await sb.from('oo1_ack_tokens').select('*').eq('token',token).single();
+    const box=wrap.querySelector('div');
+    if(!tkRow){
+      box.innerHTML=oo1AckPage(null,null,'invalid');return true;
+    }
+    if(tkRow.used){
+      box.innerHTML=oo1AckPage(null,null,'used');return true;
+    }
+    if(new Date(tkRow.expires_at)<new Date()){
+      box.innerHTML=oo1AckPage(null,null,'expired');return true;
+    }
+    // Load session + case
+    const{data:sess}=await sb.from('oo1_sessions').select('*').eq('id',tkRow.session_id).single();
+    const{data:cas}=sess?await sb.from('oo1_cases').select('*').eq('id',sess.case_id).single():{data:null};
+    box.innerHTML=oo1AckPage(cas,sess,'valid',token,tkRow.session_id);
+  }catch(e){
+    wrap.querySelector('div').innerHTML=oo1AckPage(null,null,'error',e.message);
+  }
+  return true;
+}
+
+function oo1AckPage(cas,sess,state,token,sessionId){
+  if(state==='invalid')return`<div style="text-align:center;padding:20px"><div style="font-size:40px;margin-bottom:12px">🔗</div><div style="font-size:16px;font-weight:700;color:#DC2626;margin-bottom:8px">Invalid link</div><div style="font-size:13px;color:#888">This acknowledgement link is not valid.</div></div>`;
+  if(state==='used')return`<div style="text-align:center;padding:20px"><div style="font-size:40px;margin-bottom:12px">✅</div><div style="font-size:16px;font-weight:700;color:#166534;margin-bottom:8px">Already submitted</div><div style="font-size:13px;color:#888">Your response was already recorded. Thank you.</div></div>`;
+  if(state==='expired')return`<div style="text-align:center;padding:20px"><div style="font-size:40px;margin-bottom:12px">⏳</div><div style="font-size:16px;font-weight:700;color:#D97706;margin-bottom:8px">Link expired</div><div style="font-size:13px;color:#888">This link was valid for 30 minutes. Please contact your patroller for a new link.</div></div>`;
+  if(state==='error')return`<div style="text-align:center;padding:20px"><div style="font-size:40px;margin-bottom:12px">⚠️</div><div style="font-size:16px;font-weight:700;color:#DC2626;margin-bottom:8px">Error</div><div style="font-size:13px;color:#888">${token||''}</div></div>`;
+  return`
+    <div style="background:#534AB7;margin:-28px -28px 20px;padding:20px;border-radius:14px 14px 0 0;text-align:center">
+      <div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:4px">Talabat Operations</div>
+      <div style="font-size:17px;font-weight:600;color:#fff">Coaching Acknowledgement</div>
+    </div>
+    <div style="width:52px;height:52px;border-radius:50%;background:#EEEDFE;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:15px;font-weight:500;color:#534AB7">${(cas?.rider_name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+    <div style="font-weight:600;font-size:15px;margin-bottom:3px">${cas?.rider_name||'Rider'}</div>
+    <div style="font-size:12px;color:#888;margin-bottom:16px">${cas?.rider_id||''} · ${cas?.violation_type||''}</div>
+    <div style="background:#F4EDE3;border-radius:10px;padding:14px;text-align:left;margin-bottom:18px;font-size:13px;color:#411517;line-height:1.6">
+      <div style="font-weight:600;margin-bottom:6px">I acknowledge that:</div>
+      I attended a 1-on-1 coaching session with Talabat Operations on <strong>${sess?.session_date||''}</strong> regarding a <strong>${cas?.violation_type||'violation'}</strong>.
+      I confirm I have been briefed and commit to not repeating this violation.
+    </div>
+    <button onclick="oo1SubmitAck('${token}','${sessionId}','acknowledged')" style="width:100%;padding:12px;background:#166534;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:6px"><span>✅</span> I acknowledge and agree</button>
+    <button onclick="oo1SubmitAck('${token}','${sessionId}','refused')" style="width:100%;padding:10px;background:#fff;color:#991B1B;border:1.5px solid #FCA5A5;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit">I do not agree</button>`;
+}
+
+async function oo1SubmitAck(token,sessionId,outcome){
+  const btns=document.querySelectorAll('button');
+  btns.forEach(b=>b.disabled=true);
+  try{
+    // Mark token as used
+    await sb.from('oo1_ack_tokens').update({used:true,used_at:new Date().toISOString(),outcome}).eq('token',token);
+    // Update session
+    const now=new Date().toISOString();
+    if(outcome==='acknowledged'){
+      await sb.from('oo1_sessions').update({ack_outcome:'acknowledged',ack_responded_at:now,step:4}).eq('id',sessionId);
+    } else {
+      await sb.from('oo1_sessions').update({ack_outcome:'refused',ack_responded_at:now,step:4}).eq('id',sessionId);
+    }
+    document.querySelector('div>div').innerHTML=outcome==='acknowledged'
+      ?`<div style="text-align:center;padding:20px"><div style="font-size:48px;margin-bottom:12px">✅</div><div style="font-size:16px;font-weight:700;color:#166534;margin-bottom:8px">Acknowledged</div><div style="font-size:13px;color:#888">Your response has been recorded. Thank you.</div></div>`
+      :`<div style="text-align:center;padding:20px"><div style="font-size:48px;margin-bottom:12px">📋</div><div style="font-size:16px;font-weight:700;color:#D97706;margin-bottom:8px">Response recorded</div><div style="font-size:13px;color:#888">Your refusal has been noted and passed to your manager.</div></div>`;
+  }catch(e){alert('Error: '+e.message);btns.forEach(b=>b.disabled=false);}
+}
+
+// ── EXPORT CSV ──
+function oo1ExportCSV(){
+  const cases=D.oo1Cases||[];
+  const sessions=D.oo1Sessions||[];
+  const headers=['Rider ID','Rider Name','Supplier','Contact Number','Rider Status','Violation Type','Frequency','Rooster Action','Action Category','Violation Summary','Proof URL','Violation Date','Session Date','Session Time','Assigned Patroller','Rider Attended','Coached','Coaching Notes','Ack Sent via WA','Ack Sent At','Ack Status','Case Status','Completed At'];
+  const esc=v=>`"${String(v||'').replace(/"/g,'""')}"`;
+  const rows=cases.map(c=>{
+    const s=sessions.find(ss=>ss.case_id===c.id);
+    const ackSent=s?.ack_sent_at?new Date(s.ack_sent_at).toLocaleString('en-GB',{timeZone:'Asia/Bahrain'}):'';
+    const completedAt=s?.completed_at?new Date(s.completed_at).toLocaleString('en-GB',{timeZone:'Asia/Bahrain'}):'';
+    return[c.rider_id,c.rider_name,c.supplier,c.contact_number,c.rider_status,c.violation_type,c.frequency,c.rooster_action,c.action_category,c.violation_summary,c.proof_url,c.violation_date,s?.session_date||'',s?.session_time||'',s?.patroller_name||'',s?.rider_attended===true?'Yes':s?.rider_attended===false?'No':'',s?.rider_coached===true?'Yes':s?.rider_coached===false?'No':'',s?.notes||'',s?.ack_token?'Sent':'',ackSent,s?.ack_outcome||'',c.status||'',completedAt].map(esc).join(',');
+  });
+  const csv=[headers.map(esc).join(','),...rows].join('
+');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='1on1_coaching_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  addNotification('CSV exported — '+cases.length+' cases','success');
+}
+
+// ── ADMIN 1-ON-1 VIEW ──
+function oo1AdminView(){
+  const cases=D.oo1Cases||[];
+  const sessions=D.oo1Sessions||[];
+  const pts=activePats().filter(p=>getUtype(p)==='patroller');
+  const today=todayStr();
+  const pending=cases.filter(c=>c.status!=='completed');
+  const completed=cases.filter(c=>c.status==='completed');
+  const scheduled=sessions.filter(s=>s.status==='scheduled');
+  const inSession=sessions.filter(s=>s.status==='in_session');
+  const lastSync=cases.length?new Date(Math.max(...cases.map(c=>new Date(c.synced_at||c.created_at)))).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'Never';
+
+  const pendingRows=pending.map(c=>{
+    const sess=sessions.find(s=>s.case_id===c.id&&s.status!=='completed'&&s.status!=='closed');
+    const isInSession=sess?.status==='in_session';
+    const isScheduled=sess?.status==='scheduled';
+    const sessDateLabel=isScheduled?`📅 ${sess.session_date} ${sess.session_time?sess.session_time.slice(0,5):''}`:isInSession?'🎙 In session today':'';
+    const assignedName=sess?.patroller_name||'Unassigned';
+    const statusBg=isInSession?'#EEEDFE':isScheduled?'#E6F1FB':'#FEF3C7';
+    const statusCol=isInSession?'#3C3489':isScheduled?'#0C447C':'#633806';
+    const statusLabel=isInSession?'🎙 In session':isScheduled?sessDateLabel:'⏳ Unscheduled';
+    const initials=(c.rider_name||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+    const phone=(c.contact_number||'').replace(/[^0-9]/g,'');
+    return`<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:0.5px solid var(--g2)">
+      <div style="width:32px;height:32px;border-radius:50%;background:#534AB7;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0">${initials}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:12px">${c.rider_name||'—'} <span style="font-family:monospace;font-size:10px;color:var(--g3)">${c.rider_id||''}</span></div>
+        <div style="font-size:11px;color:var(--g3);margin-top:1px">${c.violation_type||'—'} · ${c.supplier||'—'} · ${c.violation_date||'—'}</div>
+        <div style="margin-top:4px;display:flex;gap:5px;flex-wrap:wrap">
+          <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px;background:${statusBg};color:${statusCol}">${statusLabel}</span>
+          ${assignedName?`<span style="font-size:10px;color:var(--g3)">· ${assignedName}</span>`:''}
+          ${phone?`<a href="tel:${phone}" style="font-size:10px;color:#0C447C;text-decoration:none;display:inline-flex;align-items:center;gap:2px"><i class="ti ti-phone" style="font-size:10px"></i></a>`:''}
+          ${phone?`<a href="https://wa.me/${phone}" target="_blank" style="font-size:10px;color:#075E54;text-decoration:none;display:inline-flex;align-items:center;gap:2px"><i class="ti ti-brand-whatsapp" style="font-size:10px"></i></a>`:''}
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+        ${canEdit()?`<button onclick="oo1OpenSchedule('${c.id}')" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid #AFA9EC;background:#EEEDFE;color:#3C3489;cursor:pointer;font-family:inherit;white-space:nowrap"><i class="ti ti-calendar" style="font-size:11px"></i> ${sess?'Reschedule':'Schedule'}</button>`:''}
+        ${sess&&(isScheduled||isInSession)?`<button onclick="oo1OpenSession('${sess.id}')" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid #86efac;background:#DCFCE7;color:#166534;cursor:pointer;font-family:inherit;white-space:nowrap"><i class="ti ti-player-play" style="font-size:11px"></i> Start session</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Summary stats
+  const totalSessions=sessions.length;
+  const attendedSessions=sessions.filter(s=>s.rider_attended===true).length;
+  const coachedSessions=sessions.filter(s=>s.rider_coached===true).length;
+  const ackedSessions=sessions.filter(s=>s.ack_outcome==='acknowledged').length;
+  const completedSessions=sessions.filter(s=>s.status==='completed'||s.status==='closed').length;
+
+  // Access management
+  const accessRows=pts.map(p=>{
+    const u=D.users.find(u=>u.id===p.user_id);
+    const hasAccess=(D.oo1AccessList||[]).some(a=>a.user_id===p.user_id);
+    const initials=(p.name||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+    return`<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:0.5px solid var(--g2)">
+      <div style="width:28px;height:28px;border-radius:50%;background:${hasAccess?'#534AB7':'#888'};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0">${initials}</div>
+      <div style="flex:1"><div style="font-size:12px;font-weight:600">${p.name}</div><div style="font-size:10px;color:var(--g3)">${u?.email||'No email'}</div></div>
+      <button onclick="oo1ToggleAccess('${p.user_id}',${hasAccess})" style="font-size:11px;padding:5px 12px;border-radius:7px;font-family:inherit;cursor:pointer;font-weight:600;border:1.5px solid ${hasAccess?'#86efac':'var(--g2)'};background:${hasAccess?'#DCFCE7':'var(--g1)'};color:${hasAccess?'#166534':'var(--g3)'}">
+        ${hasAccess?'✓ Has access':'Grant access'}
+      </button>
+    </div>`;
+  }).join('');
+
+  return`
+  <div style="background:#1C1033;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden">
+    <div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div>
+    <div style="position:relative;z-index:1">
+      <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.5;margin-bottom:9px"><i class="ti ti-message-2-heart" style="font-size:12px"></i> 1 on 1 Coaching</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px">
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Total cases</div><div style="font-size:24px;font-weight:500;color:#C4B5FD">${cases.length}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Pending</div><div style="font-size:24px;font-weight:500;color:#FCD34D">${pending.length}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Scheduled</div><div style="font-size:24px;font-weight:500;color:#93C5FD">${scheduled.length+inSession.length}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Completed</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${completed.length}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Ack. rate</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${attendedSessions?Math.round(ackedSessions/attendedSessions*100)+'%':'—'}</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button id="oo1-sync-btn" onclick="oo1SyncFromSheet()" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25);padding:6px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px"><i class="ti ti-refresh" style="font-size:13px"></i> Sync from sheet</button>
+        <span style="font-size:10px;opacity:.4">Last synced: ${lastSync}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tcard" style="margin-bottom:12px">
+    <div style="padding:9px 13px;border-bottom:0.5px solid var(--g2);display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:11px;font-weight:700;color:var(--g4);text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-clock" style="font-size:13px;margin-right:4px"></i> Pending sessions (${pending.length})</div>
+    </div>
+    ${pending.length?pendingRows:`<div style="padding:30px;text-align:center;color:var(--g3)">All sessions completed. <button onclick="oo1SyncFromSheet()" style="color:#FF5900;background:none;border:none;cursor:pointer;font-family:inherit;font-size:12px">Sync new cases</button></div>`}
+  </div>
+
+  <div class="tcard" style="margin-bottom:12px">
+    <div style="padding:9px 13px;border-bottom:0.5px solid var(--g2);font-size:11px;font-weight:700;color:var(--g4);text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-chart-bar" style="font-size:13px;margin-right:4px"></i> Session summary</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:0.5px solid var(--g2)">
+      ${[['Scheduled',totalSessions,'#534AB7'],['Attended',attendedSessions,'#166534'],['Coached',coachedSessions,'#166534'],['Acknowledged',ackedSessions,'#0C447C']].map(([l,v,c])=>`<div style="padding:12px;text-align:center;border-right:0.5px solid var(--g2)"><div style="font-size:9px;color:var(--g3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">${l}</div><div style="font-size:20px;font-weight:600;color:${c}">${v}</div></div>`).join('')}
+    </div>
+  </div>
+
+  <div class="tcard">
+    <div style="padding:9px 13px;border-bottom:0.5px solid var(--g2);font-size:11px;font-weight:700;color:var(--g4);text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-shield-lock" style="font-size:13px;margin-right:4px"></i> Tab access control</div>
+    ${accessRows||'<div style="padding:20px;text-align:center;color:var(--g3)">No patrollers found</div>'}
+  </div>
+
+  <div class="tcard" style="margin-top:12px">
+    <div style="padding:9px 13px;border-bottom:0.5px solid var(--g2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div style="font-size:11px;font-weight:700;color:var(--g4);text-transform:uppercase;letter-spacing:.05em"><i class="ti ti-list-details" style="font-size:13px;margin-right:4px"></i> Full coaching log (${cases.length} cases)</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <select id="oo1-filter-status" onchange="render()" style="font-size:11px;padding:4px 8px;border:0.5px solid var(--g2);border-radius:6px;font-family:inherit;background:var(--sur);color:var(--g5)">
+          <option value="">All statuses</option>
+          <option value="pending">⏳ Unscheduled</option>
+          <option value="scheduled">📅 Scheduled</option>
+          <option value="completed">✓ Completed</option>
+        </select>
+        <button onclick="oo1ExportCSV()" style="font-size:10px;padding:5px 10px;border-radius:7px;border:0.5px solid var(--g2);background:var(--g1);color:var(--g4);cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-download" style="font-size:11px"></i> Export CSV</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+    <table style="border-collapse:collapse;font-size:11px;min-width:1600px;width:100%">
+      <thead>
+        <tr>
+          <th colspan="7" style="padding:5px 10px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;background:#1C1033;color:rgba(255,255,255,.5);text-align:left">Rider data (from sheet)</th>
+          <th colspan="4" style="padding:5px 10px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;background:#0F4D22;color:rgba(255,255,255,.5);text-align:left">Session</th>
+          <th colspan="2" style="padding:5px 10px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;background:#1C3A5F;color:rgba(255,255,255,.5);text-align:left">Coaching</th>
+          <th colspan="3" style="padding:5px 10px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;background:#3A1C50;color:rgba(255,255,255,.5);text-align:left">Acknowledgement</th>
+          <th colspan="2" style="padding:5px 10px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;background:#3A1A00;color:rgba(255,255,255,.5);text-align:left">Status</th>
+          <th style="padding:5px 10px;background:var(--g1)"></th>
+        </tr>
+        <tr style="background:var(--g1)">
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap">Rider ID</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap">Rider name</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap">Supplier</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap">Contact</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap">Rider status</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap">Violation</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap;border-right:2px solid var(--g2)">Viol. date</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap">Session date</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap">Time</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap">Patroller</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap;border-right:2px solid var(--g2)">Attended</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap">Coached</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap;border-right:2px solid var(--g2)">Notes</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap">Ack via WA</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap">Ack sent at</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap;border-right:2px solid var(--g2)">Ack status</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap">Case status</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3);text-align:left;white-space:nowrap;border-right:2px solid var(--g2)">Completed at</th>
+          <th style="padding:7px 10px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--g3)"></th>
+        </tr>
+      </thead>
+      <tbody>
+      ${(()=>{
+        const filterSt=document.getElementById('oo1-filter-status')?.value||'';
+        const filteredCases=filterSt?cases.filter(c=>c.status===filterSt):cases;
+        if(!filteredCases.length)return\`<tr><td colspan="19" style="padding:30px;text-align:center;color:var(--g3)">No cases found. Click "Sync from sheet" to import.</td></tr>\`;
+        return filteredCases.map(c=>{
+          const s=sessions.find(ss=>ss.case_id===c.id);
+          const phone=(c.contact_number||'').replace(/[^0-9]/g,'');
+          // Status badges
+          const caseSt=c.status||'pending';
+          const csBg=caseSt==='completed'?'#DCFCE7':caseSt==='scheduled'||caseSt==='in_session'?'#E6F1FB':'#FEF3C7';
+          const csCol=caseSt==='completed'?'#166534':caseSt==='scheduled'||caseSt==='in_session'?'#0C447C':'#633806';
+          const csLabel=caseSt==='completed'?'✓ Completed':caseSt==='in_session'?'🎙 In session':caseSt==='scheduled'?'📅 Scheduled':'⏳ Unscheduled';
+          const attBg=s?.rider_attended===true?'#DCFCE7':s?.rider_attended===false?'#FEE2E2':'var(--g1)';
+          const attCol=s?.rider_attended===true?'#166534':s?.rider_attended===false?'#991B1B':'var(--g3)';
+          const attLabel=s?.rider_attended===true?'✓ Attended':s?.rider_attended===false?'✗ Absent':'—';
+          const coachBg=s?.rider_coached===true?'#DCFCE7':s?.rider_coached===false?'#FEE2E2':'var(--g1)';
+          const coachCol=s?.rider_coached===true?'#166534':s?.rider_coached===false?'#991B1B':'var(--g3)';
+          const coachLabel=s?.rider_coached===true?'✓ Yes':s?.rider_coached===false?'✗ No':'—';
+          const ackOut=s?.ack_outcome||null;
+          const ackSent=s?.ack_sent_at?new Date(s.ack_sent_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'—';
+          const ackBg=ackOut==='acknowledged'?'#DCFCE7':ackOut==='refused'?'#FEE2E2':s?.ack_token?'#FEF3C7':'var(--g1)';
+          const ackCol=ackOut==='acknowledged'?'#166534':ackOut==='refused'?'#991B1B':s?.ack_token?'#633806':'var(--g3)';
+          const ackLabel=ackOut==='acknowledged'?'✅ Acknowledged':ackOut==='refused'?'❌ Refused':s?.ack_token?'⏳ Pending':'—';
+          const completedAt=s?.completed_at?new Date(s.completed_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'}):'—';
+          const riderStCol=c.rider_status==='Suspended'?'#991B1B':c.rider_status==='Active'?'#166534':'var(--g3)';
+          const riderStBg=c.rider_status==='Suspended'?'#FEE2E2':c.rider_status==='Active'?'#DCFCE7':'var(--g1)';
+          const canAction=canEdit();
+          return\`<tr style="border-bottom:0.5px solid var(--g2)">
+            <td style="padding:8px 10px;font-family:monospace;font-size:10px;color:var(--g3);white-space:nowrap">\${c.rider_id||'—'}</td>
+            <td style="padding:8px 10px;font-weight:600;white-space:nowrap">\${c.rider_name||'—'}</td>
+            <td style="padding:8px 10px;color:var(--g3);white-space:nowrap;font-size:10px">\${c.supplier||'—'}</td>
+            <td style="padding:8px 10px;white-space:nowrap">
+              \${phone?\`<div style="display:flex;gap:5px;align-items:center">
+                <a href="tel:\${phone}" style="font-size:10px;color:#0C447C;background:#E6F1FB;padding:3px 7px;border-radius:5px;text-decoration:none;display:inline-flex;align-items:center;gap:2px"><i class="ti ti-phone" style="font-size:10px"></i> \${c.contact_number}</a>
+                <a href="https://wa.me/\${phone}" target="_blank" style="font-size:10px;color:#075E54;background:#DCFCE7;padding:3px 6px;border-radius:5px;text-decoration:none;display:inline-flex;align-items:center;gap:2px"><i class="ti ti-brand-whatsapp" style="font-size:11px"></i></a>
+              </div>\`:'—'}
+            </td>
+            <td style="padding:8px 10px"><span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:999px;background:\${riderStBg};color:\${riderStCol}">\${c.rider_status||'—'}</span></td>
+            <td style="padding:8px 10px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="\${c.violation_type||''}">\${c.violation_type||'—'}</td>
+            <td style="padding:8px 10px;font-family:monospace;font-size:10px;color:var(--g3);white-space:nowrap;border-right:2px solid var(--g2)">\${c.violation_date||'—'}</td>
+            <td style="padding:8px 10px;font-family:monospace;font-size:10px;white-space:nowrap">\${s?.session_date||'—'}</td>
+            <td style="padding:8px 10px;font-family:monospace;font-size:10px;white-space:nowrap">\${s?.session_time?s.session_time.slice(0,5):'—'}</td>
+            <td style="padding:8px 10px;white-space:nowrap;font-size:11px">\${s?.patroller_name||'—'}</td>
+            <td style="padding:8px 10px;border-right:2px solid var(--g2)"><span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:999px;background:\${attBg};color:\${attCol}">\${attLabel}</span></td>
+            <td style="padding:8px 10px"><span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:999px;background:\${coachBg};color:\${coachCol}">\${coachLabel}</span></td>
+            <td style="padding:8px 10px;font-size:10px;color:var(--g3);max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-right:2px solid var(--g2)" title="\${s?.notes||''}">\${s?.notes||'—'}</td>
+            <td style="padding:8px 10px;white-space:nowrap">\${s?.ack_token?\`<span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:999px;background:#DCFCE7;color:#075E54"><i class="ti ti-brand-whatsapp" style="font-size:9px"></i> Sent</span>\`:'<span style="font-size:9px;color:var(--g3)">—</span>'}</td>
+            <td style="padding:8px 10px;font-family:monospace;font-size:10px;color:var(--g3);white-space:nowrap">\${ackSent}</td>
+            <td style="padding:8px 10px;border-right:2px solid var(--g2)"><span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:999px;background:\${ackBg};color:\${ackCol}">\${ackLabel}</span></td>
+            <td style="padding:8px 10px"><span style="font-size:9px;font-weight:600;padding:2px 7px;border-radius:999px;background:\${csBg};color:\${csCol}">\${csLabel}</span></td>
+            <td style="padding:8px 10px;font-family:monospace;font-size:10px;color:var(--g3);white-space:nowrap;border-right:2px solid var(--g2)">\${completedAt}</td>
+            <td style="padding:8px 10px;white-space:nowrap">
+              \${caseSt!=='completed'&&canAction?\`<button onclick="oo1OpenSchedule('\${c.id}')" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid #AFA9EC;background:#EEEDFE;color:#3C3489;cursor:pointer;font-family:inherit"><i class="ti ti-calendar" style="font-size:10px"></i> \${s?'Reschedule':'Schedule'}</button>\`:''}
+              \${s&&caseSt!=='completed'&&canAction?\` <button onclick="oo1OpenSession('\${s.id}')" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1px solid #86efac;background:#DCFCE7;color:#166534;cursor:pointer;font-family:inherit;margin-left:3px"><i class="ti ti-player-play" style="font-size:10px"></i> Session</button>\`:''}
+              \${caseSt==='completed'?'<span style="font-size:10px;color:var(--g3)">✓ Done</span>':''}
+            </td>
+          </tr>\`;
+        }).join('');
+      })()}
+      </tbody>
+    </table>
+    </div>
+  </div>`;
+}
+
+// ── PATROLLER 1-ON-1 VIEW ──
+function oo1PatrollerView(){
+  const myPat=D.patrollers.find(p=>p.user_id===D.profile?.id);
+  if(!myPat)return`<div style="padding:40px;text-align:center;color:var(--g3)">Your account is not linked to a schedule record.</div>`;
+  const sessions=(D.oo1Sessions||[]).filter(s=>s.patroller_id===myPat.id);
+  const pending=sessions.filter(s=>s.status!=='completed'&&s.status!=='closed');
+  const completed=sessions.filter(s=>s.status==='completed'||s.status==='closed');
+
+  const pendingRows=pending.sort((a,b)=>{
+    const pri={in_session:0,scheduled:1,unscheduled:2};
+    return (pri[a.status]||9)-(pri[b.status]||9);
+  }).map(s=>{
+    const c=D.oo1Cases.find(x=>x.id===s.case_id);
+    if(!c)return'';
+    const initials=(c.rider_name||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+    const phone=(c.contact_number||'').replace(/[^0-9]/g,'');
+    const ackPending=s.ack_token&&!['acknowledged','refused'].includes(s.ack_outcome||'');
+    const ackDone=s.ack_outcome==='acknowledged';
+    const ackRefused=s.ack_outcome==='refused';
+    return`<div style="background:#fff;border:0.5px solid var(--g2);border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="width:36px;height:36px;border-radius:50%;background:#534AB7;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0">${initials}</div>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:13px">${c.rider_name||'—'}</div>
+          <div style="font-size:11px;color:var(--g3)">${c.rider_id||''} · ${c.supplier||''}</div>
+        </div>
+        <div style="display:flex;gap:5px">
+          ${phone?`<a href="tel:${phone}" style="font-size:11px;color:#0C447C;background:#E6F1FB;padding:4px 8px;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-phone" style="font-size:12px"></i> Call</a>`:''}
+          ${phone?`<a href="https://wa.me/${phone}" target="_blank" style="font-size:11px;color:#075E54;background:#DCFCE7;padding:4px 8px;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:3px"><i class="ti ti-brand-whatsapp" style="font-size:12px"></i> WA</a>`:''}
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--g3);margin-bottom:8px">${c.violation_type||'—'} · ${c.violation_date||'—'}</div>
+      ${s.session_date?`<div style="font-size:11px;color:#0C447C;background:#E6F1FB;padding:4px 8px;border-radius:6px;display:inline-block;margin-bottom:8px">📅 ${s.session_date} ${s.session_time?s.session_time.slice(0,5):''}</div>`:''}
+      ${ackDone?`<div style="background:#DCFCE7;border-radius:7px;padding:6px 10px;font-size:11px;color:#166534;margin-bottom:8px">✅ Rider acknowledged</div>`:''}
+      ${ackRefused?`<div style="background:#FEE2E2;border-radius:7px;padding:6px 10px;font-size:11px;color:#991B1B;margin-bottom:8px">❌ Rider refused to acknowledge</div>`:''}
+      ${ackPending?`<div style="background:#FEF3C7;border-radius:7px;padding:6px 10px;font-size:11px;color:#633806;margin-bottom:8px">⏳ Awaiting rider acknowledgement (link sent)</div>`:''}
+      <button onclick="oo1OpenSession('${s.id}')" style="width:100%;padding:9px;background:#534AB7;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px"><i class="ti ti-player-play" style="font-size:13px"></i> ${s.status==='in_session'?'Continue session':'Start session'}</button>
+    </div>`;
+  }).join('');
+
+  return`
+  <div style="background:#1C1033;border-radius:12px;padding:13px 16px;margin-bottom:10px;color:#fff;position:relative;overflow:hidden">
+    <div style="position:absolute;inset:0;background:repeating-linear-gradient(55deg,transparent,transparent 14px,rgba(255,255,255,.022) 14px,rgba(255,255,255,.022) 15px);pointer-events:none"></div>
+    <div style="position:relative;z-index:1">
+      <div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.5;margin-bottom:9px">1 on 1 Coaching · My sessions</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Pending</div><div style="font-size:24px;font-weight:500;color:#FCD34D">${pending.length}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Completed</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${completed.length}</div></div>
+        <div style="background:rgba(255,255,255,.1);border-radius:9px;padding:10px 8px;text-align:center"><div style="font-size:8px;opacity:.5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Ack rate</div><div style="font-size:24px;font-weight:500;color:#4ADE80">${sessions.filter(s=>s.rider_attended).length?Math.round(sessions.filter(s=>s.ack_outcome==='acknowledged').length/sessions.filter(s=>s.rider_attended).length*100)+'%':'—'}</div></div>
+      </div>
+    </div>
+  </div>
+  ${pending.length?`<div style="margin-bottom:8px;font-size:11px;font-weight:700;color:var(--g3);text-transform:uppercase;letter-spacing:.05em">Pending sessions (${pending.length})</div>${pendingRows}`:`<div style="padding:30px;text-align:center;color:var(--g3)">No pending sessions assigned to you.</div>`}`;
+}
+
+// ── MODAL: SCHEDULE SESSION ──
+// handled in renderModal below
+
+// ── MODAL: CONDUCT SESSION ──
+// handled in renderModal below
 
 // ── OVERTIME VIEW ──
 function overtimeView(){
