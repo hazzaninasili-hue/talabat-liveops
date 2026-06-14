@@ -3442,12 +3442,17 @@ async function doClockIn(){
     const adjEndTime=adjEndMins!==null?`${String(Math.floor(adjEndMins/60)%24).padStart(2,'0')}:${String(adjEndMins%60).padStart(2,'0')}`:null;
     const clockInTimeStr=`${String(bhrNow.getUTCHours()).padStart(2,'0')}:${String(bhrNow.getUTCMinutes()).padStart(2,'0')}`;
 
-    const{data,error}=await sb.from('attendance').upsert({
+    // If late: do NOT modify adj_end_time or late_mins yet — wait for approval decision
+    // If on time: write normally
+    const upsertPayload={
       patroller_id:pat.id,patroller_name:pat.name,date:today,
       clock_in:nowIso,clock_in_lat:loc.lat,clock_in_lng:loc.lng,clock_in_map:mapUrl,
-      late_mins:lateMins,adj_end_time:adjEndTime,
-      status:'Attended',updated_at:nowIso
-    },{onConflict:'patroller_id,date'}).select().single();
+      status:'Attended',updated_at:nowIso,
+      // Only write late_mins now if on time (0) — late value is set after approval
+      late_mins:lateMins>0?0:0,
+      adj_end_time:null // never pre-modify end time — approval/rejection sets this
+    };
+    const{data,error}=await sb.from('attendance').upsert(upsertPayload,{onConflict:'patroller_id,date'}).select().single();
     if(error)throw error;
     // Log location for live map
     sb.from('location_log').insert({patroller_id:pat.id,patroller_name:pat.name,lat:loc.lat,lng:loc.lng,map_url:mapUrl,accuracy:Math.round(loc.accuracy||0),logged_at:nowIso,date:today,type:'clock_in'}).then(()=>{});
@@ -3465,7 +3470,7 @@ async function doClockIn(){
     if(lateMins>0&&sh){
       const lH=Math.floor(lateMins/60);const lM=lateMins%60;
       const lLabel=lH>0?`${lH}h ${lM}m`:`${lM}m`;
-      addNotification(`⚠️ You clocked in ${lLabel} late — please submit a reason below`,'warning',{
+      addNotification(`⚠️ You clocked in ${lLabel} late — please submit your reason. Shift end pending approval.`,'warning',{
         title:`⏰ Late Clock-In — ${lLabel}`,tag:'late-warn',requireInteraction:true
       });
       // Broadcast to ALL admin + lead devices immediately
@@ -3680,9 +3685,14 @@ function myAttendanceView(){
     </div>`;
   } else if(rec.clock_in&&!rec.clock_out){
     const inTime=new Date(rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
-    // Check if there's a pending early clock-out request for this patroller today
+    // Check for pending early clock-out
     const _myEarlyTask=(D.tasks||[]).find(t=>t.patroller_id===pat.id&&t.date===today&&t.task_type==='Early Clock Out'&&t.status==='Pending');
     const _myRejTask=(D.tasks||[]).find(t=>t.patroller_id===pat.id&&t.date===today&&t.task_type==='Early Clock Out'&&t.status==='Rejected');
+    // Check for late clock-in request status
+    const _myLateTask=(D.tasks||[]).find(t=>t.patroller_id===pat.id&&t.date===today&&t.task_type==='Late Clock In');
+    const _latePending=_myLateTask?.status==='Pending';
+    const _lateApproved=_myLateTask?.status==='Approved';
+    const _lateRejected=_myLateTask?.status==='Rejected';
     const _earlyReason=(_myEarlyTask?.description||'').replace(/Early clock out request\.\s*Reason:\s*/i,'').split('. Att')[0].replace(/\.\s*Location:.*$/i,'').trim();
     const _earlyLocMatch=(_myEarlyTask?.description||'').match(/Location: (https:\/\/[^\s]+)/i);
     const _earlyLoc=_earlyLocMatch?_earlyLocMatch[1]:'';
@@ -3705,7 +3715,10 @@ function myAttendanceView(){
         <div style="font-size:13px;opacity:.7;margin-bottom:6px">CLOCKED IN AT ${inTime}</div>
         <div style="font-size:16px;font-weight:600;margin-bottom:4px">${zone}</div>
         ${rec.clock_in_map?`<div style="margin-bottom:6px"><a href="${rec.clock_in_map}" target="_blank" style="color:#86efac;font-size:11px"><i class="ti ti-map-pin" style="font-size:11px"></i> View clock-in location</a></div>`:''}
-        <div style="font-size:12px;opacity:.6;margin-bottom:20px">Shift: ${sh?`${fmtT(sh.start_time)} - ${fmtT(sh.end_time)}`:''}</div>
+        <div style="font-size:12px;opacity:.6;margin-bottom:12px">Shift: ${sh?`${fmtT(sh.start_time)} - ${fmtT(sh.end_time)}`:''}</div>
+        ${_latePending?`<div style="background:rgba(251,191,36,.2);border:1px solid rgba(251,191,36,.4);border-radius:8px;padding:10px 12px;font-size:12px;color:#FCD34D;margin-bottom:14px;text-align:left"><i class="ti ti-clock-exclamation" style="font-size:14px"></i> <strong>Late clock-in request pending</strong><br><span style="font-size:11px;opacity:.8">Awaiting TL / Admin review. Shift end will be confirmed after decision.</span></div>`:''}
+        ${_lateApproved?`<div style="background:rgba(22,163,74,.2);border:1px solid rgba(22,163,74,.4);border-radius:8px;padding:10px 12px;font-size:12px;color:#4ADE80;margin-bottom:14px;text-align:left"><i class="ti ti-check" style="font-size:14px"></i> <strong>Late request approved</strong> — your shift end time is unchanged.</div>`:''}
+        ${_lateRejected?`<div style="background:rgba(220,38,38,.2);border:1px solid rgba(220,38,38,.4);border-radius:8px;padding:10px 12px;font-size:12px;color:#FCA5A5;margin-bottom:14px;text-align:left"><i class="ti ti-x" style="font-size:14px"></i> <strong>Late request rejected</strong> — your late arrival has been recorded.</div>`:''}
         ${_myRejTask?`<div style="background:rgba(220,38,38,.25);border-radius:8px;padding:8px 12px;font-size:12px;color:#FCA5A5;margin-bottom:14px"><i class="ti ti-x"></i> Early clock-out request was rejected — please complete your shift.</div>`:''}
         <button id="clock-out-btn" onclick="doClockOut()" style="background:#FF5900;color:#fff;border:none;padding:14px 36px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px" onmouseover="this.style.background='#D94D00'" onmouseout="this.style.background='#FF5900'">
           <i class="ti ti-clock-stop" style="font-size:18px"></i> Clock Out
@@ -5094,25 +5107,27 @@ async function submitLateClockInRequest(){
 async function approveLateClockIn(taskId){
   const t=D.tasks.find(x=>x.id===taskId);
   if(!t)return;
-  // Approved: shift end stays original — extract from description
+  // APPROVED: clock_in time stays. Shift end stays at ORIGINAL (no adj needed). late_mins=0 (excused).
   const origEndMatch=(t.description||'').match(/Orig end: ([0-9]{2}:[0-9]{2})/);
   const origEnd=origEndMatch?origEndMatch[1]:null;
-  const attIdMatch=(t.description||'').match(/Att ID: ([0-9a-f-]{32,36})/i);
+  const attIdMatch=(t.description||'').match(/Att ID: ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})/i);
   const attId=attIdMatch?attIdMatch[1]:null;
   const now=new Date().toISOString();
-  if(attId&&origEnd){
-    await sb.from('attendance').update({adj_end_time:origEnd,late_request_status:'Approved',status:'Attended'}).eq('id',attId);
+  // Set adj_end_time = original shift end (keeps original schedule), late_mins = 0 (excused)
+  const updatePayload={late_request_status:'Approved',late_mins:0,status:'Attended'};
+  if(origEnd)updatePayload.adj_end_time=origEnd; // restore to original shift end
+  if(attId){
+    await sb.from('attendance').update(updatePayload).eq('id',attId);
   } else if(t.patroller_id&&t.date){
-    await sb.from('attendance').update({late_request_status:'Approved'}).eq('patroller_id',t.patroller_id).eq('date',t.date);
+    await sb.from('attendance').update(updatePayload).eq('patroller_id',t.patroller_id).eq('date',t.date);
   }
   await sb.from('task_requests').update({status:'Approved',reviewed_by:D.profile.id,updated_at:now}).eq('id',taskId);
   await reload();
-  addNotification('Late clock-in approved — shift end unchanged','success',{
+  addNotification(`Late clock-in approved — ${t.patroller_name||'Patroller'} shift end unchanged`,'success',{
     title:'✅ Late Request Approved',tag:'late-approved',requireInteraction:true
   });
-  // Broadcast to the specific patroller
   if(t?.patroller_id){
-    broadcastNotify('✅ Your late clock-in request was approved — shift end unchanged','success',{
+    broadcastNotify('✅ Your late clock-in request was approved — your shift end time is unchanged','success',{
       title:'✅ Late Request Approved',tag:'late-approved-pat',requireInteraction:true,
       targetPatrollerId:t.patroller_id,targets:[]
     });
@@ -5122,28 +5137,42 @@ async function approveLateClockIn(taskId){
 async function rejectLateClockIn(taskId){
   const t=D.tasks.find(x=>x.id===taskId);
   if(!t)return;
-  // Rejected: overwrite start time with actual clock-in; keep adj_end_time (shorter shift)
+  // REJECTED: shift end moves proportionally (late minutes lost from shift duration)
+  // adj_end_time = original end — because clock-in was late, shift is effectively shorter.
+  // late_mins = actual late minutes (recorded as penalty)
   const adjEndMatch=(t.description||'').match(/Adj end: ([0-9]{2}:[0-9]{2})/);
   const adjEnd=adjEndMatch?adjEndMatch[1]:null;
-  const attIdMatch=(t.description||'').match(/Att ID: ([0-9a-f-]{32,36})/i);
+  const attIdMatch=(t.description||'').match(/Att ID: ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})/i);
   const attId=attIdMatch?attIdMatch[1]:null;
+  // Extract late_mins from description
+  const lateMinsMatch=(t.description||'').match(/Late clock-in request.*?Att ID/i);
+  // Extract from start_time vs origEnd
+  const origEndMatch=(t.description||'').match(/Orig end: ([0-9]{2}:[0-9]{2})/);
+  const origEnd=origEndMatch?origEndMatch[1]:null;
+  // Calc late_mins: difference between actual clock-in (t.start_time) and scheduled start
+  // We store actual latemins in adj end: scheduled_end + late = adjEnd, so late = adjEnd_mins - origEnd_mins
+  let lateMins=0;
+  if(adjEnd&&origEnd){
+    const toMins=s=>{const[h,m]=s.split(':').map(Number);return h*60+m;};
+    lateMins=Math.max(0,toMins(adjEnd)-toMins(origEnd));
+  }
   const now=new Date().toISOString();
+  // Set adj_end_time to the ORIGINAL end (shift is shorter because they arrived late — no extension)
+  // And record the actual late_mins as penalty
+  const updateObj={late_request_status:'Rejected',late_mins:lateMins};
+  if(origEnd)updateObj.adj_end_time=origEnd; // end stays at original — late minutes are deducted from start
   if(attId){
-    const updateObj={late_request_status:'Rejected'};
-    if(adjEnd)updateObj.adj_end_time=adjEnd;
     await sb.from('attendance').update(updateObj).eq('id',attId);
   } else if(t.patroller_id&&t.date){
-    const updateObj={late_request_status:'Rejected'};
-    if(adjEnd)updateObj.adj_end_time=adjEnd;
     await sb.from('attendance').update(updateObj).eq('patroller_id',t.patroller_id).eq('date',t.date);
   }
   await sb.from('task_requests').update({status:'Rejected',reviewed_by:D.profile.id,updated_at:now}).eq('id',taskId);
   await reload();
-  addNotification('Late clock-in rejected — schedule adjusted to actual clock-in time','warning',{
+  addNotification(`Late clock-in rejected — ${t.patroller_name||'Patroller'} shift recorded from actual clock-in time`,'warning',{
     title:'❌ Late Request Rejected',tag:'late-rejected',requireInteraction:true
   });
   if(t?.patroller_id){
-    broadcastNotify('❌ Your late clock-in request was rejected — schedule adjusted to actual clock-in time','warning',{
+    broadcastNotify('❌ Your late clock-in request was rejected — your late arrival has been recorded','warning',{
       title:'❌ Late Request Rejected',tag:'late-reject-pat',requireInteraction:true,
       targetPatrollerId:t.patroller_id,targets:[]
     });
