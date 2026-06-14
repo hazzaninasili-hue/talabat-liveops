@@ -1093,22 +1093,39 @@ function dateView(){
         if(ps){
           if(ps.status==='clocked_in'){
             const inT=new Date(ps.rec.clock_in).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bahrain'});
-            // calc expected end = clock_in + shift duration
+            const _lateApproved=ps.lateReqStatus==='Approved';
+            const _latePending=ps.lateReqStatus==='Pending';
+            const _lateRejected=ps.lateReqStatus==='Rejected';
+            // Calc late minutes from actual clock-in vs planned start
+            const[cih,cim]=inT.split(':').map(Number);
+            const shStartMins=sh?((parseInt(sh.start_time)||0)*60+(parseInt((sh.start_time||'').split(':')[1])||0)):null;
+            const actualClockInMins=cih*60+cim;
+            const rawLateM=shStartMins!==null?Math.max(0,actualClockInMins-shStartMins):0;
+            const lateH=Math.floor(rawLateM/60);const lateM2=rawLateM%60;
+            const lateLabel=lateH>0?`${lateH}h ${lateM2}m`:`${lateM2}m`;
+            const isEarly=shStartMins!==null&&actualClockInMins<shStartMins;
+            // For approved: use planned end. For others: show actual clock-in + planned duration
             let expEnd='';
             if(sh&&sh.start_time&&sh.end_time){
-              const[psh,psm]=sh.start_time.split(':').map(Number);
-              const[peh,pem]=sh.end_time.split(':').map(Number);
-              let pSM=psh*60+psm;let pEM=peh*60+pem;if(pEM<=pSM)pEM+=24*60;
-              const dur=pEM-pSM;
-              const[ih,im]=inT.split(':').map(Number);
-              const actualEndM=ih*60+im+dur;
-              expEnd=`${String(Math.floor(actualEndM/60)%24).padStart(2,'0')}:${String(actualEndM%60).padStart(2,'0')}`;
+              if(_lateApproved){
+                expEnd=sh.end_time; // original end unchanged
+              } else {
+                const[psh,psm]=sh.start_time.split(':').map(Number);
+                const[peh,pem]=sh.end_time.split(':').map(Number);
+                let pSM=psh*60+psm;let pEM=peh*60+pem;if(pEM<=pSM)pEM+=24*60;
+                const dur=pEM-pSM;
+                const actualEndM=actualClockInMins+dur;
+                expEnd=`${String(Math.floor(actualEndM/60)%24).padStart(2,'0')}:${String(actualEndM%60).padStart(2,'0')}`;
+              }
             }
-            const isEarly=sh&&ps.rec.clock_in&&(()=>{const[ih,im]=inT.split(':').map(Number);const[psh,psm]=sh.start_time.split(':').map(Number);return(ih*60+im)<(psh*60+psm);})();
-            attBadge=`<div style="margin-top:2px;display:flex;gap:3px;flex-wrap:wrap">
+            attBadge=`<div style="margin-top:2px;display:flex;gap:3px;flex-wrap:wrap;align-items:center">
               <span style="font-size:9px;font-weight:700;background:#DCFCE7;color:#166534;padding:1px 5px;border-radius:4px">🟢 In ${inT}</span>
-              ${expEnd?`<span style="font-size:9px;color:#16A34A;padding:1px 4px;border-radius:4px;background:#F0FDF4">→${fmtT(expEnd)}</span>`:''}
+              ${expEnd&&!_lateApproved&&!_latePending?`<span style="font-size:9px;color:#16A34A;padding:1px 4px;border-radius:4px;background:#F0FDF4">→${fmtT(expEnd)}</span>`:''}
               ${isEarly?`<span style="font-size:9px;font-weight:700;background:#EDE9FE;color:#7C3AED;padding:1px 5px;border-radius:4px">⚡ Early</span>`:''}
+              ${_lateApproved?`<span style="font-size:9px;font-weight:700;background:#DCFCE7;color:#166534;padding:1px 5px;border-radius:4px;border:1px solid #86efac">✅ Late approved</span>`:''}
+              ${_latePending?`<span style="font-size:9px;font-weight:700;background:#FEF3C7;color:#B45309;padding:1px 5px;border-radius:4px;animation:pulse 2s infinite">⏳ Late pending</span>`:''}
+              ${_lateRejected?`<span style="font-size:9px;font-weight:700;background:#FEE2E2;color:#991B1B;padding:1px 5px;border-radius:4px">❌ Late ${lateLabel}</span>`:''}
+              ${rawLateM>0&&!_lateApproved&&!_latePending&&!_lateRejected?`<span style="font-size:9px;font-weight:700;background:#FEF3C7;color:#B45309;padding:1px 5px;border-radius:4px">⚠ ${lateLabel} late</span>`:''}
             </div>`;
           } else if(ps.status==='late'){
             const h=Math.floor(ps.lateMins/60);const m=ps.lateMins%60;
